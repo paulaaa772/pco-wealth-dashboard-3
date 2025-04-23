@@ -1,21 +1,22 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import dynamic from 'next/dynamic'
-
-const TradingView = dynamic(() =>
-  import('lightweight-charts').then(mod => mod.createChart)
-)
 
 export default function TradingChart() {
   const chartRef = useRef<HTMLDivElement>(null)
   const [data, setData] = useState<any[]>([])
 
   useEffect(() => {
-    setData([
-      { time: '2023-01-01', open: 100, high: 110, low: 95, close: 105 },
-      { time: '2023-01-02', open: 105, high: 115, low: 100, close: 110 }
-    ])
+    const fetchCandles = async () => {
+      try {
+        const res = await fetch(`/api/polygon/candles?symbol=AAPL`)
+        const candles = await res.json()
+        setData(candles)
+      } catch (err) {
+        console.error('Failed to load candles:', err)
+      }
+    }
+    fetchCandles()
   }, [])
 
   useEffect(() => {
@@ -39,8 +40,7 @@ export default function TradingChart() {
         wickDownColor: '#ef5350'
       })
 
-      const safeData = Array.isArray(data) ? data : []
-      candleSeries.setData(safeData)
+      candleSeries.setData(Array.isArray(data) ? data : [])
 
       const handleResize = () => {
         if (chartRef.current) {
@@ -58,6 +58,9 @@ export default function TradingChart() {
   }, [data])
 
   return (
-    <div ref={chartRef} className="w-full h-[400px]" />
+    <div>
+      <h2 className="text-md font-semibold">Live Chart</h2>
+      <div ref={chartRef} className="w-full h-[400px] border" />
+    </div>
   )
 }
