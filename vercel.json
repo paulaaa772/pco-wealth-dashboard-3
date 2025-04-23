@@ -1,7 +1,4 @@
 {
   "version": 2,
-  "public": false,
-  "env": {
-    "POLYGON_API_KEY": "@polygon-api-key"
-  }
+  "public": false
 }
