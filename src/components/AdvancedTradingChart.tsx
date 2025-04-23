@@ -1,60 +1,43 @@
 'use client'
-import { useEffect, useRef } from 'react'
-import { createChart, ColorType, CrosshairMode } from 'lightweight-charts'
 
-export default function AdvancedTradingChart({ data }) {
-  const chartRef = useRef(null)
-  const chartCreated = useRef(null)
+import { useEffect, useRef } from 'react'
+import {
+  createChart,
+  ColorType,
+  CrosshairMode,
+  CandlestickData
+} from 'lightweight-charts'
+
+type Props = {
+  data: CandlestickData[]
+}
+
+export default function AdvancedTradingChart({ data }: Props) {
+  const chartRef = useRef<HTMLDivElement>(null)
+  const chartCreated = useRef<any>(null)
 
   useEffect(() => {
-    if (!chartRef.current || !data.length) return
+    if (!chartRef.current || chartCreated.current) return
 
     const chart = createChart(chartRef.current, {
+      height: 300,
       layout: {
-        background: { type: ColorType.Solid, color: '#ffffff' },
-        textColor: '#333',
-      },
-      width: chartRef.current.clientWidth,
-      height: 500,
-      crosshair: {
-        mode: CrosshairMode.Normal,
+        background: { color: '#ffffff' },
+        textColor: '#333'
       },
       grid: {
-        vertLines: { color: '#f0f0f0' },
-        horzLines: { color: '#f0f0f0' },
+        vertLines: { color: '#eee' },
+        horzLines: { color: '#eee' }
       },
+      crosshair: {
+        mode: CrosshairMode.Normal
+      }
     })
 
-    const candleSeries = chart.addCandlestickSeries({
-      upColor: '#26a69a',
-      downColor: '#ef5350',
-      borderVisible: false,
-      wickUpColor: '#26a69a',
-      wickDownColor: '#ef5350',
-    })
-
-    candleSeries.setData(data)
-
-    // Add volume indicator
-    const volumeSeries = chart.addHistogramSeries({
-      color: '#26a69a80',
-      priceFormat: {
-        type: 'volume',
-      },
-      priceScaleId: '',
-    })
-    volumeSeries.setData(data.map(d => ({
-      time: d.time,
-      value: d.volume,
-      color: d.close >= d.open ? '#26a69a80' : '#ef535080'
-    })))
-
-    chartCreated.current = chart
-
-    return () => {
-      chart.remove()
-    }
+    const series = chart.addCandlestickSeries()
+    series.setData(data)
+    chartCreated.current = true
   }, [data])
 
-  return <div ref={chartRef} className="w-full h-[500px]" />
+  return <div ref={chartRef} className="w-full border rounded" />
 }
