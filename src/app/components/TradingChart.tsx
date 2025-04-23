@@ -1,54 +1,37 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import { createChart } from 'lightweight-charts'
 
 export default function TradingChart() {
   const chartRef = useRef<HTMLDivElement | null>(null)
-  const [symbol, setSymbol] = useState('AAPL')
-  const [candles, setCandles] = useState([])
 
   useEffect(() => {
-    const fetchCandles = async () => {
-      const res = await fetch(`/api/polygon/candles?symbol=${symbol}`)
-      const data = await res.json()
-      console.log('Fetched candles:', data)
-      setCandles(data)
-    }
-    fetchCandles()
-  }, [symbol])
-
-  useEffect(() => {
-    if (!chartRef.current || candles.length === 0) return
+    if (!chartRef.current) return
 
     const chart = createChart(chartRef.current, {
       width: chartRef.current.clientWidth,
       height: 400,
-      layout: { textColor: '#333', background: { color: '#ffffff' } },
+      layout: {
+        background: { color: '#ffffff' },
+        textColor: '#333',
+      },
+      grid: {
+        vertLines: { color: '#eee' },
+        horzLines: { color: '#eee' },
+      },
     })
 
     const candleSeries = chart.addCandlestickSeries()
-    candleSeries.setData(candles)
+    candleSeries.setData([
+      { time: '2023-01-01', open: 100, high: 110, low: 95, close: 105 },
+      { time: '2023-01-02', open: 105, high: 115, low: 100, close: 110 }
+    ])
 
     return () => chart.remove()
-  }, [candles])
+  }, [])
 
   return (
-    <div className="space-y-4">
-      <select
-        className="border px-2 py-1 text-sm"
-        value={symbol}
-        onChange={(e) => setSymbol(e.target.value)}
-      >
-        <option value="AAPL">AAPL</option>
-        <option value="MSFT">MSFT</option>
-        <option value="TSLA">TSLA</option>
-        <option value="NVDA">NVDA</option>
-        <option value="BTC-USD">BTC</option>
-        <option value="ETH-USD">ETH</option>
-      </select>
-
-      <div ref={chartRef} className="w-full h-[400px] border" />
-    </div>
+    <div className="border w-full h-[400px]" ref={chartRef} />
   )
 }
