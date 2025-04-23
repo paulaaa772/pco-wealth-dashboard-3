@@ -1,22 +1,21 @@
-'use client'
-
 import { create } from 'zustand'
 
 type Trade = {
   type: 'BUY' | 'SELL'
-  ticker: string
-  price: number
-  timestamp: Date
+  name: string
+  detail: string
+  time: string
 }
 
-interface AITradeState {
+type AITradeState = {
   trades: Trade[]
-  addTrade: (trade: Omit<Trade, 'timestamp'>) => void
+  add: (trade: Trade) => void
 }
 
 export const useAITradeStore = create<AITradeState>((set) => ({
   trades: [],
-  addTrade: (trade) => set((state) => ({
-    trades: [...state.trades, { ...trade, timestamp: new Date() }]
-  }))
+  add: (trade) =>
+    set((state) => ({
+      trades: [trade, ...state.trades.slice(0, 9)]
+    }))
 }))
