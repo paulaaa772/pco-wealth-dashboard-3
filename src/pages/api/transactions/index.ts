@@ -1,5 +1,5 @@
 import { NextApiRequest, NextApiResponse } from 'next'
-import connectDB from '../../../lib/mongo'
+import { connectDB } from '../../../lib/mongo'
 import Transaction from '../../../models/Transaction'
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
