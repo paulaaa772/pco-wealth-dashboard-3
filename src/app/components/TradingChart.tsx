@@ -12,6 +12,7 @@ export default function TradingChart() {
     const fetchCandles = async () => {
       const res = await fetch(`/api/polygon/candles?symbol=${symbol}`)
       const data = await res.json()
+      console.log('Fetched candles:', data)
       setCandles(data)
     }
     fetchCandles()
