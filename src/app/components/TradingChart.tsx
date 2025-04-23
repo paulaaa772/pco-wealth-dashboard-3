@@ -1,65 +1,52 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { createChart } from 'lightweight-charts'
 
 export default function TradingChart() {
-  const chartRef = useRef<HTMLDivElement>(null)
-  const [data, setData] = useState<any[]>([])
+  const chartRef = useRef<HTMLDivElement | null>(null)
+  const [symbol, setSymbol] = useState('AAPL')
+  const [candles, setCandles] = useState([])
 
   useEffect(() => {
     const fetchCandles = async () => {
-      try {
-        const res = await fetch(`/api/polygon/candles?symbol=AAPL`)
-        const candles = await res.json()
-        setData(candles)
-      } catch (err) {
-        console.error('Failed to load candles:', err)
-      }
+      const res = await fetch(`/api/polygon/candles?symbol=${symbol}`)
+      const data = await res.json()
+      setCandles(data)
     }
     fetchCandles()
-  }, [])
+  }, [symbol])
 
   useEffect(() => {
-    if (!chartRef.current || !data.length) return
+    if (!chartRef.current || candles.length === 0) return
 
-    import('lightweight-charts').then(({ createChart }) => {
-      const chart = createChart(chartRef.current!, {
-        width: chartRef.current!.clientWidth,
-        height: 400,
-        layout: {
-          background: { color: '#ffffff' },
-          textColor: '#333333'
-        }
-      })
-
-      const candleSeries = chart.addCandlestickSeries({
-        upColor: '#26a69a',
-        downColor: '#ef5350',
-        borderVisible: false,
-        wickUpColor: '#26a69a',
-        wickDownColor: '#ef5350'
-      })
-
-      candleSeries.setData(Array.isArray(data) ? data : [])
-
-      const handleResize = () => {
-        if (chartRef.current) {
-          chart.applyOptions({ width: chartRef.current.clientWidth })
-        }
-      }
-
-      window.addEventListener('resize', handleResize)
-
-      return () => {
-        window.removeEventListener('resize', handleResize)
-        chart.remove()
-      }
+    const chart = createChart(chartRef.current, {
+      width: chartRef.current.clientWidth,
+      height: 400,
+      layout: { textColor: '#333', background: { color: '#ffffff' } },
     })
-  }, [data])
+
+    const candleSeries = chart.addCandlestickSeries()
+    candleSeries.setData(candles)
+
+    return () => chart.remove()
+  }, [candles])
 
   return (
-    <div>
-      <h2 className="text-md font-semibold">Live Chart</h2>
+    <div className="space-y-4">
+      <select
+        className="border px-2 py-1 text-sm"
+        value={symbol}
+        onChange={(e) => setSymbol(e.target.value)}
+      >
+        <option value="AAPL">AAPL</option>
+        <option value="MSFT">MSFT</option>
+        <option value="TSLA">TSLA</option>
+        <option value="NVDA">NVDA</option>
+        <option value="BTC-USD">BTC</option>
+        <option value="ETH-USD">ETH</option>
+      </select>
+
       <div ref={chartRef} className="w-full h-[400px] border" />
     </div>
   )
