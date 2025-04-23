@@ -76,7 +76,7 @@ export default function TradingChart() {
     <div className="mt-6">
       <div ref={chartRef} className="w-full border h-[400px]" />
       <IndicatorSelector
-        onSelect={(name) => setIndicators((prev) => [...prev, name])}
+        onChange={(names) => setIndicators(names)}
       />
     </div>
   )
