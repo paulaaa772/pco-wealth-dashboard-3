@@ -9,21 +9,23 @@ type PolygonCandle = {
 }
 
 export async function GET(req: NextRequest) {
-  const { searchParams } = new URL(req.url)
+  const searchParams = new URL(req.url).searchParams
   const symbol = searchParams.get('symbol') || 'AAPL'
   const timespan = 'minute'
   const multiplier = 5
   const limit = 100
   const today = new Date().toISOString().split('T')[0]
 
-  const url = `https://api.polygon.io/v2/aggs/ticker/${symbol}/range/${multiplier}/${timespan}/${today}/${today}?limit=${limit}&apiKey=${process.env.POLYGON_API_KEY}`
+  const url = `https://api.polygon.io/v2/aggs/ticker/${symbol}/range/${multiplier}/${timespan}/${today}/${today}?adjusted=true&sort=asc&limit=${limit}&apiKey=${process.env.POLYGON_API_KEY}`
 
   try {
     const response = await fetch(url)
     const data = await response.json()
 
     if (!data.results || !Array.isArray(data.results)) {
-      return new Response(JSON.stringify({ error: 'No data returned' }), { status: 500 })
+      return new Response(JSON.stringify({ error: 'No data returned' }), {
+        status: 500
+      })
     }
 
     const formatted = data.results.map((d: PolygonCandle) => ({
@@ -40,8 +42,7 @@ export async function GET(req: NextRequest) {
     })
   } catch (err) {
     return new Response(JSON.stringify({ error: 'Failed to fetch data' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' }
+      status: 500
     })
   }
 }

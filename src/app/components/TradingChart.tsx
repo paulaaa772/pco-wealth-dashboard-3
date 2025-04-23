@@ -1,68 +1,63 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { createChart } from 'lightweight-charts'
+import dynamic from 'next/dynamic'
 
-type Candle = {
-  time: number
-  open: number
-  high: number
-  low: number
-  close: number
-}
+const TradingView = dynamic(() =>
+  import('lightweight-charts').then(mod => mod.createChart)
+)
 
 export default function TradingChart() {
   const chartRef = useRef<HTMLDivElement>(null)
-  const seriesRef = useRef<any>(null)
-  const [symbol, setSymbol] = useState('AAPL')
-  const [data, setData] = useState<Candle[]>([])
+  const [data, setData] = useState<any[]>([])
 
   useEffect(() => {
-    if (!chartRef.current) return
-
-    const chart = createChart(chartRef.current, {
-      width: chartRef.current.clientWidth,
-      height: 400,
-      layout: { background: { color: '#fff' }, textColor: '#333' },
-      grid: { vertLines: { color: '#eee' }, horzLines: { color: '#eee' } },
-      crosshair: { mode: 0 }
-    })
-
-    const candlestickSeries = chart.addCandlestickSeries()
-    seriesRef.current = candlestickSeries
-
-    return () => chart.remove()
+    setData([
+      { time: '2023-01-01', open: 100, high: 110, low: 95, close: 105 },
+      { time: '2023-01-02', open: 105, high: 115, low: 100, close: 110 }
+    ])
   }, [])
 
   useEffect(() => {
-    if (!seriesRef.current) return
+    if (!chartRef.current || !data.length) return
 
-    const fetchData = async () => {
-      const res = await fetch(`/api/polygon/candles?symbol=${symbol}`)
-      const candles = await res.json()
-      setData(candles)
-      seriesRef.current.setData(candles)
-    }
+    import('lightweight-charts').then(({ createChart }) => {
+      const chart = createChart(chartRef.current!, {
+        width: chartRef.current!.clientWidth,
+        height: 400,
+        layout: {
+          background: { color: '#ffffff' },
+          textColor: '#333333'
+        }
+      })
 
-    fetchData()
-    const interval = setInterval(fetchData, 10000)
-    return () => clearInterval(interval)
-  }, [symbol])
+      const candleSeries = chart.addCandlestickSeries({
+        upColor: '#26a69a',
+        downColor: '#ef5350',
+        borderVisible: false,
+        wickUpColor: '#26a69a',
+        wickDownColor: '#ef5350'
+      })
+
+      const safeData = Array.isArray(data) ? data : []
+      candleSeries.setData(safeData)
+
+      const handleResize = () => {
+        if (chartRef.current) {
+          chart.applyOptions({ width: chartRef.current.clientWidth })
+        }
+      }
+
+      window.addEventListener('resize', handleResize)
+
+      return () => {
+        window.removeEventListener('resize', handleResize)
+        chart.remove()
+      }
+    })
+  }, [data])
 
   return (
-    <div className="p-4">
-      <h2 className="text-md font-semibold mb-2">Live Chart</h2>
-      <select
-        className="border p-1 mb-2"
-        value={symbol}
-        onChange={(e) => setSymbol(e.target.value)}
-      >
-        <option value="AAPL">AAPL</option>
-        <option value="TSLA">TSLA</option>
-        <option value="BTC-USD">BTC</option>
-        <option value="ETH-USD">ETH</option>
-      </select>
-      <div ref={chartRef} />
-    </div>
+    <div ref={chartRef} className="w-full h-[400px]" />
   )
 }
