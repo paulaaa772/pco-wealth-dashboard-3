@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server'
 import { connectDB } from '@/lib/mongo'
-import Trade from '@/models/Trade'
+import { Trade } from '@/models/Trade'
 
 export async function POST(req: NextRequest) {
   try {
