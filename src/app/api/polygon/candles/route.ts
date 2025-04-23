@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
   const limit = 100
   const today = new Date().toISOString().split('T')[0]
 
-  const url = `https://api.polygon.io/v2/aggs/ticker/${symbol}/range/${multiplier}/${timespan}/${today}/${today}?adjusted=true&sort=asc&limit=${limit}&apiKey=${process.env.POLYGON_API_KEY}`
+  const url = `https://api.polygon.io/v2/aggs/ticker/${symbol}/range/${multiplier}/${timespan}/${today}/${today}?limit=${limit}&apiKey=${process.env.POLYGON_API_KEY}`
 
   try {
     const response = await fetch(url)
@@ -31,14 +31,17 @@ export async function GET(req: NextRequest) {
       open: d.o,
       high: d.h,
       low: d.l,
-      close: d.c,
+      close: d.c
     }))
 
     return new Response(JSON.stringify(formatted), {
       status: 200,
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json' }
     })
-  } catch {
-    return new Response(JSON.stringify({ error: 'Failed to fetch data' }), { status: 500 })
+  } catch (err) {
+    return new Response(JSON.stringify({ error: 'Failed to fetch data' }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' }
+    })
   }
 }

@@ -1,9 +1,10 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { createChart } from 'lightweight-charts'
 
 type Candle = {
-  time: string
+  time: number
   open: number
   high: number
   low: number
@@ -11,25 +12,57 @@ type Candle = {
 }
 
 export default function TradingChart() {
+  const chartRef = useRef<HTMLDivElement>(null)
+  const seriesRef = useRef<any>(null)
+  const [symbol, setSymbol] = useState('AAPL')
   const [data, setData] = useState<Candle[]>([])
 
   useEffect(() => {
-    setData([
-      { time: '2023-01-01', open: 100, high: 110, low: 95, close: 105 },
-      { time: '2023-01-02', open: 105, high: 115, low: 100, close: 110 }
-    ])
+    if (!chartRef.current) return
+
+    const chart = createChart(chartRef.current, {
+      width: chartRef.current.clientWidth,
+      height: 400,
+      layout: { background: { color: '#fff' }, textColor: '#333' },
+      grid: { vertLines: { color: '#eee' }, horzLines: { color: '#eee' } },
+      crosshair: { mode: 0 }
+    })
+
+    const candlestickSeries = chart.addCandlestickSeries()
+    seriesRef.current = candlestickSeries
+
+    return () => chart.remove()
   }, [])
 
+  useEffect(() => {
+    if (!seriesRef.current) return
+
+    const fetchData = async () => {
+      const res = await fetch(`/api/polygon/candles?symbol=${symbol}`)
+      const candles = await res.json()
+      setData(candles)
+      seriesRef.current.setData(candles)
+    }
+
+    fetchData()
+    const interval = setInterval(fetchData, 10000)
+    return () => clearInterval(interval)
+  }, [symbol])
+
   return (
-    <div className="p-4 border rounded bg-white dark:bg-zinc-900">
-      <h2 className="text-lg font-bold mb-2">Trading Chart (Test View)</h2>
-      <ul className="text-sm space-y-1">
-        {data.map((candle, i) => (
-          <li key={i}>
-            {candle.time}: O:{candle.open} H:{candle.high} L:{candle.low} C:{candle.close}
-          </li>
-        ))}
-      </ul>
+    <div className="p-4">
+      <h2 className="text-md font-semibold mb-2">Live Chart</h2>
+      <select
+        className="border p-1 mb-2"
+        value={symbol}
+        onChange={(e) => setSymbol(e.target.value)}
+      >
+        <option value="AAPL">AAPL</option>
+        <option value="TSLA">TSLA</option>
+        <option value="BTC-USD">BTC</option>
+        <option value="ETH-USD">ETH</option>
+      </select>
+      <div ref={chartRef} />
     </div>
   )
 }

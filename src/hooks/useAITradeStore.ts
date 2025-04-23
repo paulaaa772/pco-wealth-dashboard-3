@@ -16,6 +16,6 @@ export const useAITradeStore = create<AITradeState>((set) => ({
   trades: [],
   add: (trade) =>
     set((state) => ({
-      trades: [trade, ...state.trades.slice(0, 9)]
+      trades: [trade, ...state.trades.slice(0, 10)]
     }))
 }))
