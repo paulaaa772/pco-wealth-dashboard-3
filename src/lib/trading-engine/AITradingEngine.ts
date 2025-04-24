@@ -501,9 +501,24 @@ export class AITradingEngine {
   }
 
   calculatePositionSize(price: number, risk: number = 0.02): number {
-    // ... (logic remains the same) ...
+    const accountSize = 10000; // Simulated account size
+    const riskAmount = accountSize * risk;
+    if (price <= 0) return 0;
+    const shares = Math.floor(riskAmount / price);
+    return shares > 0 ? shares : 0; // Return 0 if shares calculation is negative/zero
   }
+  
   async executeTradeSignal(signal: TradeSignal): Promise<boolean> {
-    // ... (logic remains the same) ...
+    console.log(`Executing ${signal.direction} signal for ${signal.symbol} at $${signal.price} (Strategy: ${signal.strategy})`);
+    if (this.mode === TradingModeEnum.DEMO) {
+      console.log('Demo mode: Simulating trade execution');
+      await new Promise(resolve => setTimeout(resolve, 300));
+      return true;
+    } else {
+      console.log('Live mode: Connecting to brokerage API (Not implemented)');
+      await new Promise(resolve => setTimeout(resolve, 500));
+      console.log('Live trade simulated successfully (No actual execution)');
+      return true; // Simulate success for now
+    }
   }
 }
