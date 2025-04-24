@@ -291,6 +291,53 @@ const calculateADX = (candles: PolygonCandle[], period: number = 14): ADXResult 
     };
 };
 
+interface StochasticResult {
+    percentK: number[]; // Fast
+    percentD: number[]; // Slow (SMA of %K)
+}
+
+const calculateStochastic = (
+    candles: PolygonCandle[], 
+    kPeriod: number = 14, 
+    dPeriod: number = 3 // Smoothing for %D
+): StochasticResult | null => {
+    if (kPeriod <= 0 || dPeriod <= 0 || !candles || candles.length < kPeriod) {
+        return null;
+    }
+
+    const percentK: number[] = [];
+
+    for (let i = kPeriod - 1; i < candles.length; i++) {
+        const slice = candles.slice(i - kPeriod + 1, i + 1);
+        const lowestLow = Math.min(...slice.map(c => c.l));
+        const highestHigh = Math.max(...slice.map(c => c.h));
+        const currentClose = candles[i].c;
+
+        let kValue = 0;
+        const range = highestHigh - lowestLow;
+        if (range > 0) {
+            kValue = ((currentClose - lowestLow) / range) * 100;
+        }
+        // If range is 0, kValue remains 0, which is reasonable
+        percentK.push(kValue);
+    }
+
+    if (percentK.length < dPeriod) {
+        return null; // Not enough %K values to calculate %D
+    }
+
+    // Calculate %D (SMA of %K)
+    const percentD = calculateSMA(percentK, dPeriod);
+
+    // Align outputs (%D starts later than %K)
+    const kStartOffset = percentK.length - percentD.length;
+
+    return {
+        percentK: percentK.slice(kStartOffset),
+        percentD: percentD
+    };
+};
+
 // --- AI Trading Engine Class ---
 
 export class AITradingEngine {
@@ -311,12 +358,16 @@ export class AITradingEngine {
   private bbandsStdDev = 2;
   private adxPeriod = 14;
   private adxTrendThreshold = 25; // Example threshold for trend strength
+  private stochasticKPeriod = 14;
+  private stochasticDPeriod = 3;
+  private stochasticOverbought = 80;
+  private stochasticOversold = 20;
 
   constructor(symbol: string = 'AAPL', mode: TradingMode = TradingModeEnum.DEMO) {
     this.symbol = symbol;
     this.mode = mode;
     this.polygonService = PolygonService.getInstance();
-    console.log(`AI Engine initialized for ${symbol} (${mode}). Strategies: MA(${this.fastSMAPeriod}/${this.slowSMAPeriod}), RSI(${this.rsiPeriod}), MACD(${this.macdFast}/${this.macdSlow}/${this.macdSignal}), BBands(${this.bbandsPeriod}/${this.bbandsStdDev}), ADX(${this.adxPeriod})`);
+    console.log(`AI Engine initialized for ${symbol} (${mode}). Strategies: MA(${this.fastSMAPeriod}/${this.slowSMAPeriod}), RSI(${this.rsiPeriod}), MACD(${this.macdFast}/${this.macdSlow}/${this.macdSignal}), BBands(${this.bbandsPeriod}/${this.bbandsStdDev}), ADX(${this.adxPeriod}), Stoch(${this.stochasticKPeriod}/${this.stochasticDPeriod})`);
   }
 
   // --- Helper methods for individual strategy checks --- 
@@ -454,7 +505,8 @@ export class AITradingEngine {
           this.rsiPeriod + 1, 
           this.macdSlow + this.macdSignal, 
           this.bbandsPeriod, // BBands period needed
-          this.adxPeriod + this.adxPeriod // ADX needs period + period for smoothing DX
+          this.adxPeriod + this.adxPeriod, // ADX needs period + period for smoothing DX
+          this.stochasticKPeriod + this.stochasticDPeriod // Need K period + D smoothing for Stoch
       );
       const historyDays = historyNeeded + 40; // Ample buffer
       const endDate = new Date();
@@ -510,6 +562,38 @@ export class AITradingEngine {
             if (bbandsSignal) return bbandsSignal;
         // }
         
+        // --- Strategy 5: Stochastic Oscillator Crossover --- 
+        console.log(`[AI Engine] Checking Stochastic (${this.stochasticKPeriod}/${this.stochasticDPeriod})...`);
+        const stochResult = calculateStochastic(candles, this.stochasticKPeriod, this.stochasticDPeriod);
+        if (stochResult && stochResult.percentK.length >= 2) { // Need 2 points for crossover check
+            const k_last = stochResult.percentK[stochResult.percentK.length - 1];
+            const k_prev = stochResult.percentK[stochResult.percentK.length - 2];
+            const d_last = stochResult.percentD[stochResult.percentD.length - 1];
+            const d_prev = stochResult.percentD[stochResult.percentD.length - 2];
+            console.log(`[Stoch] Latest %K: ${k_last.toFixed(2)}, %D: ${d_last.toFixed(2)}`);
+
+            // Bullish Crossover (in oversold territory)
+            if (k_prev <= d_prev && k_last > d_last && k_prev < this.stochasticOversold && d_prev < this.stochasticOversold) {
+                const signal: TradeSignal = {
+                    symbol: targetSymbol, direction: 'buy', price: latestPrice,
+                    confidence: 0.70, timestamp: Date.now(), strategy: `Stoch (${this.stochasticKPeriod}/${this.stochasticDPeriod}) Oversold Cross`
+                };
+                console.log(`[AI Engine] Stoch signal generated:`, signal);
+                return signal;
+            }
+            
+            // Bearish Crossover (in overbought territory)
+            if (k_prev >= d_prev && k_last < d_last && k_prev > this.stochasticOverbought && d_prev > this.stochasticOverbought) {
+                const signal: TradeSignal = {
+                    symbol: targetSymbol, direction: 'sell', price: latestPrice,
+                    confidence: 0.70, timestamp: Date.now(), strategy: `Stoch (${this.stochasticKPeriod}/${this.stochasticDPeriod}) Overbought Cross`
+                };
+                console.log(`[AI Engine] Stoch signal generated:`, signal);
+                return signal;
+            }
+        }
+        console.log(`[AI Engine] No Stoch signal.`);
+
         console.log(`[AI Engine] No signals generated for ${targetSymbol}.`);
         return null;
 
