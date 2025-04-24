@@ -18,49 +18,13 @@ interface ChartDataPoint {
   close: number;
 }
 
-// Generate mock data for fallback when API fails
-const generateMockData = (symbol: string): ChartDataPoint[] => {
-  console.log('Generating mock data for', symbol);
-  const data: ChartDataPoint[] = [];
-  const basePrice = symbol === 'AAPL' ? 180 : 
-                   symbol === 'MSFT' ? 380 : 
-                   symbol === 'GOOG' ? 140 : 100;
-  
-  const today = new Date();
-  
-  for (let i = 29; i >= 0; i--) {
-    const date = new Date(today);
-    date.setDate(date.getDate() - i);
-    const dateStr = date.toISOString().split('T')[0];
-    
-    // Random price movement but trending slightly upward
-    const randomFactor = 0.98 + Math.random() * 0.04; // 0.98 to 1.02
-    const prevPrice = i === 29 ? basePrice : data[data.length - 1].close;
-    const close = prevPrice * randomFactor;
-    
-    // Daily range is roughly 1-2% of price
-    const rangePercent = 0.01 + Math.random() * 0.01;
-    const range = close * rangePercent;
-    
-    data.push({
-      time: dateStr,
-      open: close * (0.995 + Math.random() * 0.01), // Open near previous close
-      high: close + (range / 2) + Math.random() * (range / 2),
-      low: close - (range / 2) - Math.random() * (range / 2),
-      close: close
-    });
-  }
-  
-  return data;
-};
-
 export default function BrokeragePage() {
   const [chartData, setChartData] = useState<ChartDataPoint[]>([]);
   const [selectedSymbol, setSelectedSymbol] = useState<string>('AAPL');
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [polygonService, setPolygonService] = useState<PolygonService | null>(null);
-  const [useMockData, setUseMockData] = useState<boolean>(false);
+  const [useMockData, setUseMockData] = useState<boolean>(true); // Always use mock data for testing
 
   useEffect(() => {
     // Skip during SSR
@@ -68,7 +32,7 @@ export default function BrokeragePage() {
 
     const initPage = async () => {
       try {
-        console.log('Initializing brokerage page');
+        console.log('Initializing brokerage page with mock data');
         const service = PolygonService.getInstance();
         setPolygonService(service);
         
@@ -79,29 +43,11 @@ export default function BrokeragePage() {
           console.error('Failed to initialize Polygon service');
           setError('Failed to initialize market data service.');
           setIsLoading(false);
-          
-          // Fall back to mock data after a brief delay
-          setTimeout(() => {
-            console.log('Falling back to mock data');
-            setChartData(generateMockData(selectedSymbol));
-            setError('Using demo data (API connection failed)');
-            setUseMockData(true);
-            setIsLoading(false);
-          }, 1000);
         }
       } catch (error) {
         console.error('Error initializing page:', error);
-        setError('Failed to initialize the page. Please check your API key configuration.');
+        setError('Failed to initialize the page.');
         setIsLoading(false);
-        
-        // Fall back to mock data after a brief delay
-        setTimeout(() => {
-          console.log('Falling back to mock data after error');
-          setChartData(generateMockData(selectedSymbol));
-          setError('Using demo data (API connection failed)');
-          setUseMockData(true);
-          setIsLoading(false);
-        }, 1000);
       }
     };
 
@@ -109,16 +55,10 @@ export default function BrokeragePage() {
   }, []);
 
   useEffect(() => {
-    if (useMockData) {
-      console.log('Using mock data for symbol change:', selectedSymbol);
-      setChartData(generateMockData(selectedSymbol));
-      return;
-    }
-    
     if (polygonService && selectedSymbol) {
       loadMarketData(polygonService);
     }
-  }, [selectedSymbol, useMockData]);
+  }, [selectedSymbol]);
 
   const loadMarketData = async (service: PolygonService) => {
     if (!selectedSymbol) {
@@ -139,54 +79,44 @@ export default function BrokeragePage() {
       
       console.log('Date range:', { from, to });
       
-      try {
-        const candles = await service.getStockCandles(selectedSymbol, from, to, '1day');
-        console.log('Received candles:', candles);
-        
-        if (!candles || !Array.isArray(candles) || candles.length === 0) {
-          console.log('No data available for symbol:', selectedSymbol);
-          throw new Error('No data available for this symbol');
-        }
-
-        const formattedData = candles.map(candle => {
-          if (!candle || typeof candle.t === 'undefined') {
-            console.error('Invalid candle data:', candle);
-            return null;
-          }
-          
-          return {
-            time: new Date(candle.t).toISOString().split('T')[0],
-            open: Number(candle.o) || 0,
-            high: Number(candle.h) || 0,
-            low: Number(candle.l) || 0,
-            close: Number(candle.c) || 0,
-          };
-        }).filter(Boolean) as ChartDataPoint[];
-        
-        console.log('Formatted data:', formattedData);
-        
-        if (formattedData.length === 0) {
-          throw new Error('Invalid data received from server');
-        }
-        
-        setChartData(formattedData);
-        setUseMockData(false);
-      } catch (apiError) {
-        console.error('API request failed, falling back to mock data:', apiError);
-        const mockData = generateMockData(selectedSymbol);
-        setChartData(mockData);
-        setError('Using demo data - API connection failed');
-        setUseMockData(true);
+      const candles = await service.getStockCandles(selectedSymbol, from, to, '1day');
+      console.log('Received candles:', candles.length);
+      
+      if (!candles || !Array.isArray(candles) || candles.length === 0) {
+        console.log('No data available for symbol:', selectedSymbol);
+        setError('No data available for this symbol');
+        setChartData([]);
+        return;
       }
+
+      const formattedData = candles.map(candle => {
+        if (!candle || typeof candle.t === 'undefined') {
+          console.error('Invalid candle data:', candle);
+          return null;
+        }
+        
+        return {
+          time: new Date(candle.t).toISOString().split('T')[0],
+          open: Number(candle.o) || 0,
+          high: Number(candle.h) || 0,
+          low: Number(candle.l) || 0,
+          close: Number(candle.c) || 0,
+        };
+      }).filter(Boolean) as ChartDataPoint[];
+      
+      console.log('Formatted data points:', formattedData.length);
+      
+      if (formattedData.length === 0) {
+        setError('Invalid data received from server');
+        return;
+      }
+      
+      setChartData(formattedData);
       
     } catch (error) {
       console.error('Error loading market data:', error);
-      setError('Failed to load market data. Using demo mode.');
-      
-      // Fall back to mock data
-      const mockData = generateMockData(selectedSymbol);
-      setChartData(mockData);
-      setUseMockData(true);
+      setError('Failed to load market data. Please try again.');
+      setChartData([]);
     } finally {
       setIsLoading(false);
     }
@@ -203,17 +133,21 @@ export default function BrokeragePage() {
     <div className="p-6 space-y-6 bg-gray-800 min-h-screen">
       <div className="max-w-7xl mx-auto">
         <div className="grid grid-cols-1 gap-6">
+          <div className="bg-blue-500/10 border border-blue-500 rounded-lg p-4">
+            <h3 className="text-blue-300 font-medium">Demo Mode</h3>
+            <p className="text-blue-200 mt-1">
+              Using simulated market data for testing. All data is generated locally and does not reflect real market conditions.
+            </p>
+          </div>
+          
           {error && (
             <div className="bg-red-500/10 border border-red-500 rounded-lg p-4">
               <p className="text-red-500">{error}</p>
-              {useMockData && (
-                <p className="text-gray-400 mt-2 text-sm">
-                  Using simulated data for demonstration. Real API access is currently unavailable.
-                </p>
-              )}
             </div>
           )}
+          
           <TradingInterface onSymbolChange={handleSymbolChange} />
+          
           <div className="bg-gray-900 rounded-lg p-6">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-2xl font-semibold text-white">Market Chart</h2>
