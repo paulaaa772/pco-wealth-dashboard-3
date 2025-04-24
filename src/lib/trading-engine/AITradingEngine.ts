@@ -344,7 +344,10 @@ export class AITradingEngine {
         );
         const historyDays = historyNeeded + 40;
 
-        // ** DATE FIX ATTEMPT #8 - Manual Formatting **
+        // ** DIAGNOSTIC LOG for current Date() **
+        console.log(`[AI Engine] Environment Date() Check: ${new Date().toString()}`);
+
+        // ** FINAL DYNAMIC DATE CALCULATION - Using Manual Formatting **
         const endDate = new Date(); 
         const startDate = new Date(); 
         startDate.setDate(endDate.getDate() - historyDays);
