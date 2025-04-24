@@ -343,16 +343,16 @@ export class AITradingEngine {
         );
         const historyDays = historyNeeded + 40; 
         
-        // ** CORRECTED DATE CALCULATION **
-        const endDate = new Date(); // Today
-        const startDate = new Date();
-        startDate.setDate(endDate.getDate() - historyDays); // Go back X days from today
+        // ** ENSURE DATE CALCULATION IS CORRECT **
+        const endDate = new Date(); // Use current date as end date
+        const startDate = new Date(); // Create start date object
+        startDate.setDate(endDate.getDate() - historyDays); // Subtract days from today
         
         // Format dates as YYYY-MM-DD
         const formatDate = (date: Date) => date.toISOString().split('T')[0];
         const startDateStr = formatDate(startDate);
         const endDateStr = formatDate(endDate); 
-        // ** END CORRECTION **
+        // ** END DATE CORRECTION **
 
         console.log(`[AI Engine] Fetching candles from ${startDateStr} to ${endDateStr}`); // Log corrected dates
         const candles: PolygonCandle[] = await this.polygonService.getStockCandles(targetSymbol, startDateStr, endDateStr, 'day');
