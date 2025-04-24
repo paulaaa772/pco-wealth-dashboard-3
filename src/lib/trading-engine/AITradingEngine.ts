@@ -15,11 +15,10 @@ export interface TradeSignal {
   strategy: string; // Added strategy identifier
 }
 
-// Helper function to calculate Simple Moving Average (SMA)
+// --- Indicator Calculation Helpers ---
+
 const calculateSMA = (data: number[], period: number): number[] => {
-  if (period <= 0 || !data || data.length < period) {
-    return [];
-  }
+  if (period <= 0 || !data || data.length < period) return [];
   const sma: number[] = [];
   for (let i = period - 1; i < data.length; i++) {
     const sum = data.slice(i - period + 1, i + 1).reduce((acc, val) => acc + val, 0);
@@ -28,18 +27,72 @@ const calculateSMA = (data: number[], period: number): number[] => {
   return sma;
 };
 
+const calculateRSI = (data: number[], period: number = 14): number[] => {
+  if (period <= 0 || !data || data.length < period + 1) return [];
+
+  const rsi: number[] = [];
+  let avgGain = 0;
+  let avgLoss = 0;
+
+  // Calculate initial average gain/loss for the first period
+  let firstGainSum = 0;
+  let firstLossSum = 0;
+  for (let i = 1; i <= period; i++) {
+    const change = data[i] - data[i - 1];
+    if (change > 0) {
+      firstGainSum += change;
+    } else {
+      firstLossSum += Math.abs(change);
+    }
+  }
+  avgGain = firstGainSum / period;
+  avgLoss = firstLossSum / period;
+
+  // Calculate first RSI value
+  let rs = avgLoss === 0 ? Infinity : avgGain / avgLoss;
+  rsi.push(100 - (100 / (1 + rs)));
+
+  // Calculate subsequent RSI values using Wilder's smoothing
+  for (let i = period + 1; i < data.length; i++) {
+    const change = data[i] - data[i - 1];
+    let currentGain = 0;
+    let currentLoss = 0;
+
+    if (change > 0) {
+      currentGain = change;
+    } else {
+      currentLoss = Math.abs(change);
+    }
+
+    avgGain = (avgGain * (period - 1) + currentGain) / period;
+    avgLoss = (avgLoss * (period - 1) + currentLoss) / period;
+
+    rs = avgLoss === 0 ? Infinity : avgGain / avgLoss;
+    rsi.push(100 - (100 / (1 + rs)));
+  }
+
+  return rsi;
+};
+
+// --- AI Trading Engine Class ---
+
 export class AITradingEngine {
   private symbol: string;
   private mode: TradingMode;
   private polygonService: PolygonService;
+  
+  // Strategy Parameters
   private fastSMAPeriod = 9;
   private slowSMAPeriod = 21;
+  private rsiPeriod = 14;
+  private rsiOverbought = 70;
+  private rsiOversold = 30;
 
   constructor(symbol: string = 'AAPL', mode: TradingMode = TradingModeEnum.DEMO) {
     this.symbol = symbol;
     this.mode = mode;
     this.polygonService = PolygonService.getInstance();
-    console.log(`AI Trading Engine initialized for ${symbol} in ${mode} mode with MA Crossover (${this.fastSMAPeriod}/${this.slowSMAPeriod})`);
+    console.log(`AI Engine initialized for ${symbol} (${mode}). Strategies: MA Crossover (${this.fastSMAPeriod}/${this.slowSMAPeriod}), RSI(${this.rsiPeriod})`);
   }
 
   setSymbol(symbol: string): void {
@@ -54,93 +107,104 @@ export class AITradingEngine {
 
   async analyzeMarket(symbol?: string): Promise<TradeSignal | null> {
     const targetSymbol = symbol || this.symbol;
-    console.log(`[MA Crossover] Analyzing market for ${targetSymbol}...`);
+    console.log(`[AI Engine] Analyzing market for ${targetSymbol}...`);
 
     try {
-      // 1. Fetch historical data (need enough for the longest period + 1)
-      const historyDays = this.slowSMAPeriod + 20; // Fetch extra days to ensure enough trading days
+      // 1. Fetch historical data (need enough for longest period + buffer)
+      const historyNeeded = Math.max(this.slowSMAPeriod + 1, this.rsiPeriod + 1);
+      const historyDays = historyNeeded + 20; // Fetch extra for safety
       const endDate = new Date();
       const startDate = new Date();
       startDate.setDate(endDate.getDate() - historyDays);
       const startDateStr = startDate.toISOString().split('T')[0];
       const endDateStr = endDate.toISOString().split('T')[0];
 
-      console.log(`[MA Crossover] Fetching candles from ${startDateStr} to ${endDateStr}`);
-      const candles: PolygonCandle[] = await this.polygonService.getStockCandles(
-        targetSymbol,
-        startDateStr,
-        endDateStr,
-        'day' // Ensure daily candles
-      );
+      console.log(`[AI Engine] Fetching candles from ${startDateStr} to ${endDateStr}`);
+      const candles: PolygonCandle[] = await this.polygonService.getStockCandles(targetSymbol, startDateStr, endDateStr, 'day');
 
-      if (!candles || candles.length < this.slowSMAPeriod + 1) {
-        console.warn(`[MA Crossover] Insufficient candle data for ${targetSymbol} (${candles?.length || 0} received). Needed ${this.slowSMAPeriod + 1}.`);
+      if (!candles || candles.length < historyNeeded) {
+        console.warn(`[AI Engine] Insufficient candle data for ${targetSymbol} (${candles?.length || 0} received). Needed ${historyNeeded}.`);
         return null;
       }
-
-      // Sort candles just in case API doesn't guarantee order
-      candles.sort((a, b) => a.t - b.t);
-
-      // 2. Extract closing prices
+      candles.sort((a, b) => a.t - b.t); // Ensure chronological order
       const closingPrices = candles.map(candle => candle.c);
       const latestPrice = closingPrices[closingPrices.length - 1];
 
-      // 3. Calculate SMAs
+      // --- Strategy 1: MA Crossover --- 
+      console.log(`[AI Engine] Checking MA Crossover (${this.fastSMAPeriod}/${this.slowSMAPeriod})...`);
       const fastSMA = calculateSMA(closingPrices, this.fastSMAPeriod);
       const slowSMA = calculateSMA(closingPrices, this.slowSMAPeriod);
+      let maSignal: TradeSignal | null = null;
 
-      // Ensure we have enough SMA points to check the crossover
-      // Since slowSMA is longer, it determines the number of points.
-      // We need at least 2 points for both fast and slow to compare the last two.
-      if (fastSMA.length < 2 || slowSMA.length < 2) {
-         console.warn(`[MA Crossover] Not enough SMA points calculated for ${targetSymbol}.`);
-         return null;
+      if (fastSMA.length >= 2 && slowSMA.length >= 2) {
+        const fastSMA_last = fastSMA[fastSMA.length - 1];
+        const fastSMA_prev = fastSMA[fastSMA.length - 2];
+        const slowSMA_last = slowSMA[slowSMA.length - 1];
+        const slowSMA_prev = slowSMA[slowSMA.length - 2];
+
+        // Bullish Crossover
+        if (fastSMA_prev <= slowSMA_prev && fastSMA_last > slowSMA_last) {
+          console.log(`[MA Crossover] Bullish crossover detected`);
+          maSignal = {
+            symbol: targetSymbol, direction: 'buy', price: latestPrice,
+            confidence: 0.80, timestamp: Date.now(), strategy: `MA Crossover (${this.fastSMAPeriod}/${this.slowSMAPeriod})`
+          };
+        }
+        // Bearish Crossover
+        else if (fastSMA_prev >= slowSMA_prev && fastSMA_last < slowSMA_last) {
+          console.log(`[MA Crossover] Bearish crossover detected`);
+          maSignal = {
+            symbol: targetSymbol, direction: 'sell', price: latestPrice,
+            confidence: 0.80, timestamp: Date.now(), strategy: `MA Crossover (${this.fastSMAPeriod}/${this.slowSMAPeriod})`
+          };
+        }
+      }
+      if (maSignal) {
+         console.log(`[AI Engine] MA Crossover signal generated:`, maSignal);
+         return maSignal; // Prioritize MA signal for now
+      }
+      console.log(`[AI Engine] No MA Crossover signal.`);
+
+      // --- Strategy 2: RSI Overbought/Oversold --- 
+      console.log(`[AI Engine] Checking RSI(${this.rsiPeriod})...`);
+      const rsi = calculateRSI(closingPrices, this.rsiPeriod);
+      let rsiSignal: TradeSignal | null = null;
+
+      if (rsi.length >= 2) {
+        const rsi_last = rsi[rsi.length - 1];
+        const rsi_prev = rsi[rsi.length - 2];
+        console.log(`[RSI] Latest RSI(${this.rsiPeriod}) = ${rsi_last.toFixed(2)}`);
+
+        // Bullish Signal: Crosses above oversold level
+        if (rsi_prev <= this.rsiOversold && rsi_last > this.rsiOversold) {
+          console.log(`[RSI] Bullish signal detected (crossed above ${this.rsiOversold})`);
+          rsiSignal = {
+            symbol: targetSymbol, direction: 'buy', price: latestPrice,
+            confidence: 0.75, timestamp: Date.now(), strategy: `RSI(${this.rsiPeriod}) Oversold Exit`
+          };
+        }
+        // Bearish Signal: Crosses below overbought level
+        else if (rsi_prev >= this.rsiOverbought && rsi_last < this.rsiOverbought) {
+          console.log(`[RSI] Bearish signal detected (crossed below ${this.rsiOverbought})`);
+          rsiSignal = {
+            symbol: targetSymbol, direction: 'sell', price: latestPrice,
+            confidence: 0.75, timestamp: Date.now(), strategy: `RSI(${this.rsiPeriod}) Overbought Exit`
+          };
+        }
       }
 
-      // Get the last two points for comparison
-      // Adjust index because calculateSMA returns fewer points than input data
-      const fastSMA_last = fastSMA[fastSMA.length - 1];
-      const fastSMA_prev = fastSMA[fastSMA.length - 2];
-      const slowSMA_last = slowSMA[slowSMA.length - 1];
-      const slowSMA_prev = slowSMA[slowSMA.length - 2];
-
-      console.log(`[MA Crossover] Latest SMAs for ${targetSymbol}: Fast(${this.fastSMAPeriod})=${fastSMA_last.toFixed(2)}, Slow(${this.slowSMAPeriod})=${slowSMA_last.toFixed(2)}`);
-      console.log(`[MA Crossover] Previous SMAs for ${targetSymbol}: Fast(${this.fastSMAPeriod})=${fastSMA_prev.toFixed(2)}, Slow(${this.slowSMAPeriod})=${slowSMA_prev.toFixed(2)}`);
-
-
-      // 4. Check for Crossover Signal
-      let direction: 'buy' | 'sell' | null = null;
-
-      // Bullish Crossover (Fast crosses above Slow)
-      if (fastSMA_prev <= slowSMA_prev && fastSMA_last > slowSMA_last) {
-        console.log(`[MA Crossover] Bullish crossover detected for ${targetSymbol}`);
-        direction = 'buy';
+      if (rsiSignal) {
+        console.log(`[AI Engine] RSI signal generated:`, rsiSignal);
+        return rsiSignal;
       }
-      // Bearish Crossover (Fast crosses below Slow)
-      else if (fastSMA_prev >= slowSMA_prev && fastSMA_last < slowSMA_last) {
-        console.log(`[MA Crossover] Bearish crossover detected for ${targetSymbol}`);
-        direction = 'sell';
-      }
+      console.log(`[AI Engine] No RSI signal.`);
 
-      if (direction) {
-        const signal: TradeSignal = {
-          symbol: targetSymbol,
-          direction: direction,
-          price: latestPrice,
-          confidence: 0.85, // Assign higher confidence for clear crossover
-          timestamp: Date.now(),
-          strategy: `MA Crossover (${this.fastSMAPeriod}/${this.slowSMAPeriod})`
-        };
-        console.log(`[MA Crossover] Signal generated:`, signal);
-        return signal;
-      } else {
-        console.log(`[MA Crossover] No crossover signal detected for ${targetSymbol}`);
-        return null;
-      }
+      // --- No signals from implemented strategies ---
+      console.log(`[AI Engine] No signals generated for ${targetSymbol}.`);
+      return null;
 
     } catch (error) {
-      console.error(`[MA Crossover] Error analyzing market for ${targetSymbol}:`, error);
-      // Optionally, fall back to mock/random or return null
+      console.error(`[AI Engine] Error analyzing market for ${targetSymbol}:`, error);
       return null;
     }
   }
@@ -148,26 +212,22 @@ export class AITradingEngine {
   calculatePositionSize(price: number, risk: number = 0.02): number {
     const accountSize = 10000; // Simulated account size
     const riskAmount = accountSize * risk;
-    
-    // Basic position sizing - ensure price is not zero
     if (price <= 0) return 0;
     const shares = Math.floor(riskAmount / price);
-    return shares > 0 ? shares : 0; // Return 0 if shares calculation is negative/zero
+    return shares > 0 ? shares : 0;
   }
 
   async executeTradeSignal(signal: TradeSignal): Promise<boolean> {
     console.log(`Executing ${signal.direction} signal for ${signal.symbol} at $${signal.price} (Strategy: ${signal.strategy})`);
-
     if (this.mode === TradingModeEnum.DEMO) {
       console.log('Demo mode: Simulating trade execution');
-      await new Promise(resolve => setTimeout(resolve, 300)); // Simulate network delay
+      await new Promise(resolve => setTimeout(resolve, 300));
       return true;
     } else {
       console.log('Live mode: Connecting to brokerage API (Not implemented)');
-      // Real brokerage integration would go here
       await new Promise(resolve => setTimeout(resolve, 500));
       console.log('Live trade simulated successfully (No actual execution)');
-      return true; // Simulate success for now
+      return true;
     }
   }
 } 
