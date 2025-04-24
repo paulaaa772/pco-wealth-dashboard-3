@@ -319,16 +319,130 @@ export class AITradingEngine {
     console.log(`AI Engine initialized for ${symbol} (${mode}). Strategies: MA(${this.fastSMAPeriod}/${this.slowSMAPeriod}), RSI(${this.rsiPeriod}), MACD(${this.macdFast}/${this.macdSlow}/${this.macdSignal}), BBands(${this.bbandsPeriod}/${this.bbandsStdDev}), ADX(${this.adxPeriod})`);
   }
 
-  setSymbol(symbol: string): void {
-    this.symbol = symbol;
-    console.log(`Trading symbol updated to: ${symbol}`);
+  // --- Helper methods for individual strategy checks --- 
+
+  private checkMACrossover(closingPrices: number[], targetSymbol: string, latestPrice: number): TradeSignal | null {
+      console.log(`[AI Engine] Checking MA Crossover (${this.fastSMAPeriod}/${this.slowSMAPeriod})...`);
+      const fastSMA = calculateSMA(closingPrices, this.fastSMAPeriod);
+      const slowSMA = calculateSMA(closingPrices, this.slowSMAPeriod);
+      if (fastSMA.length >= 2 && slowSMA.length >= 2) {
+        // ... (crossover checks) ...
+        if (/* Bullish condition */ fastSMA[fastSMA.length - 2] <= slowSMA[slowSMA.length - 2] && fastSMA[fastSMA.length - 1] > slowSMA[slowSMA.length - 1]) {
+          return {
+            symbol: targetSymbol,
+            direction: 'buy',
+            price: latestPrice,
+            confidence: 0.8,
+            timestamp: Date.now(),
+            strategy: 'MA Crossover'
+          };
+        }
+        if (/* Bearish condition */ fastSMA[fastSMA.length - 2] >= slowSMA[slowSMA.length - 2] && fastSMA[fastSMA.length - 1] < slowSMA[slowSMA.length - 1]) {
+          return {
+            symbol: targetSymbol,
+            direction: 'sell',
+            price: latestPrice,
+            confidence: 0.8,
+            timestamp: Date.now(),
+            strategy: 'MA Crossover'
+          };
+        }
+      }
+      console.log(`[AI Engine] No MA Crossover signal.`);
+      return null; // Ensure null is returned if no signal
   }
 
-  setMode(mode: TradingMode): void {
-    this.mode = mode;
-    console.log(`Trading mode updated to: ${mode}`);
+  private checkRSIConditions(closingPrices: number[], targetSymbol: string, latestPrice: number): TradeSignal | null {
+      console.log(`[AI Engine] Checking RSI(${this.rsiPeriod})...`);
+      const rsi = calculateRSI(closingPrices, this.rsiPeriod);
+      if (rsi.length >= 2) {
+        // ... (rsi checks) ...
+        if (/* Bullish condition */ rsi[rsi.length - 2] <= this.rsiOversold && rsi[rsi.length - 1] > this.rsiOversold) {
+          return {
+            symbol: targetSymbol,
+            direction: 'buy',
+            price: latestPrice,
+            confidence: 0.8,
+            timestamp: Date.now(),
+            strategy: 'RSI'
+          };
+        }
+        if (/* Bearish condition */ rsi[rsi.length - 2] >= this.rsiOverbought && rsi[rsi.length - 1] < this.rsiOverbought) {
+          return {
+            symbol: targetSymbol,
+            direction: 'sell',
+            price: latestPrice,
+            confidence: 0.8,
+            timestamp: Date.now(),
+            strategy: 'RSI'
+          };
+        }
+      }
+      console.log(`[AI Engine] No RSI signal.`);
+      return null; // Ensure null is returned if no signal
   }
 
+  private checkMACDCrossover(closingPrices: number[], targetSymbol: string, latestPrice: number): TradeSignal | null {
+       console.log(`[AI Engine] Checking MACD(${this.macdFast}/${this.macdSlow}/${this.macdSignal})...`);
+      const macdResult = calculateMACD(closingPrices, this.macdFast, this.macdSlow, this.macdSignal);
+      if (macdResult && macdResult.macdLine.length >= 2) {
+          // ... (macd crossover checks) ...
+          if (/* Bullish condition */ macdResult.macdLine[macdResult.macdLine.length - 2] <= macdResult.signalLine[macdResult.signalLine.length - 2] && macdResult.macdLine[macdResult.macdLine.length - 1] > macdResult.signalLine[macdResult.signalLine.length - 1]) {
+              return {
+                symbol: targetSymbol,
+                direction: 'buy',
+                price: latestPrice,
+                confidence: 0.8,
+                timestamp: Date.now(),
+                strategy: 'MACD'
+              };
+          }
+          if (/* Bearish condition */ macdResult.macdLine[macdResult.macdLine.length - 2] >= macdResult.signalLine[macdResult.signalLine.length - 2] && macdResult.macdLine[macdResult.macdLine.length - 1] < macdResult.signalLine[macdResult.signalLine.length - 1]) {
+              return {
+                symbol: targetSymbol,
+                direction: 'sell',
+                price: latestPrice,
+                confidence: 0.8,
+                timestamp: Date.now(),
+                strategy: 'MACD'
+              };
+          }
+      }
+      console.log(`[AI Engine] No MACD signal.`);
+      return null; // Ensure null is returned if no signal
+  }
+
+  private checkBollingerBands(closingPrices: number[], targetSymbol: string, latestPrice: number): TradeSignal | null {
+     console.log(`[AI Engine] Checking Bollinger Bands (${this.bbandsPeriod}/${this.bbandsStdDev})...`);
+     const bbandsResult = calculateBollingerBands(closingPrices, this.bbandsPeriod, this.bbandsStdDev);
+      if (bbandsResult && bbandsResult.upperBand.length >= 2) {
+          // ... (bbands checks) ...
+          if (/* Sell condition */ latestPrice > bbandsResult.upperBand[bbandsResult.upperBand.length - 1]) { 
+              return {
+                symbol: targetSymbol,
+                direction: 'sell',
+                price: latestPrice,
+                confidence: 0.8,
+                timestamp: Date.now(),
+                strategy: 'Bollinger Bands'
+              };
+          }
+          if (/* Buy condition */ latestPrice < bbandsResult.lowerBand[bbandsResult.lowerBand.length - 1]) {
+              return {
+                symbol: targetSymbol,
+                direction: 'buy',
+                price: latestPrice,
+                confidence: 0.8,
+                timestamp: Date.now(),
+                strategy: 'Bollinger Bands'
+              };
+          }
+      }
+      console.log(`[AI Engine] No BBands signal.`);
+      return null; // Ensure null is returned if no signal
+  }
+
+  // --- Main Analysis Method --- 
   async analyzeMarket(symbol?: string): Promise<TradeSignal | null> {
     const targetSymbol = symbol || this.symbol;
     console.log(`[AI Engine] Analyzing market for ${targetSymbol}...`);
@@ -380,33 +494,24 @@ export class AITradingEngine {
       const isTrending = adxValue > this.adxTrendThreshold;
       console.log(`[AI Engine] Market Trending (ADX > ${this.adxTrendThreshold}): ${isTrending}`);
 
-      // --- Strategy Checks (Potentially use ADX as filter) --- 
-
-      // Strategy 1: MA Crossover (Only if Trending?)
-      // if (isTrending) {
-          const maSignal = this.checkMACrossover(closingPrices, targetSymbol, latestPrice);
-          if (maSignal) return maSignal;
-      // }
-
-      // Strategy 2: RSI (Less reliable in strong trends? Use differently?)
-      const rsiSignal = this.checkRSIConditions(closingPrices, targetSymbol, latestPrice);
-      if (rsiSignal) return rsiSignal;
-      
-      // Strategy 3: MACD Crossover (Only if Trending?)
-      // if (isTrending) {
-          const macdSignal = this.checkMACDCrossover(closingPrices, targetSymbol, latestPrice);
-          if (macdSignal) return macdSignal;
-      // }
-      
-      // Strategy 4: Bollinger Bands (Better for ranging? Use if NOT isTrending?)
-      // if (!isTrending) {
-          const bbandsSignal = this.checkBollingerBands(closingPrices, targetSymbol, latestPrice);
-          if (bbandsSignal) return bbandsSignal;
-      // }
-
-      // --- No signals triggered ---
-      console.log(`[AI Engine] No signals generated for ${targetSymbol}.`);
-      return null;
+       // --- Strategy Checks (Using helper methods defined above) --- 
+        // if (isTrending) {
+            const maSignal = this.checkMACrossover(closingPrices, targetSymbol, latestPrice);
+            if (maSignal) return maSignal;
+        // }
+        const rsiSignal = this.checkRSIConditions(closingPrices, targetSymbol, latestPrice);
+        if (rsiSignal) return rsiSignal;
+        // if (isTrending) {
+            const macdSignal = this.checkMACDCrossover(closingPrices, targetSymbol, latestPrice);
+            if (macdSignal) return macdSignal;
+        // }
+        // if (!isTrending) {
+            const bbandsSignal = this.checkBollingerBands(closingPrices, targetSymbol, latestPrice);
+            if (bbandsSignal) return bbandsSignal;
+        // }
+        
+        console.log(`[AI Engine] No signals generated for ${targetSymbol}.`);
+        return null;
 
     } catch (error) {
       console.error(`[AI Engine] Error analyzing market for ${targetSymbol}:`, error);
@@ -414,31 +519,9 @@ export class AITradingEngine {
     }
   }
 
-  // --- Helper methods for individual strategy checks --- 
-  // ... (checkMACrossover, checkRSIConditions, checkMACDCrossover remain the same) ...
-  
-  // Renamed for consistency
-  private checkBollingerBands(closingPrices: number[], targetSymbol: string, latestPrice: number): TradeSignal | null {
-     console.log(`[AI Engine] Checking Bollinger Bands (${this.bbandsPeriod}/${this.bbandsStdDev})...`);
-     const bbandsResult = calculateBollingerBands(closingPrices, this.bbandsPeriod, this.bbandsStdDev);
-      if (bbandsResult && bbandsResult.upperBand.length >= 2) {
-          const upperBand_last = bbandsResult.upperBand[bbandsResult.upperBand.length - 1];
-          const lowerBand_last = bbandsResult.lowerBand[bbandsResult.lowerBand.length - 1];
-          const prevPrice = closingPrices[closingPrices.length - 2]; // Get previous price here
-          console.log(`[BBands] Latest Close: ${latestPrice.toFixed(2)}, Upper: ${upperBand_last.toFixed(2)}, Lower: ${lowerBand_last.toFixed(2)}`);
-          // Sell Signal: Price crosses ABOVE Upper Band 
-          if (latestPrice > upperBand_last /* && prevPrice <= upperBand_prev - More strict */) { 
-              return { symbol: targetSymbol, direction: 'sell', price: latestPrice, confidence: 0.65, timestamp: Date.now(), strategy: `BBands (${this.bbandsPeriod}/${this.bbandsStdDev}) Upper Cross` };
-          }
-          // Buy Signal: Price crosses BELOW Lower Band
-          if (latestPrice < lowerBand_last /* && prevPrice >= lowerBand_prev - More strict */) {
-              return { symbol: targetSymbol, direction: 'buy', price: latestPrice, confidence: 0.65, timestamp: Date.now(), strategy: `BBands (${this.bbandsPeriod}/${this.bbandsStdDev}) Lower Cross` };
-          }
-      }
-      console.log(`[AI Engine] No BBands signal.`);
-      return null;
-  }
-
+  // --- Other Methods --- 
+  setSymbol(symbol: string): void { this.symbol = symbol; }
+  setMode(mode: TradingMode): void { this.mode = mode; }
   calculatePositionSize(price: number, risk: number = 0.02): number {
     const accountSize = 10000; // Simulated account size
     const riskAmount = accountSize * risk;
@@ -446,7 +529,6 @@ export class AITradingEngine {
     const shares = Math.floor(riskAmount / price);
     return shares > 0 ? shares : 0;
   }
-
   async executeTradeSignal(signal: TradeSignal): Promise<boolean> {
     console.log(`Executing ${signal.direction} signal for ${signal.symbol} at $${signal.price} (Strategy: ${signal.strategy})`);
     if (this.mode === TradingModeEnum.DEMO) {
