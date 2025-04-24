@@ -2,6 +2,21 @@
 
 import { PolygonService, PolygonCandle } from '../market-data/PolygonService';
 import { TradingMode as TradingModeEnum } from './TradingMode';
+// Import necessary calculation functions and types from indicators.ts
+import {
+    calculateSMA,
+    calculateEMA,
+    calculateRSI,
+    calculateMACD,
+    MACDResult,
+    calculateBollingerBands,
+    BollingerBandsResult,
+    calculateADX,
+    ADXResult,
+    calculateStochastic,
+    StochasticResult,
+    calculateOBV
+} from './indicators';
 
 // Define TradingMode type locally if the import causes issues
 export type TradingMode = 'demo' | 'live';
@@ -16,176 +31,6 @@ export interface TradeSignal {
 }
 
 // --- Indicator Calculation Helpers ---
-
-const calculateSMA = (data: number[], period: number): number[] => {
-  if (period <= 0 || !data || data.length < period) return [];
-  const sma: number[] = [];
-  for (let i = period - 1; i < data.length; i++) {
-    const sum = data.slice(i - period + 1, i + 1).reduce((acc, val) => acc + val, 0);
-    sma.push(sum / period);
-  }
-  return sma;
-};
-
-const calculateEMA = (data: number[], period: number): number[] => {
-  if (period <= 0 || !data || data.length < period) return [];
-  const ema: number[] = [];
-  const multiplier = 2 / (period + 1);
-  
-  // Calculate initial SMA for the first EMA value
-  let sum = 0;
-  for(let i = 0; i < period; i++) {
-      sum += data[i];
-  }
-  let previousEma = sum / period;
-  ema.push(previousEma);
-
-  // Calculate subsequent EMAs
-  for (let i = period; i < data.length; i++) {
-    const currentEma = (data[i] - previousEma) * multiplier + previousEma;
-    ema.push(currentEma);
-    previousEma = currentEma;
-  }
-  return ema;
-};
-
-const calculateRSI = (data: number[], period: number = 14): number[] => {
-  if (period <= 0 || !data || data.length < period + 1) return [];
-
-  const rsi: number[] = [];
-  let avgGain = 0;
-  let avgLoss = 0;
-
-  // Calculate initial average gain/loss for the first period
-  let firstGainSum = 0;
-  let firstLossSum = 0;
-  for (let i = 1; i <= period; i++) {
-    const change = data[i] - data[i - 1];
-    if (change > 0) {
-      firstGainSum += change;
-    } else {
-      firstLossSum += Math.abs(change);
-    }
-  }
-  avgGain = firstGainSum / period;
-  avgLoss = firstLossSum / period;
-
-  // Calculate first RSI value
-  let rs = avgLoss === 0 ? Infinity : avgGain / avgLoss;
-  rsi.push(100 - (100 / (1 + rs)));
-
-  // Calculate subsequent RSI values using Wilder's smoothing
-  for (let i = period + 1; i < data.length; i++) {
-    const change = data[i] - data[i - 1];
-    let currentGain = 0;
-    let currentLoss = 0;
-
-    if (change > 0) {
-      currentGain = change;
-    } else {
-      currentLoss = Math.abs(change);
-    }
-
-    avgGain = (avgGain * (period - 1) + currentGain) / period;
-    avgLoss = (avgLoss * (period - 1) + currentLoss) / period;
-
-    rs = avgLoss === 0 ? Infinity : avgGain / avgLoss;
-    rsi.push(100 - (100 / (1 + rs)));
-  }
-
-  return rsi;
-};
-
-interface MACDResult {
-  macdLine: number[];
-  signalLine: number[];
-  histogram: number[];
-}
-
-const calculateMACD = (
-  data: number[], 
-  fastPeriod: number = 12, 
-  slowPeriod: number = 26, 
-  signalPeriod: number = 9
-): MACDResult | null => {
-  if (slowPeriod <= fastPeriod || signalPeriod <= 0 || !data || data.length < slowPeriod) {
-    return null; // Not enough data or invalid periods
-  }
-
-  const emaFast = calculateEMA(data, fastPeriod);
-  const emaSlow = calculateEMA(data, slowPeriod);
-
-  // Align arrays: MACD line starts where the slower EMA starts
-  const macdLine: number[] = [];
-  const startOffset = emaFast.length - emaSlow.length; // Difference in starting points
-  for (let i = 0; i < emaSlow.length; i++) {
-    macdLine.push(emaFast[i + startOffset] - emaSlow[i]);
-  }
-
-  if (macdLine.length < signalPeriod) {
-    return null; // Not enough MACD points for signal line
-  }
-
-  const signalLine = calculateEMA(macdLine, signalPeriod);
-
-  // Align signal line and calculate histogram
-  const histogram: number[] = [];
-  const signalStartOffset = macdLine.length - signalLine.length;
-  for (let i = 0; i < signalLine.length; i++) {
-      histogram.push(macdLine[i + signalStartOffset] - signalLine[i]);
-  }
-
-  // Return aligned results (all starting from the same logical point)
-   return {
-      macdLine: macdLine.slice(signalStartOffset), // Trim beginning to match signal/hist
-      signalLine: signalLine,
-      histogram: histogram
-   };
-};
-
-interface BollingerBandsResult {
-  upperBand: number[];
-  middleBand: number[]; // SMA
-  lowerBand: number[];
-}
-
-const calculateBollingerBands = (
-  data: number[], 
-  period: number = 20, 
-  stdDevMultiplier: number = 2
-): BollingerBandsResult | null => {
-  if (period <= 0 || stdDevMultiplier <= 0 || !data || data.length < period) {
-    return null;
-  }
-
-  const middleBand = calculateSMA(data, period);
-  if (middleBand.length === 0) return null; // SMA calculation failed
-
-  const upperBand: number[] = [];
-  const lowerBand: number[] = [];
-  
-  // Standard deviation calculation needs to align with SMA output
-  const dataOffset = data.length - middleBand.length; // SMA starts later than raw data
-
-  for (let i = 0; i < middleBand.length; i++) {
-    const slice = data.slice(i + dataOffset - period + 1, i + dataOffset + 1);
-    if (slice.length !== period) continue; // Should not happen if logic is correct
-    
-    const mean = middleBand[i];
-    const variance = slice.reduce((acc, val) => acc + Math.pow(val - mean, 2), 0) / period;
-    const stdDev = Math.sqrt(variance);
-
-    upperBand.push(mean + stdDevMultiplier * stdDev);
-    lowerBand.push(mean - stdDevMultiplier * stdDev);
-  }
-
-  if (upperBand.length !== middleBand.length) {
-      console.error("[BBands] Length mismatch between bands!");
-      return null; // Error condition
-  }
-
-  return { upperBand, middleBand, lowerBand };
-};
 
 // Helper for Wilder's Smoothing (used in RSI and ADX)
 const wilderSmoothing = (data: number[], period: number): number[] => {
@@ -205,159 +50,6 @@ const wilderSmoothing = (data: number[], period: number): number[] => {
         smoothed.push(currentSmoothed);
     }
     return smoothed;
-};
-
-interface ADXResult {
-    adx: number[];
-    plusDI: number[];
-    minusDI: number[];
-}
-
-const calculateADX = (candles: PolygonCandle[], period: number = 14): ADXResult | null => {
-    if (period <= 0 || !candles || candles.length < period + 1) return null;
-
-    const trueRanges: number[] = [];
-    const plusDMs: number[] = [];
-    const minusDMs: number[] = [];
-
-    for (let i = 1; i < candles.length; i++) {
-        const high = candles[i].h;
-        const low = candles[i].l;
-        const close = candles[i].c;
-        const prevHigh = candles[i - 1].h;
-        const prevLow = candles[i - 1].l;
-        const prevClose = candles[i - 1].c;
-
-        // True Range (TR)
-        const tr = Math.max(high - low, Math.abs(high - prevClose), Math.abs(low - prevClose));
-        trueRanges.push(tr);
-
-        // Directional Movement (+DM, -DM)
-        const moveUp = high - prevHigh;
-        const moveDown = prevLow - low;
-
-        let plusDM = 0;
-        let minusDM = 0;
-        if (moveUp > moveDown && moveUp > 0) {
-            plusDM = moveUp;
-        }
-        if (moveDown > moveUp && moveDown > 0) {
-            minusDM = moveDown;
-        }
-        plusDMs.push(plusDM);
-        minusDMs.push(minusDM);
-    }
-    
-    if (trueRanges.length < period || plusDMs.length < period || minusDMs.length < period) return null;
-
-    // Smoothed TR, +DM, -DM
-    const smoothedTR = wilderSmoothing(trueRanges, period);
-    const smoothedPlusDM = wilderSmoothing(plusDMs, period);
-    const smoothedMinusDM = wilderSmoothing(minusDMs, period);
-    
-    if (smoothedTR.length === 0 || smoothedPlusDM.length !== smoothedTR.length || smoothedMinusDM.length !== smoothedTR.length) return null;
-
-    // Directional Indicators (+DI, -DI)
-    const plusDI: number[] = [];
-    const minusDI: number[] = [];
-    for (let i = 0; i < smoothedTR.length; i++) {
-        // Avoid division by zero if smoothedTR is 0 (can happen in flat markets)
-        const diPlus = smoothedTR[i] === 0 ? 0 : (smoothedPlusDM[i] / smoothedTR[i]) * 100;
-        const diMinus = smoothedTR[i] === 0 ? 0 : (smoothedMinusDM[i] / smoothedTR[i]) * 100;
-        plusDI.push(diPlus);
-        minusDI.push(diMinus);
-    }
-
-    // Directional Movement Index (DX)
-    const dx: number[] = [];
-    for (let i = 0; i < plusDI.length; i++) {
-        const diSum = plusDI[i] + minusDI[i];
-        const dxValue = diSum === 0 ? 0 : (Math.abs(plusDI[i] - minusDI[i]) / diSum) * 100;
-        dx.push(dxValue);
-    }
-    
-    if (dx.length < period) return null; // Need enough DX values for ADX smoothing
-
-    // Average Directional Index (ADX)
-    const adx = wilderSmoothing(dx, period);
-
-    // Align outputs (ADX starts later than +/-DI)
-    const adxStartOffset = plusDI.length - adx.length;
-
-    return {
-        adx: adx,
-        plusDI: plusDI.slice(adxStartOffset),
-        minusDI: minusDI.slice(adxStartOffset)
-    };
-};
-
-interface StochasticResult {
-    percentK: number[]; // Fast
-    percentD: number[]; // Slow (SMA of %K)
-}
-
-const calculateStochastic = (
-    candles: PolygonCandle[], 
-    kPeriod: number = 14, 
-    dPeriod: number = 3 // Smoothing for %D
-): StochasticResult | null => {
-    if (kPeriod <= 0 || dPeriod <= 0 || !candles || candles.length < kPeriod) {
-        return null;
-    }
-
-    const percentK: number[] = [];
-
-    for (let i = kPeriod - 1; i < candles.length; i++) {
-        const slice = candles.slice(i - kPeriod + 1, i + 1);
-        const lowestLow = Math.min(...slice.map(c => c.l));
-        const highestHigh = Math.max(...slice.map(c => c.h));
-        const currentClose = candles[i].c;
-
-        let kValue = 0;
-        const range = highestHigh - lowestLow;
-        if (range > 0) {
-            kValue = ((currentClose - lowestLow) / range) * 100;
-        }
-        // If range is 0, kValue remains 0, which is reasonable
-        percentK.push(kValue);
-    }
-
-    if (percentK.length < dPeriod) {
-        return null; // Not enough %K values to calculate %D
-    }
-
-    // Calculate %D (SMA of %K)
-    const percentD = calculateSMA(percentK, dPeriod);
-
-    // Align outputs (%D starts later than %K)
-    const kStartOffset = percentK.length - percentD.length;
-
-    return {
-        percentK: percentK.slice(kStartOffset),
-        percentD: percentD
-    };
-};
-
-const calculateOBV = (candles: PolygonCandle[]): number[] => {
-    if (!candles || candles.length === 0) return [];
-
-    const obv: number[] = [0]; // Start OBV at 0 for the first available point
-
-    for (let i = 1; i < candles.length; i++) {
-        const currentClose = candles[i].c;
-        const prevClose = candles[i-1].c;
-        const currentVolume = candles[i].v;
-        const prevObv = obv[obv.length - 1];
-
-        if (currentClose > prevClose) {
-            obv.push(prevObv + currentVolume);
-        } else if (currentClose < prevClose) {
-            obv.push(prevObv - currentVolume);
-        } else { // Close is the same
-            obv.push(prevObv);
-        }
-    }
-    return obv;
 };
 
 // --- AI Trading Engine Class ---
@@ -395,242 +87,340 @@ export class AITradingEngine {
 
   // --- Helper methods for individual strategy checks --- 
 
-  private checkMACrossover(closingPrices: number[], targetSymbol: string, latestPrice: number): TradeSignal | null {
-      console.log(`[AI Engine] Checking MA Crossover (${this.fastSMAPeriod}/${this.slowSMAPeriod})...`);
-      const fastSMA = calculateSMA(closingPrices, this.fastSMAPeriod);
-      const slowSMA = calculateSMA(closingPrices, this.slowSMAPeriod);
-      if (fastSMA.length >= 2 && slowSMA.length >= 2) {
-        // ... (crossover checks) ...
-        if (/* Bullish condition */ fastSMA[fastSMA.length - 2] <= slowSMA[slowSMA.length - 2] && fastSMA[fastSMA.length - 1] > slowSMA[slowSMA.length - 1]) {
-          return {
-            symbol: targetSymbol,
-            direction: 'buy',
-            price: latestPrice,
-            confidence: 0.8,
-            timestamp: Date.now(),
-            strategy: 'MA Crossover'
-          };
-        }
-        if (/* Bearish condition */ fastSMA[fastSMA.length - 2] >= slowSMA[slowSMA.length - 2] && fastSMA[fastSMA.length - 1] < slowSMA[slowSMA.length - 1]) {
-          return {
-            symbol: targetSymbol,
-            direction: 'sell',
-            price: latestPrice,
-            confidence: 0.8,
-            timestamp: Date.now(),
-            strategy: 'MA Crossover'
-          };
-        }
+  // Refactored to accept pre-calculated indicator values and the current index
+  private checkMACrossover(
+      fastSMA: number[], 
+      slowSMA: number[], 
+      index: number, // Index corresponding to the CURRENT bar in the original closingPrices array
+      targetSymbol: string, 
+      currentPrice: number
+  ): TradeSignal | null {
+      // We need index-1 and index-2 relative to the original closingPrices.
+      // Need to map this back to the SMA array indices.
+      // SMA arrays are shorter than closingPrices. SMA calculation requires 'period' bars.
+      // SMA value at index `k` corresponds to closing price at index `k + period - 1`
+      // So, closing price at index `i` corresponds to SMA index `k = i - period + 1`
+      
+      // Map current index `i` to corresponding indices in the SMA arrays
+      const fastSMAIndex = index - this.fastSMAPeriod + 1;
+      const slowSMAIndex = index - this.slowSMAPeriod + 1;
+
+      // Check if we have enough data points in the SMA arrays for the required indices
+      // Need current (k) and previous (k-1) points for both SMAs.
+      if (fastSMAIndex < 1 || slowSMAIndex < 1 || fastSMAIndex >= fastSMA.length || slowSMAIndex >= slowSMA.length) {
+          // console.log(`[MA Cross] Index out of bounds. i=${index}, fastK=${fastSMAIndex}, slowK=${slowSMAIndex}`);
+          return null; // Not enough historical SMA data for comparison at this index
       }
-      console.log(`[AI Engine] No MA Crossover signal.`);
-      return null; // Ensure null is returned if no signal
+
+      // Get the relevant SMA values using the mapped indices
+      const fastSMA_last = fastSMA[fastSMAIndex];
+      const fastSMA_prev = fastSMA[fastSMAIndex - 1];
+      const slowSMA_last = slowSMA[slowSMAIndex];
+      const slowSMA_prev = slowSMA[slowSMAIndex - 1];
+      
+      // console.log(`[MA Cross @ idx ${index}] F_prev:${fastSMA_prev?.toFixed(2)}, F_last:${fastSMA_last?.toFixed(2)}, S_prev:${slowSMA_prev?.toFixed(2)}, S_last:${slowSMA_last?.toFixed(2)}`);
+
+      // Bullish Crossover
+      if (fastSMA_prev <= slowSMA_prev && fastSMA_last > slowSMA_last) {
+          // console.log(`[MA Crossover @ idx ${index}] Bullish crossover detected`);
+          return {
+            symbol: targetSymbol, direction: 'buy', price: currentPrice, // Use price at index i
+            confidence: 0.80, timestamp: Date.now(), // Timestamp would be candle time in backtest
+            strategy: `MA Crossover (${this.fastSMAPeriod}/${this.slowSMAPeriod})`
+          };
+      }
+      // Bearish Crossover
+      if (fastSMA_prev >= slowSMA_prev && fastSMA_last < slowSMA_last) {
+          // console.log(`[MA Crossover @ idx ${index}] Bearish crossover detected`);
+          return {
+            symbol: targetSymbol, direction: 'sell', price: currentPrice,
+            confidence: 0.80, timestamp: Date.now(),
+            strategy: `MA Crossover (${this.fastSMAPeriod}/${this.slowSMAPeriod})`
+          };
+      }
+      
+      return null; // No crossover signal at this index
   }
 
-  private checkRSIConditions(closingPrices: number[], targetSymbol: string, latestPrice: number): TradeSignal | null {
+  // Refactored for backtesting
+  private checkRSIConditions(
+      rsi: number[], // Pass calculated RSI array
+      index: number, 
+      targetSymbol: string, 
+      currentPrice: number
+  ): TradeSignal | null {
       console.log(`[AI Engine] Checking RSI(${this.rsiPeriod})...`);
-      const rsi = calculateRSI(closingPrices, this.rsiPeriod);
-      if (rsi.length >= 2) {
-        // ... (rsi checks) ...
-        if (/* Bullish condition */ rsi[rsi.length - 2] <= this.rsiOversold && rsi[rsi.length - 1] > this.rsiOversold) {
-          return {
-            symbol: targetSymbol,
-            direction: 'buy',
-            price: latestPrice,
-            confidence: 0.8,
-            timestamp: Date.now(),
-            strategy: 'RSI'
-          };
-        }
-        if (/* Bearish condition */ rsi[rsi.length - 2] >= this.rsiOverbought && rsi[rsi.length - 1] < this.rsiOverbought) {
-          return {
-            symbol: targetSymbol,
-            direction: 'sell',
-            price: latestPrice,
-            confidence: 0.8,
-            timestamp: Date.now(),
-            strategy: 'RSI'
-          };
-        }
+      // Map current index `i` to corresponding index in the indicator array
+      // RSI calculation needs period+1 bars, result length is data.length - period
+      const rsiIndex = index - this.rsiPeriod;
+
+      if (rsiIndex < 1 || rsiIndex >= rsi.length) { // Need k and k-1
+           // console.log(`[RSI @ idx ${index}] Index out of bounds. rsiIndex=${rsiIndex}, rsiLen=${rsi.length}`);
+           return null; 
+      }
+
+      const rsi_last = rsi[rsiIndex];
+      const rsi_prev = rsi[rsiIndex - 1];
+      // console.log(`[RSI @ idx ${index}] Prev: ${rsi_prev?.toFixed(2)}, Last: ${rsi_last?.toFixed(2)}`);
+      
+      if (rsi_prev <= this.rsiOversold && rsi_last > this.rsiOversold) {
+        return {
+          symbol: targetSymbol, direction: 'buy', price: currentPrice,
+          confidence: 0.75, timestamp: Date.now(), // Use candle time in backtest
+          strategy: `RSI(${this.rsiPeriod}) Oversold Exit`
+        };
+      }
+      if (rsi_prev >= this.rsiOverbought && rsi_last < this.rsiOverbought) {
+        return {
+          symbol: targetSymbol, direction: 'sell', price: currentPrice,
+          confidence: 0.75, timestamp: Date.now(),
+          strategy: `RSI(${this.rsiPeriod}) Overbought Exit`
+        };
       }
       console.log(`[AI Engine] No RSI signal.`);
-      return null; // Ensure null is returned if no signal
+      return null; 
   }
 
-  private checkMACDCrossover(closingPrices: number[], targetSymbol: string, latestPrice: number): TradeSignal | null {
-       console.log(`[AI Engine] Checking MACD(${this.macdFast}/${this.macdSlow}/${this.macdSignal})...`);
-      const macdResult = calculateMACD(closingPrices, this.macdFast, this.macdSlow, this.macdSignal);
-      if (macdResult && macdResult.macdLine.length >= 2) {
-          // ... (macd crossover checks) ...
-          if (/* Bullish condition */ macdResult.macdLine[macdResult.macdLine.length - 2] <= macdResult.signalLine[macdResult.signalLine.length - 2] && macdResult.macdLine[macdResult.macdLine.length - 1] > macdResult.signalLine[macdResult.signalLine.length - 1]) {
-              return {
-                symbol: targetSymbol,
-                direction: 'buy',
-                price: latestPrice,
-                confidence: 0.8,
-                timestamp: Date.now(),
-                strategy: 'MACD'
-              };
-          }
-          if (/* Bearish condition */ macdResult.macdLine[macdResult.macdLine.length - 2] >= macdResult.signalLine[macdResult.signalLine.length - 2] && macdResult.macdLine[macdResult.macdLine.length - 1] < macdResult.signalLine[macdResult.signalLine.length - 1]) {
-              return {
-                symbol: targetSymbol,
-                direction: 'sell',
-                price: latestPrice,
-                confidence: 0.8,
-                timestamp: Date.now(),
-                strategy: 'MACD'
-              };
-          }
+  // Refactored for backtesting
+  private checkMACDCrossover(
+      macdResult: MACDResult | null, // Pass calculated MACD result object
+      index: number, 
+      targetSymbol: string, 
+      currentPrice: number
+  ): TradeSignal | null {
+      console.log(`[AI Engine] Checking MACD(${this.macdFast}/${this.macdSlow}/${this.macdSignal})...`);
+      if (!macdResult) {
+          console.warn(`[MACD @ idx ${index}] MACD result is null.`);
+          return null;
+      }
+      // Map current index `i` to corresponding index in the indicator arrays
+      // This depends heavily on how calculateMACD aligns its output arrays.
+      // Assuming the returned arrays (macdLine, signalLine) start at the same conceptual time point.
+      // The offset needed is the total lookback required *before* the first *aligned* output point.
+      const macdLookback = this.macdSlow + this.macdSignal - 2; // Lookback before first point of macdLine/signalLine
+      const macdIndex = index - macdLookback; 
+
+      if (macdIndex < 1 || macdIndex >= macdResult.macdLine.length) { // Need k and k-1
+           // console.log(`[MACD @ idx ${index}] Index out of bounds. macdIndex=${macdIndex}, macdLen=${macdResult.macdLine.length}`);
+           return null;
+      }
+      
+      const macd_last = macdResult.macdLine[macdIndex];
+      const macd_prev = macdResult.macdLine[macdIndex - 1];
+      const signal_last = macdResult.signalLine[macdIndex];
+      const signal_prev = macdResult.signalLine[macdIndex - 1];
+      // console.log(`[MACD @ idx ${index}] M_prev:${macd_prev?.toFixed(2)}, M_last:${macd_last?.toFixed(2)}, S_prev:${signal_prev?.toFixed(2)}, S_last:${signal_last?.toFixed(2)}`);
+
+      if (macd_prev <= signal_prev && macd_last > signal_last) {
+          return {
+            symbol: targetSymbol, direction: 'buy', price: currentPrice, 
+            confidence: 0.70, timestamp: Date.now(), 
+            strategy: `MACD Crossover (${this.macdFast}/${this.macdSlow}/${this.macdSignal})`
+          };
+      }
+      if (macd_prev >= signal_prev && macd_last < signal_last) {
+          return {
+            symbol: targetSymbol, direction: 'sell', price: currentPrice, 
+            confidence: 0.70, timestamp: Date.now(), 
+            strategy: `MACD Crossover (${this.macdFast}/${this.macdSlow}/${this.macdSignal})`
+          };
       }
       console.log(`[AI Engine] No MACD signal.`);
-      return null; // Ensure null is returned if no signal
+      return null; 
   }
 
-  private checkBollingerBands(closingPrices: number[], targetSymbol: string, latestPrice: number): TradeSignal | null {
+  // Refactored for backtesting
+  private checkBollingerBands(
+      bbandsResult: BollingerBandsResult | null, // Pass calculated BBands result object
+      index: number, 
+      targetSymbol: string, 
+      currentPrice: number,
+      prevPrice?: number // Optional: previous price for stricter crossing check
+  ): TradeSignal | null {
      console.log(`[AI Engine] Checking Bollinger Bands (${this.bbandsPeriod}/${this.bbandsStdDev})...`);
-     const bbandsResult = calculateBollingerBands(closingPrices, this.bbandsPeriod, this.bbandsStdDev);
-      if (bbandsResult && bbandsResult.upperBand.length >= 2) {
-          // ... (bbands checks) ...
-          if (/* Sell condition */ latestPrice > bbandsResult.upperBand[bbandsResult.upperBand.length - 1]) { 
-              return {
-                symbol: targetSymbol,
-                direction: 'sell',
-                price: latestPrice,
-                confidence: 0.8,
-                timestamp: Date.now(),
-                strategy: 'Bollinger Bands'
-              };
-          }
-          if (/* Buy condition */ latestPrice < bbandsResult.lowerBand[bbandsResult.lowerBand.length - 1]) {
-              return {
-                symbol: targetSymbol,
-                direction: 'buy',
-                price: latestPrice,
-                confidence: 0.8,
-                timestamp: Date.now(),
-                strategy: 'Bollinger Bands'
-              };
-          }
+     if (!bbandsResult) {
+         console.warn(`[BBands @ idx ${index}] BBands result is null.`);
+         return null;
+     }
+     // Map current index `i` to corresponding index in the indicator array
+     // BBands calc needs period bars, result length is data.length - period + 1
+     const bbandsIndex = index - this.bbandsPeriod + 1;
+
+      if (bbandsIndex < 0 || bbandsIndex >= bbandsResult.upperBand.length) { // Only need current point k
+          // console.log(`[BBands @ idx ${index}] Index out of bounds. bbandsIndex=${bbandsIndex}, bbandsLen=${bbandsResult.upperBand.length}`);
+          return null;
+      }
+
+      const upperBand_last = bbandsResult.upperBand[bbandsIndex];
+      const lowerBand_last = bbandsResult.lowerBand[bbandsIndex];
+      // const upperBand_prev = bbandsIndex > 0 ? bbandsResult.upperBand[bbandsIndex - 1] : null;
+      // const lowerBand_prev = bbandsIndex > 0 ? bbandsResult.lowerBand[bbandsIndex - 1] : null;
+      
+      // console.log(`[BBands @ idx ${index}] C:${currentPrice.toFixed(2)}, U:${upperBand_last?.toFixed(2)}, L:${lowerBand_last?.toFixed(2)}`);
+
+      // Sell Signal: Current price crosses ABOVE Upper Band 
+      if (currentPrice > upperBand_last /* && prevPrice && upperBand_prev && prevPrice <= upperBand_prev */) { 
+          return { 
+              symbol: targetSymbol, direction: 'sell', price: currentPrice, 
+              confidence: 0.65, timestamp: Date.now(), 
+              strategy: `BBands (${this.bbandsPeriod}/${this.bbandsStdDev}) Upper Cross` 
+          };
+      }
+      // Buy Signal: Current price crosses BELOW Lower Band
+      if (currentPrice < lowerBand_last /* && prevPrice && lowerBand_prev && prevPrice >= lowerBand_prev */) {
+          return { 
+              symbol: targetSymbol, direction: 'buy', price: currentPrice, 
+              confidence: 0.65, timestamp: Date.now(), 
+              strategy: `BBands (${this.bbandsPeriod}/${this.bbandsStdDev}) Lower Cross` 
+          };
       }
       console.log(`[AI Engine] No BBands signal.`);
-      return null; // Ensure null is returned if no signal
+      return null; 
   }
 
-  // --- Main Analysis Method --- 
-  async analyzeMarket(symbol?: string): Promise<TradeSignal | null> {
-    const targetSymbol = symbol || this.symbol;
-    console.log(`[AI Engine] Analyzing market for ${targetSymbol}...`);
-
-    try {
-      // 1. Fetch historical data
-      const historyNeeded = Math.max(
-          this.slowSMAPeriod + 1, 
-          this.rsiPeriod + 1, 
-          this.macdSlow + this.macdSignal, 
-          this.bbandsPeriod, // BBands period needed
-          this.adxPeriod + this.adxPeriod, // ADX needs period + period for smoothing DX
-          this.stochasticKPeriod + this.stochasticDPeriod, // Need K period + D smoothing for Stoch
-          this.obvSmaPeriod // Need enough for OBV SMA calculation buffer
-      );
-      const historyDays = historyNeeded + 40; // Ample buffer
-      const endDate = new Date();
-      const startDate = new Date();
-      startDate.setDate(endDate.getDate() - historyDays);
-      const startDateStr = startDate.toISOString().split('T')[0];
-      const endDateStr = endDate.toISOString().split('T')[0];
-
-      console.log(`[AI Engine] Fetching candles from ${startDateStr} to ${endDateStr}`);
-      const candles: PolygonCandle[] = await this.polygonService.getStockCandles(targetSymbol, startDateStr, endDateStr, 'day');
-
-      if (!candles || candles.length < historyNeeded) {
-        console.warn(`[AI Engine] Insufficient candle data for ${targetSymbol} (${candles?.length || 0} received). Needed >= ${historyNeeded}.`);
-        return null;
-      }
-      candles.sort((a, b) => a.t - b.t); // Ensure chronological order
-      const closingPrices = candles.map(candle => candle.c);
-      const latestPrice = closingPrices[closingPrices.length - 1];
-      const prevPrice = closingPrices[closingPrices.length - 2]; // Need previous price for BBands cross check
-
-      // Calculate ADX (needs full candle data)
-      console.log(`[AI Engine] Calculating ADX(${this.adxPeriod})...`);
-      const adxResult = calculateADX(candles, this.adxPeriod);
-      let adxValue = 0;
-      let plusDIValue = 0;
-      let minusDIValue = 0;
-      if (adxResult && adxResult.adx.length > 0) {
-          adxValue = adxResult.adx[adxResult.adx.length - 1];
-          plusDIValue = adxResult.plusDI[adxResult.plusDI.length - 1];
-          minusDIValue = adxResult.minusDI[adxResult.minusDI.length - 1];
-          console.log(`[ADX] Latest ADX: ${adxValue.toFixed(2)}, +DI: ${plusDIValue.toFixed(2)}, -DI: ${minusDIValue.toFixed(2)}`);
-      } else {
-          console.warn(`[ADX] Calculation failed or insufficient data.`);
-      }
-      
-      // Determine if market is trending based on ADX
-      const isTrending = adxValue > this.adxTrendThreshold;
-      console.log(`[AI Engine] Market Trending (ADX > ${this.adxTrendThreshold}): ${isTrending}`);
-
-       // --- Strategy Checks --- 
-        
-        // Note: OBV is not used for direct signals here yet,
-        // but could be used to confirm signals from other strategies later.
-        // Example: if (maSignal && maSignal.direction === 'buy' && latestObv > obvSmaValue) { return maSignal; }
-
-        // Strategy 1: MA Crossover
-        const maSignal = this.checkMACrossover(closingPrices, targetSymbol, latestPrice);
-        if (maSignal) return maSignal;
-
-        // Strategy 2: RSI
-        const rsiSignal = this.checkRSIConditions(closingPrices, targetSymbol, latestPrice);
-        if (rsiSignal) return rsiSignal;
-        
-        // Strategy 3: MACD Crossover
-        const macdSignal = this.checkMACDCrossover(closingPrices, targetSymbol, latestPrice);
-        if (macdSignal) return macdSignal;
-      
-        // Strategy 4: Bollinger Bands Cross
-        const bbandsSignal = this.checkBollingerBands(closingPrices, targetSymbol, latestPrice);
-        if (bbandsSignal) return bbandsSignal;
-        
-        // Strategy 5: Stochastic Oscillator Crossover
-        const stochSignal = this.checkStochastic(candles, targetSymbol, latestPrice);
-        if (stochSignal) return stochSignal;
-
-      // --- No signals from implemented strategies ---
-      console.log(`[AI Engine] No signals generated for ${targetSymbol}.`);
-      return null;
-
-    } catch (error) {
-      console.error(`[AI Engine] Error analyzing market for ${targetSymbol}:`, error);
-      return null;
-    }
-  }
-
-  // --- Helper methods for individual strategy checks --- 
-  // ... (checkMACrossover, checkRSIConditions, checkMACDCrossover, checkBollingerBands remain the same) ...
-  
-  // Added Stochastic check helper method
-  private checkStochastic(candles: PolygonCandle[], targetSymbol: string, latestPrice: number): TradeSignal | null {
+  // Refactored for backtesting
+  private checkStochastic(
+      stochResult: StochasticResult | null, // Pass calculated Stoch result object
+      index: number,
+      targetSymbol: string,
+      currentPrice: number
+  ): TradeSignal | null {
       console.log(`[AI Engine] Checking Stochastic (${this.stochasticKPeriod}/${this.stochasticDPeriod})...`);
-        const stochResult = calculateStochastic(candles, this.stochasticKPeriod, this.stochasticDPeriod);
-        if (stochResult && stochResult.percentK.length >= 2) { 
-            const k_last = stochResult.percentK[stochResult.percentK.length - 1];
-            const k_prev = stochResult.percentK[stochResult.percentK.length - 2];
-            const d_last = stochResult.percentD[stochResult.percentD.length - 1];
-            const d_prev = stochResult.percentD[stochResult.percentD.length - 2];
-            console.log(`[Stoch] Latest %K: ${k_last.toFixed(2)}, %D: ${d_last.toFixed(2)}`);
+      if (!stochResult) {
+          console.warn(`[Stoch @ idx ${index}] Stoch result is null.`);
+          return null;
+      }
+      // Map current index `i` 
+      // Stoch calc needs kPeriod + dPeriod - 1 bars. Result length depends on alignment.
+      // Assuming calculateStochastic returns arrays aligned from a common start point
+      const commonIndicatorOffset = this.stochasticKPeriod + this.stochasticDPeriod - 2; // Approx start delay
+      const stochIndex = index - commonIndicatorOffset;
 
-            // Bullish Crossover 
-            if (k_prev <= d_prev && k_last > d_last && k_prev < this.stochasticOversold && d_prev < this.stochasticOversold) {
-                return { symbol: targetSymbol, direction: 'buy', price: latestPrice, confidence: 0.70, timestamp: Date.now(), strategy: `Stoch (${this.stochasticKPeriod}/${this.stochasticDPeriod}) Oversold Cross` };
-            }
-            // Bearish Crossover 
-            if (k_prev >= d_prev && k_last < d_last && k_prev > this.stochasticOverbought && d_prev > this.stochasticOverbought) {
-                return { symbol: targetSymbol, direction: 'sell', price: latestPrice, confidence: 0.70, timestamp: Date.now(), strategy: `Stoch (${this.stochasticKPeriod}/${this.stochasticDPeriod}) Overbought Cross` };
-            }
+        if (stochIndex < 1 || stochIndex >= stochResult.percentK.length) { 
+             // console.log(`[Stoch @ idx ${index}] Index out of bounds. stochIndex=${stochIndex}, stochLen=${stochResult.percentK.length}`);
+             return null;
+        }
+        
+        const k_last = stochResult.percentK[stochIndex];
+        const k_prev = stochResult.percentK[stochIndex - 1];
+        const d_last = stochResult.percentD[stochIndex];
+        const d_prev = stochResult.percentD[stochIndex - 1];
+        // console.log(`[Stoch @ idx ${index}] K_prev:${k_prev?.toFixed(2)}, K_last:${k_last?.toFixed(2)}, D_prev:${d_prev?.toFixed(2)}, D_last:${d_last?.toFixed(2)}`);
+
+        if (k_prev <= d_prev && k_last > d_last && k_prev < this.stochasticOversold && d_prev < this.stochasticOversold) {
+            return { 
+                symbol: targetSymbol, direction: 'buy', price: currentPrice, 
+                confidence: 0.70, timestamp: Date.now(), 
+                strategy: `Stoch (${this.stochasticKPeriod}/${this.stochasticDPeriod}) Oversold Cross` 
+            };
+        }
+        if (k_prev >= d_prev && k_last < d_last && k_prev > this.stochasticOverbought && d_prev > this.stochasticOverbought) {
+            return { 
+                symbol: targetSymbol, direction: 'sell', price: currentPrice, 
+                confidence: 0.70, timestamp: Date.now(), 
+                strategy: `Stoch (${this.stochasticKPeriod}/${this.stochasticDPeriod}) Overbought Cross` 
+            };
         }
         console.log(`[AI Engine] No Stoch signal.`);
         return null;
+  }
+
+  // --- Main Analysis Method (Adjusted to call refactored helpers) --- 
+  async analyzeMarket(symbol?: string): Promise<TradeSignal | null> {
+    const targetSymbol = symbol || this.symbol;
+    console.log(`[AI Engine] Analyzing market for ${targetSymbol}... (Live Signal)`);
+
+    try {
+        // 1. Fetch historical data
+        const historyNeeded = Math.max(
+          this.slowSMAPeriod + 1, 
+          this.rsiPeriod + 1, 
+          this.macdSlow + this.macdSignal, 
+          this.bbandsPeriod, 
+          this.adxPeriod + this.adxPeriod,
+          this.stochasticKPeriod + this.stochasticDPeriod,
+          this.obvSmaPeriod 
+        );
+        const historyDays = historyNeeded + 40; 
+        const endDate = new Date();
+        const startDate = new Date();
+        startDate.setDate(endDate.getDate() - historyDays);
+        const startDateStr = startDate.toISOString().split('T')[0];
+        const endDateStr = endDate.toISOString().split('T')[0];
+        const candles: PolygonCandle[] = await this.polygonService.getStockCandles(targetSymbol, startDateStr, endDateStr, 'day');
+        
+        if (!candles || candles.length < historyNeeded) {
+            console.warn(`[AI Engine] Insufficient candle data for ${targetSymbol} (${candles?.length || 0} received). Needed >= ${historyNeeded}.`);
+            return null;
+        }
+        candles.sort((a, b) => a.t - b.t); 
+        const closingPrices = candles.map(candle => candle.c);
+        const latestIndex = closingPrices.length - 1;
+        if (latestIndex < 1) return null; 
+        const latestPrice = closingPrices[latestIndex];
+        const prevPrice = closingPrices[latestIndex - 1]; 
+
+        // 2. Calculate All Indicators Needed for Live signal check
+        console.log(`[AI Engine] Calculating all indicators for live check...`);
+        const fastSMA = calculateSMA(closingPrices, this.fastSMAPeriod);
+        const slowSMA = calculateSMA(closingPrices, this.slowSMAPeriod);
+        const rsi = calculateRSI(closingPrices, this.rsiPeriod);
+        const macdResult = calculateMACD(closingPrices, this.macdFast, this.macdSlow, this.macdSignal);
+        const bbandsResult = calculateBollingerBands(closingPrices, this.bbandsPeriod, this.bbandsStdDev);
+        const stochResult = calculateStochastic(candles, this.stochasticKPeriod, this.stochasticDPeriod);
+        const adxResult = calculateADX(candles, this.adxPeriod);
+        const obv = calculateOBV(candles);
+        
+        let adxValue = 0;
+        if (adxResult && adxResult.adx.length > 0) {
+            adxValue = adxResult.adx[adxResult.adx.length - 1];
+            console.log(`[ADX] Latest ADX: ${adxValue.toFixed(2)}`);
+        } else {
+            console.warn(`[ADX] Live calculation failed.`);
+        }
+        const isTrending = adxValue > this.adxTrendThreshold;
+        console.log(`[AI Engine] Market Trending (ADX > ${this.adxTrendThreshold}): ${isTrending}`);
+        
+        // Calculate OBV SMA if needed for filtering
+        let latestObv = obv.length > 0 ? obv[obv.length - 1] : 0;
+        let obvSmaValue = 0;
+        if (obv.length >= this.obvSmaPeriod) {
+           const obvSma = calculateSMA(obv, this.obvSmaPeriod);
+           if (obvSma.length > 0) obvSmaValue = obvSma[obvSma.length - 1];
+        }
+        console.log(`[OBV] Latest OBV: ${latestObv}, SMA(${this.obvSmaPeriod}): ${obvSmaValue.toFixed(0)}`);
+        
+        // --- Strategy Checks (using refactored helpers) --- 
+        
+        // if (isTrending) { // Example: Apply ADX filter
+            const maSignal = this.checkMACrossover(fastSMA, slowSMA, latestIndex, targetSymbol, latestPrice);
+            if (maSignal) return maSignal;
+        // }
+
+        const rsiSignal = this.checkRSIConditions(rsi, latestIndex, targetSymbol, latestPrice);
+        if (rsiSignal) return rsiSignal;
+        
+        // if (isTrending) { // Example: Apply ADX filter
+            const macdSignal = this.checkMACDCrossover(macdResult, latestIndex, targetSymbol, latestPrice);
+            if (macdSignal) return macdSignal;
+        // }
+      
+        // if (!isTrending) { // Example: Apply ADX filter (for ranging)
+            const bbandsSignal = this.checkBollingerBands(bbandsResult, latestIndex, targetSymbol, latestPrice, prevPrice);
+            if (bbandsSignal) return bbandsSignal;
+        // }
+        
+        const stochSignal = this.checkStochastic(stochResult, latestIndex, targetSymbol, latestPrice);
+        if (stochSignal) return stochSignal;
+
+      // --- No signals --- 
+      console.log(`[AI Engine] No live signal generated for ${targetSymbol}.`);
+      return null;
+
+    } catch (error) {
+        console.error(`[AI Engine] Error analyzing market for ${targetSymbol}:`, error);
+        return null;
+    }
   }
 
   // --- Other Methods --- 
