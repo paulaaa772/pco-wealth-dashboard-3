@@ -6,23 +6,12 @@ export interface TradeScenario {
   takeProfit: number;
   position: 'long' | 'short';
   confidence: number;
-  timestamp: Date;
+  timeframe: string;
 }
 
 export interface TradingSignal {
   symbol: string;
   scenario: TradeScenario;
-  indicators: {
-    rsi: number;
-    volume: number;
-    trend: 'bullish' | 'bearish' | 'neutral';
-    atr: number;
-  };
-  filters: {
-    volumeValid: boolean;
-    trendValid: boolean;
-    rsiValid: boolean;
-  };
 }
 
 export type Position = {
