@@ -469,5 +469,30 @@ export class AITradingEngine {
     }
   }
 
-  // ... (Rest of the class: helpers, other methods) ...
+  // --- Other Public Methods --- 
+  setSymbol(symbol: string): void {
+      this.symbol = symbol;
+      console.log(`Trading symbol updated to: ${symbol}`);
+  }
+  setMode(mode: TradingMode): void {
+      this.mode = mode;
+      console.log(`Trading mode updated to: ${mode}`);
+  }
+
+  calculatePositionSize(price: number, risk: number = 0.02): number {
+      const accountSize = 10000; 
+      const riskAmount = accountSize * risk;
+      if (price <= 0) return 0;
+      const shares = Math.floor(riskAmount / price);
+      return shares > 0 ? shares : 0;
+  }
+  
+  async executeTradeSignal(signal: TradeSignal): Promise<boolean> {
+      console.log(`Executing ${signal.direction} ...`);
+      if (this.mode === TradingModeEnum.DEMO) {
+          /*...*/ return true;
+      } else {
+          /*...*/ return true; 
+      }
+  }
 }
