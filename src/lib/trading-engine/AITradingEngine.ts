@@ -342,11 +342,19 @@ export class AITradingEngine {
           this.obvSmaPeriod 
         );
         const historyDays = historyNeeded + 40; 
-        const endDate = new Date();
+        
+        // ** CORRECTED DATE CALCULATION **
+        const endDate = new Date(); // Today
         const startDate = new Date();
-        startDate.setDate(endDate.getDate() - historyDays);
-        const startDateStr = startDate.toISOString().split('T')[0];
-        const endDateStr = endDate.toISOString().split('T')[0];
+        startDate.setDate(endDate.getDate() - historyDays); // Go back X days from today
+        
+        // Format dates as YYYY-MM-DD
+        const formatDate = (date: Date) => date.toISOString().split('T')[0];
+        const startDateStr = formatDate(startDate);
+        const endDateStr = formatDate(endDate); 
+        // ** END CORRECTION **
+
+        console.log(`[AI Engine] Fetching candles from ${startDateStr} to ${endDateStr}`); // Log corrected dates
         const candles: PolygonCandle[] = await this.polygonService.getStockCandles(targetSymbol, startDateStr, endDateStr, 'day');
         
         if (!candles || candles.length < historyNeeded) {
