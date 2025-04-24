@@ -6,6 +6,7 @@ import Link from 'next/link'
 const tabs = [
   { name: 'Dashboard', href: '/' },
   { name: 'Portfolio', href: '/portfolio' },
+  { name: 'Brokerage', href: '/brokerage' },
   { name: 'News', href: '/news' },
   { name: 'Settings', href: '/settings' },
 ]
