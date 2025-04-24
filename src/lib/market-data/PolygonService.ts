@@ -16,24 +16,33 @@ export class PolygonService {
   private apiKey: string;
 
   private constructor() {
-    // Get API key directly from environment variable
-    this.apiKey = process.env.NEXT_PUBLIC_POLYGON_API_KEY || '';
+    // Get API key from window environment
+    this.apiKey = window?.process?.env?.NEXT_PUBLIC_POLYGON_API_KEY || '';
     
     if (!this.apiKey) {
       console.error('Polygon API key is not configured in environment variables');
+      throw new Error('Polygon API key is not configured');
     } else {
       console.log('Polygon API key is configured:', this.apiKey.substring(0, 4) + '...');
     }
   }
 
-  static getInstance(): PolygonService {
-    if (!this.instance) {
-      this.instance = new PolygonService();
+  static getInstance(): PolygonService | null {
+    try {
+      if (!this.instance) {
+        this.instance = new PolygonService();
+      }
+      return this.instance;
+    } catch (error) {
+      console.error('Failed to initialize PolygonService:', error);
+      return null;
     }
-    return this.instance;
   }
 
   private getApiUrl(endpoint: string): string {
+    if (!this.apiKey) {
+      throw new Error('API key is not configured');
+    }
     const url = `${BASE_URL}${endpoint}?apiKey=${this.apiKey}`;
     console.log('Generated API URL:', url.replace(this.apiKey, '[HIDDEN]'));
     return url;

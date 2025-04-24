@@ -23,28 +23,34 @@ export default function BrokeragePage() {
   const [selectedSymbol, setSelectedSymbol] = useState<string>('AAPL');
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [polygonService, setPolygonService] = useState<PolygonService | null>(null);
 
   useEffect(() => {
     const initPage = async () => {
       try {
         console.log('Initializing brokerage page');
-        const polygonService = PolygonService.getInstance();
-        if (!polygonService) {
-          console.error('Failed to initialize PolygonService');
-          setError('Service initialization failed');
-          return;
+        const service = PolygonService.getInstance();
+        if (!service) {
+          throw new Error('Failed to initialize market data service. Please check your API key configuration.');
         }
-        await loadMarketData(polygonService);
+        setPolygonService(service);
+        await loadMarketData(service);
       } catch (error) {
         console.error('Error initializing page:', error);
-        setError('Failed to initialize the page');
+        setError(error instanceof Error ? error.message : 'Failed to initialize the page');
       }
     };
 
     initPage();
+  }, []);
+
+  useEffect(() => {
+    if (polygonService && selectedSymbol) {
+      loadMarketData(polygonService);
+    }
   }, [selectedSymbol]);
 
-  const loadMarketData = async (polygonService: PolygonService) => {
+  const loadMarketData = async (service: PolygonService) => {
     if (!selectedSymbol) {
       console.error('No symbol selected');
       setError('Please select a symbol');
@@ -63,7 +69,7 @@ export default function BrokeragePage() {
       
       console.log('Date range:', { from, to });
       
-      const candles = await polygonService.getStockCandles(selectedSymbol, from, to, '1day');
+      const candles = await service.getStockCandles(selectedSymbol, from, to, '1day');
       console.log('Received candles:', candles);
       
       if (!candles || !Array.isArray(candles) || candles.length === 0) {
@@ -99,7 +105,7 @@ export default function BrokeragePage() {
       
     } catch (error) {
       console.error('Error loading market data:', error);
-      setError('Failed to load market data. Please try again.');
+      setError(error instanceof Error ? error.message : 'Failed to load market data. Please try again.');
       setChartData([]);
     } finally {
       setIsLoading(false);
@@ -112,6 +118,18 @@ export default function BrokeragePage() {
       setSelectedSymbol(symbol.toUpperCase());
     }
   };
+
+  if (!polygonService) {
+    return (
+      <div className="p-6 space-y-6 bg-gray-800 min-h-screen">
+        <div className="max-w-7xl mx-auto">
+          <div className="bg-red-500/10 border border-red-500 rounded-lg p-4">
+            <p className="text-red-500">Failed to initialize market data service. Please check your API key configuration in the environment variables.</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 space-y-6 bg-gray-800 min-h-screen">
