@@ -4,10 +4,13 @@ import React, { useState, useEffect } from 'react';
 import { PolygonService } from '../../lib/market-data/PolygonService';
 import dynamic from 'next/dynamic';
 import TradingInterface from '../../components/dashboard/TradingInterface';
+import OrderBook from '@/components/brokerage/OrderBook';
+import TradeHistory from '@/components/brokerage/TradeHistory';
+import OrderEntryPanel from '@/components/brokerage/OrderEntryPanel';
 
 // Import the TradingChart component with dynamic import to avoid SSR issues
 const TradingChart = dynamic(
-  () => import('../../components/TradingChart'),
+  () => import('@/components/TradingChart'),
   { ssr: false }
 );
 
@@ -85,7 +88,8 @@ export default function BrokeragePage() {
       const response = await service.getStockCandles(
         sym,
         startDateStr,
-        endDateStr
+        endDateStr,
+        'day'
       );
       
       console.log('API Response:', response);
@@ -128,37 +132,41 @@ export default function BrokeragePage() {
   };
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <h1 className="text-3xl font-bold mb-6">Brokerage Dashboard</h1>
-      
-      {/* Error message */}
-      {error && (
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-          {error}
+    <div className="container mx-auto px-4 py-8 text-white">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6 h-[70vh]">
+        <div className="lg:col-span-2 bg-gray-900 rounded-lg p-1 flex flex-col h-full">
+          {error && !isLoading && (
+            <div className="bg-red-900/30 border border-red-700 text-red-400 px-3 py-1 rounded mb-2 text-sm">
+              {error}
+            </div>
+          )}
+          {isLoading ? (
+            <div className="flex-grow flex items-center justify-center">
+              <Spinner />
+              <p className="ml-2 text-gray-400">Loading chart data...</p>
+            </div>
+          ) : chartData.length > 0 ? (
+            <div className="flex-grow h-full w-full min-h-0">
+              <TradingChart symbol={symbol} data={chartData} />
+            </div>
+          ) : (
+            <div className="flex-grow flex items-center justify-center">
+              <p className="text-gray-500">{error ? 'Error loading data' : `No data available for ${symbol}`}</p>
+            </div>
+          )}
         </div>
-      )}
-      
-      {/* Chart container */}
-      <div className="border border-gray-700 bg-gray-900 rounded p-4 h-[500px] mb-6">
-        {isLoading ? (
-          <div className="flex items-center justify-center h-full">
-            <Spinner />
-            <p className="ml-2 text-gray-400">Loading chart data...</p>
-          </div>
-        ) : chartData.length > 0 ? (
-          <TradingChart symbol={symbol} data={chartData} />
-        ) : (
-          <div className="flex items-center justify-center h-full">
-            <p className="text-gray-500">{error ? error : `No data available for ${symbol}`}</p>
-          </div>
-        )}
+        <div className="lg:col-span-1 flex flex-col gap-4 h-full">
+          <div className="flex-shrink-0"><OrderBook /></div>
+          <div className="flex-shrink-0"><TradeHistory /></div>
+          <div className="flex-grow min-h-0"><OrderEntryPanel /></div>
+        </div>
       </div>
-
-      {/* Trading Interface component */}
-      <TradingInterface 
-        currentSymbol={symbol} 
-        onSymbolChange={handleSymbolChange} 
-      />
+      <div className="mt-8">
+        <TradingInterface 
+          currentSymbol={symbol} 
+          onSymbolChange={handleSymbolChange} 
+        />
+      </div>
     </div>
   );
 }
