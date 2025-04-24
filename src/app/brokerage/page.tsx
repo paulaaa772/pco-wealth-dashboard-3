@@ -137,6 +137,9 @@ export default function BrokeragePage() {
     console.log("Toggle fullscreen clicked (not implemented)");
   };
 
+  // Get the latest closing price from chart data
+  const latestClosePrice = chartData.length > 0 ? chartData[chartData.length - 1].close : null;
+
   return (
     <div className="container mx-auto px-4 py-6 text-white">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
@@ -179,7 +182,7 @@ export default function BrokeragePage() {
           </div>
         </div>
         <div className="lg:col-span-1 flex flex-col gap-4 h-full">
-          <div className="flex-1 min-h-0"><OrderBook symbol={symbol} /></div>
+          <div className="flex-1 min-h-0"><OrderBook symbol={symbol} latestPrice={latestClosePrice} /></div>
           <div className="flex-1 min-h-0"><TradeHistory /></div>
           <div className="flex-1 min-h-0"><OrderEntryPanel symbol={symbol} /></div>
         </div>

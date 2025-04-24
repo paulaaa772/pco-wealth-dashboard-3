@@ -1,55 +1,31 @@
 'use client'
 
-import React, { useState, useEffect } from 'react';
-import { PolygonService } from '@/lib/market-data/PolygonService'; // Assuming path alias is set up
+import React from 'react'; // Removed useState, useEffect
 
 interface OrderBookProps {
-    symbol?: string; // Pass symbol down
+    symbol?: string; 
+    latestPrice?: number | null; // Pass latest known price from parent
 }
 
-const OrderBook: React.FC<OrderBookProps> = ({ symbol = 'BTC' }) => {
-  const [latestQuote, setLatestQuote] = useState<{ bid: number, ask: number } | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+const OrderBook: React.FC<OrderBookProps> = ({ symbol = 'BTC', latestPrice }) => {
 
-  useEffect(() => {
-    const fetchQuote = async () => {
-      if (!symbol) return;
-      console.log(`[OrderBook] Fetching quote for ${symbol}...`); // Log fetch start
-      setIsLoading(true);
-      setError(null);
-      setLatestQuote(null); // Clear previous quote
-      try {
-        const polygonService = PolygonService.getInstance();
-        const price = await polygonService.getLatestPrice(symbol);
-        
-        if (price && typeof price === 'number') { // Check if price is valid number
-            console.log(`[OrderBook] Latest price fetched for ${symbol}: ${price}`);
-            const spread = price * 0.0005; 
-            setLatestQuote({ ask: price + spread / 2, bid: price - spread / 2 });
-        } else {
-             console.error(`[OrderBook] Invalid price received for ${symbol}:`, price);
-             setError('Could not fetch quote.');
-        }
-      } catch (err: any) {
-        console.error(`[OrderBook] Error fetching quote for ${symbol}:`, err);
-        // Display specific error if available
-        setError(`Quote Error: ${err.message || 'Failed to load'}`); 
-        setLatestQuote(null);
-      } finally {
-        setIsLoading(false);
-        console.log(`[OrderBook] Fetch quote finished for ${symbol}. Loading: ${isLoading}`);
-      }
-    };
+  // Remove internal state and useEffect for fetching quote
+  // const [latestQuote, setLatestQuote] = useState<{ bid: number, ask: number } | null>(null);
+  // const [isLoading, setIsLoading] = useState(false);
+  // const [error, setError] = useState<string | null>(null);
+  // useEffect(() => { ... fetchQuote logic removed ... }, [symbol]);
 
-    fetchQuote();
-    // Optionally add a timer to refresh the quote periodically
-    // const interval = setInterval(fetchQuote, 10000); // e.g., every 10 seconds
-    // return () => clearInterval(interval);
-
-  }, [symbol]);
-
-  const midPrice = latestQuote ? ((latestQuote.bid + latestQuote.ask) / 2).toFixed(2) : '--.--';
+  // Calculate mid-price based on passed prop
+  let midPrice = '--.--';
+  let simulatedBid = 92900; // Default mock bids/asks
+  let simulatedAsk = 93100;
+  
+  if (latestPrice && typeof latestPrice === 'number') {
+      const spread = latestPrice * 0.0005; 
+      simulatedAsk = latestPrice + spread / 2;
+      simulatedBid = latestPrice - spread / 2;
+      midPrice = ((simulatedBid + simulatedAsk) / 2).toFixed(2);
+  }
 
   return (
     <div className="bg-gray-800 rounded-lg p-4 h-full text-gray-300 flex flex-col">
@@ -59,30 +35,27 @@ const OrderBook: React.FC<OrderBookProps> = ({ symbol = 'BTC' }) => {
         <span>Price (USD)</span>
       </div>
       
-      {/* Asks (Sell Orders) - Static Mock Data */}
-      <div className="text-red-400 flex-grow overflow-y-auto order-1"> {/* Order matters for flex layout */} 
+      {/* Asks (Sell Orders) - Static Mock Data (uses simulatedAsk) */}
+      <div className="text-red-400 flex-grow overflow-y-auto order-1"> 
         {[...Array(15)].map((_, i) => (
           <div key={`ask-${i}`} className="flex justify-between text-sm mb-0.5">
             <span>{(Math.random() * 0.5).toFixed(6)}</span>
-            {/* Generate asks slightly above the simulated mid/latest price */} 
-            <span>{( (latestQuote?.ask || 93100) + (Math.random() * 100) ).toFixed(2)}</span>
+            <span>{( simulatedAsk + (Math.random() * 100) ).toFixed(2)}</span>
           </div>
         ))}
       </div>
 
-      {/* Mid Price Display */}
-      <div className={`text-center text-lg font-bold my-1 py-1 border-y border-gray-700 flex-shrink-0 order-2 ${isLoading ? 'text-gray-500' : 'text-white'}`}>
-         {isLoading ? 'Loading...' : midPrice }
-         {error && !isLoading && <span className="text-red-400 text-xs ml-2">({error})</span>}
+      {/* Mid Price Display (no loading/error state needed here now) */}
+      <div className={`text-center text-lg font-bold my-1 py-1 border-y border-gray-700 flex-shrink-0 order-2 text-white`}>
+         { midPrice }
       </div>
 
-      {/* Bids (Buy Orders) - Static Mock Data */}
-      <div className="text-green-400 flex-grow overflow-y-auto order-3"> {/* Order matters for flex layout */} 
+      {/* Bids (Buy Orders) - Static Mock Data (uses simulatedBid) */}
+      <div className="text-green-400 flex-grow overflow-y-auto order-3"> 
         {[...Array(15)].map((_, i) => (
           <div key={`bid-${i}`} className="flex justify-between text-sm mb-0.5">
             <span>{(Math.random() * 0.5).toFixed(6)}</span>
-             {/* Generate bids slightly below the simulated mid/latest price */} 
-            <span>{( (latestQuote?.bid || 92900) - (Math.random() * 100) ).toFixed(2)}</span>
+            <span>{( simulatedBid - (Math.random() * 100) ).toFixed(2)}</span>
           </div>
         ))}
       </div>

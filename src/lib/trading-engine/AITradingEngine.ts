@@ -343,13 +343,18 @@ export class AITradingEngine {
         );
         const historyDays = historyNeeded + 40; 
         
-        // ** ENSURE DATE CALCULATION IS CORRECT **
+        // ** ENSURE DATE CALCULATION IS CORRECT - FINAL ATTEMPT **
         const endDate = new Date(); // Use current date as end date
         const startDate = new Date(); // Create start date object
         startDate.setDate(endDate.getDate() - historyDays); // Subtract days from today
         
         // Format dates as YYYY-MM-DD
-        const formatDate = (date: Date) => date.toISOString().split('T')[0];
+        const formatDate = (date: Date) => {
+            const year = date.getFullYear();
+            const month = (date.getMonth() + 1).toString().padStart(2, '0');
+            const day = date.getDate().toString().padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
         const startDateStr = formatDate(startDate);
         const endDateStr = formatDate(endDate); 
         // ** END DATE CORRECTION **
