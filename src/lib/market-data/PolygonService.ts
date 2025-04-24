@@ -16,8 +16,10 @@ export class PolygonService {
   private apiKey: string;
 
   private constructor() {
-    // Get API key from window environment
-    this.apiKey = window?.process?.env?.NEXT_PUBLIC_POLYGON_API_KEY || '';
+    // Get API key safely in both client and server contexts
+    this.apiKey = typeof window !== 'undefined' 
+      ? (window as any)?.__NEXT_DATA__?.props?.pageProps?.env?.NEXT_PUBLIC_POLYGON_API_KEY || process.env.NEXT_PUBLIC_POLYGON_API_KEY || ''
+      : process.env.NEXT_PUBLIC_POLYGON_API_KEY || '';
     
     if (!this.apiKey) {
       console.error('Polygon API key is not configured in environment variables');
