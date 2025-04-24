@@ -15,18 +15,35 @@ interface ChartDataPoint {
 
 type Props = {
   data: ChartDataPoint[];
+  symbol: string;
   selectedIndicators?: string[];
 }
 
-export default function TradingChart({ data, selectedIndicators = [] }: Props) {
+export default function TradingChart({ data, symbol, selectedIndicators = [] }: Props) {
   const chartRef = useRef<HTMLDivElement>(null)
   const chart = useRef<any>(null)
   const [indicators, setIndicators] = useState<string[]>([])
   const [error, setError] = useState<string | null>(null)
 
+  // Complete cleanup when component unmounts or symbol changes
   useEffect(() => {
+    return () => {
+      if (chart.current) {
+        try {
+          chart.current.remove();
+          chart.current = null;
+        } catch (e) {
+          console.error('Error cleaning up chart:', e);
+        }
+      }
+    }
+  }, [symbol]) // Re-run cleanup when symbol changes
+
+  useEffect(() => {
+    // Don't try to create chart without container or data
     if (!chartRef.current) {
       console.error('Chart container ref is not available');
+      setError('Chart container not available');
       return;
     }
     
@@ -36,14 +53,19 @@ export default function TradingChart({ data, selectedIndicators = [] }: Props) {
       return;
     }
 
-    try {
-      console.log('Creating chart with data points:', data.length);
-      
-      // Clean up previous chart instance
-      if (chart.current) {
+    // Always clean up existing chart before creating a new one
+    if (chart.current) {
+      try {
         chart.current.remove();
+        chart.current = null;
+      } catch (e) {
+        console.error('Error cleaning up existing chart:', e);
       }
+    }
 
+    try {
+      console.log(`Creating chart for ${symbol} with ${data.length} data points`);
+      
       // Create new chart instance
       chart.current = createChart(chartRef.current, {
         height: 400,
@@ -104,13 +126,7 @@ export default function TradingChart({ data, selectedIndicators = [] }: Props) {
       console.error('Error creating chart:', err);
       setError('Failed to create chart. Please try again.');
     }
-
-    return () => {
-      if (chart.current) {
-        chart.current.remove()
-      }
-    }
-  }, [data, indicators])
+  }, [data, symbol, indicators]) // Depend on both data and symbol
 
   return (
     <div className="mt-6">

@@ -1,15 +1,31 @@
 'use client'
 
-import { useState, useEffect } from 'react';
-import dynamic from 'next/dynamic';
-import TradingInterface from '../../components/dashboard/TradingInterface';
+import React, { useState, useEffect } from 'react';
 import { PolygonService } from '../../lib/market-data/PolygonService';
+import dynamic from 'next/dynamic';
 
-// Dynamically import TradingChart with no SSR to avoid hydration issues
-const TradingChart = dynamic(() => import('../../components/TradingChart'), {
-  ssr: false,
-});
+// Import the TradingChart component with dynamic import to avoid SSR issues
+const TradingChart = dynamic(
+  () => import('../../components/TradingChart'),
+  { ssr: false }
+);
 
+// Define a spinner component for loading states
+const Spinner = () => (
+  <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto my-4"></div>
+);
+
+// Define the data interfaces
+interface CandleData {
+  o: number; // open
+  h: number; // high
+  l: number; // low
+  c: number; // close
+  t: number; // timestamp
+  v: number; // volume
+}
+
+// Interface for the chart component
 interface ChartDataPoint {
   time: string;
   open: number;
@@ -18,207 +34,147 @@ interface ChartDataPoint {
   close: number;
 }
 
-// Generate simple local data as fallback if API fails
-const generateLocalData = (symbol: string): ChartDataPoint[] => {
-  console.log('Generating local fallback data for', symbol);
-  const data: ChartDataPoint[] = [];
-  const basePrice = symbol === 'AAPL' ? 180 : 
-                   symbol === 'MSFT' ? 380 : 
-                   symbol === 'GOOG' ? 140 : 100;
-  
-  const today = new Date();
-  
-  for (let i = 29; i >= 0; i--) {
-    const date = new Date(today);
-    date.setDate(date.getDate() - i);
-    const dateStr = date.toISOString().split('T')[0];
-    
-    // Random price movement but trending slightly upward
-    const randomFactor = 0.98 + Math.random() * 0.04; // 0.98 to 1.02
-    const prevPrice = i === 29 ? basePrice : data[data.length - 1].close;
-    const close = prevPrice * randomFactor;
-    
-    // Daily range is roughly 1-2% of price
-    const rangePercent = 0.01 + Math.random() * 0.01;
-    const range = close * rangePercent;
-    
-    data.push({
-      time: dateStr,
-      open: close * (0.995 + Math.random() * 0.01), // Open near previous close
-      high: close + (range / 2) + Math.random() * (range / 2),
-      low: close - (range / 2) - Math.random() * (range / 2),
-      close: close
-    });
-  }
-  
-  return data;
-};
-
 export default function BrokeragePage() {
+  const [symbol, setSymbol] = useState('AAPL');
+  const [candleData, setCandleData] = useState<CandleData[]>([]);
   const [chartData, setChartData] = useState<ChartDataPoint[]>([]);
-  const [selectedSymbol, setSelectedSymbol] = useState<string>('AAPL');
-  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [useMockData, setUseMockData] = useState<boolean>(true);
+  const [polygonService, setPolygonService] = useState<PolygonService | null>(null);
 
+  // Initialize the page
   useEffect(() => {
-    // Skip during SSR
-    if (typeof window === 'undefined') return;
-
-    const initPage = async () => {
-      try {
-        console.log('Initializing brokerage page with mock data');
-        const service = PolygonService.getInstance();
-        
-        if (!service) {
-          console.error('Failed to initialize Polygon service');
-          setError('Failed to initialize market data service.');
-          setIsLoading(false);
-          
-          // Fall back to local data
-          setChartData(generateLocalData(selectedSymbol));
-          return;
-        }
-        
-        await loadMarketData(service);
-      } catch (error) {
-        console.error('Error initializing page:', error);
-        setError('Failed to initialize the page. Using fallback data.');
-        setChartData(generateLocalData(selectedSymbol));
-        setIsLoading(false);
-      }
-    };
-
-    initPage();
+    console.log('Initializing brokerage page');
+    try {
+      // Create a new instance of PolygonService
+      const service = PolygonService.getInstance();
+      setPolygonService(service);
+      
+      // Load initial market data
+      loadMarketData(service, symbol);
+    } catch (err) {
+      console.error('Failed to initialize brokerage page:', err);
+      setError('Failed to initialize the brokerage page. Please check the console for details.');
+      setIsLoading(false);
+    }
   }, []);
 
+  // Load market data when symbol changes
   useEffect(() => {
-    if (selectedSymbol) {
-      setIsLoading(true);
-      const service = PolygonService.getInstance();
-      
-      if (service) {
-        loadMarketData(service);
-      } else {
-        // Use local data if service isn't available
-        setChartData(generateLocalData(selectedSymbol));
-        setIsLoading(false);
-      }
+    if (polygonService && symbol) {
+      loadMarketData(polygonService, symbol);
     }
-  }, [selectedSymbol]);
+  }, [symbol, polygonService]);
 
-  const loadMarketData = async (service: PolygonService) => {
-    if (!selectedSymbol) {
-      console.error('No symbol selected');
-      setError('Please select a symbol');
-      return;
-    }
-
+  // Function to load market data
+  const loadMarketData = async (service: PolygonService, sym: string) => {
     try {
       setIsLoading(true);
       setError(null);
-
-      console.log('Loading market data for symbol:', selectedSymbol);
-
-      // Calculate date range (last 30 days)
-      const to = new Date().toISOString().split('T')[0];
-      const from = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
       
-      console.log('Date range:', { from, to });
+      console.log(`Loading market data for ${sym}`);
       
-      try {
-        const candles = await service.getStockCandles(selectedSymbol, from, to, '1day');
-        console.log('Received candles:', candles?.length || 0);
+      // Get the current date and date 30 days ago
+      const endDate = new Date();
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - 30);
+      
+      // Format dates as YYYY-MM-DD
+      const startDateStr = startDate.toISOString().split('T')[0];
+      const endDateStr = endDate.toISOString().split('T')[0];
+      
+      // Fetch candle data
+      const response = await service.getStockCandles(
+        sym,
+        startDateStr,
+        endDateStr
+      );
+      
+      console.log('API Response:', response);
+      
+      if (response && response.length > 0) {
+        // Store raw data
+        setCandleData(response);
         
-        if (!candles || !Array.isArray(candles) || candles.length === 0) {
-          console.log('No data available for symbol, using fallback data:', selectedSymbol);
-          setChartData(generateLocalData(selectedSymbol));
-        } else {
-          const formattedData = candles.map(candle => {
-            if (!candle || typeof candle.t === 'undefined') {
-              console.error('Invalid candle data:', candle);
-              return null;
-            }
-            
-            return {
-              time: new Date(candle.t).toISOString().split('T')[0],
-              open: Number(candle.o) || 0,
-              high: Number(candle.h) || 0,
-              low: Number(candle.l) || 0,
-              close: Number(candle.c) || 0,
-            };
-          }).filter(Boolean) as ChartDataPoint[];
-          
-          console.log('Formatted data points:', formattedData?.length || 0);
-          
-          if (!formattedData || formattedData.length === 0) {
-            console.log('Formatting failed, using fallback data');
-            setChartData(generateLocalData(selectedSymbol));
-          } else {
-            setChartData(formattedData);
-          }
-        }
-      } catch (error) {
-        console.error('Error fetching candles, using fallback data:', error);
-        setChartData(generateLocalData(selectedSymbol));
+        // Map API response to the format needed by the chart
+        const formattedData = response.map((candle: CandleData) => ({
+          time: new Date(candle.t).toISOString().split('T')[0],
+          open: candle.o,
+          high: candle.h,
+          low: candle.l,
+          close: candle.c
+        }));
+        
+        setChartData(formattedData);
+      } else {
+        console.error('Invalid response format:', response);
+        setError('Invalid data format received from the API');
       }
-    } catch (error) {
-      console.error('Error loading market data:', error);
-      setError('Failed to load market data. Using fallback data.');
-      setChartData(generateLocalData(selectedSymbol));
+    } catch (err) {
+      console.error('Error loading market data:', err);
+      setError('Failed to load market data. Please check your API key and network connection.');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleSymbolChange = (symbol: string) => {
-    if (symbol && symbol !== selectedSymbol) {
-      console.log('Symbol changed to:', symbol);
-      setSelectedSymbol(symbol.toUpperCase());
+  // Handle symbol change
+  const handleSymbolChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSymbol(e.target.value.toUpperCase());
+  };
+
+  // Handle form submission
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (polygonService && symbol) {
+      loadMarketData(polygonService, symbol);
     }
   };
 
   return (
-    <div className="p-6 space-y-6 bg-gray-800 min-h-screen">
-      <div className="max-w-7xl mx-auto">
-        <div className="grid grid-cols-1 gap-6">
-          <div className="bg-blue-500/10 border border-blue-500 rounded-lg p-4">
-            <h3 className="text-blue-300 font-medium">Demo Mode</h3>
-            <p className="text-blue-200 mt-1">
-              Using simulated market data for testing. All data is generated locally and does not reflect real market conditions.
-            </p>
-          </div>
-          
-          {error && (
-            <div className="bg-red-500/10 border border-red-500 rounded-lg p-4">
-              <p className="text-red-500">{error}</p>
-            </div>
-          )}
-          
-          <TradingInterface onSymbolChange={handleSymbolChange} />
-          
-          <div className="bg-gray-900 rounded-lg p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-2xl font-semibold text-white">Market Chart</h2>
-              <div className="text-gray-400">
-                {isLoading ? 'Loading...' : `${selectedSymbol} - Daily`}
-              </div>
-            </div>
-            <div className="h-[500px] relative">
-              {isLoading ? (
-                <div className="flex items-center justify-center h-full">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
-                </div>
-              ) : chartData.length > 0 ? (
-                <TradingChart data={chartData} />
-              ) : (
-                <div className="flex items-center justify-center h-full text-gray-500">
-                  No data available
-                </div>
-              )}
-            </div>
-          </div>
+    <div className="container mx-auto px-4 py-8">
+      <h1 className="text-3xl font-bold mb-6">Brokerage Dashboard</h1>
+      
+      {/* Symbol input form */}
+      <form onSubmit={handleSubmit} className="mb-6">
+        <div className="flex items-center gap-2">
+          <input
+            type="text"
+            value={symbol}
+            onChange={handleSymbolChange}
+            placeholder="Enter symbol (e.g., AAPL)"
+            className="border border-gray-300 rounded px-3 py-2 flex-1"
+          />
+          <button 
+            type="submit"
+            className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+          >
+            Load Chart
+          </button>
         </div>
+      </form>
+      
+      {/* Error message */}
+      {error && (
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+          {error}
+        </div>
+      )}
+      
+      {/* Chart container */}
+      <div className="border border-gray-300 rounded p-4 h-[500px]">
+        {isLoading ? (
+          <div className="flex items-center justify-center h-full">
+            <Spinner />
+            <p className="ml-2">Loading chart data...</p>
+          </div>
+        ) : chartData.length > 0 ? (
+          <TradingChart symbol={symbol} data={chartData} />
+        ) : (
+          <div className="flex items-center justify-center h-full">
+            <p className="text-gray-500">No data available for {symbol}</p>
+          </div>
+        )}
       </div>
     </div>
   );
