@@ -3,6 +3,7 @@
 import axios, { AxiosError } from 'axios';
 
 const BASE_URL = 'https://api.polygon.io';
+const API_KEY = 'B2IYP3Pd1DdpKo9XSIkoQVlzp1sdDNHK'; // Hard-coded for testing
 
 export interface PolygonCandle {
   c: number; // close
@@ -18,22 +19,21 @@ export class PolygonService {
   private apiKey: string;
 
   private constructor() {
-    this.apiKey = process.env.NEXT_PUBLIC_POLYGON_API_KEY || '';
+    this.apiKey = API_KEY;
     
     if (!this.apiKey) {
-      console.error('Polygon API key is not configured in environment variables');
-      throw new Error('Polygon API key is not configured');
+      console.error('Polygon API key is not configured');
     } else {
-      console.log('Polygon API key is configured:', this.apiKey.substring(0, 4) + '...');
+      console.log('Polygon API key is configured');
     }
   }
 
   static getInstance(): PolygonService | null {
     if (typeof window === 'undefined') {
-      console.error('PolygonService can only be used in client-side code');
+      // Skip during SSR/build
       return null;
     }
-
+    
     try {
       if (!this.instance) {
         this.instance = new PolygonService();
@@ -46,11 +46,7 @@ export class PolygonService {
   }
 
   private getApiUrl(endpoint: string): string {
-    if (!this.apiKey) {
-      throw new Error('API key is not configured');
-    }
     const url = `${BASE_URL}${endpoint}?apiKey=${this.apiKey}`;
-    console.log('Generated API URL:', url.replace(this.apiKey, '[HIDDEN]'));
     return url;
   }
 
