@@ -56,8 +56,19 @@ export default function BrokeragePage() {
   useEffect(() => {
     console.log('Initializing brokerage page');
     try {
+      // Check if API key is defined
+      const apiKey = process.env.NEXT_PUBLIC_POLYGON_API_KEY;
+      if (!apiKey) {
+        console.warn('No Polygon API key found in environment variables');
+        setError('Polygon API key is missing. Please add it to your environment variables.');
+      } else {
+        console.log('Polygon API key is available:', apiKey.substring(0, 4) + '...');
+      }
+      
       const service = PolygonService.getInstance();
       setPolygonService(service);
+      
+      // Load initial market data
       loadMarketData(service, symbol);
     } catch (err: any) {
       console.error('Failed to initialize brokerage page:', err);
@@ -75,6 +86,13 @@ export default function BrokeragePage() {
 
   // Function to load market data
   const loadMarketData = async (service: PolygonService, sym: string) => {
+    if (!service) {
+      console.error('Polygon service is not initialized');
+      setError('Service not initialized. Please refresh the page.');
+      setIsLoading(false);
+      return;
+    }
+
     try {
       setIsLoading(true);
       setError(null);
@@ -114,14 +132,20 @@ export default function BrokeragePage() {
         }));
         
         setChartData(formattedData);
+        console.log('Chart data formatted successfully:', formattedData.length, 'data points');
+        
+        // Log the first data point to verify format
+        if (formattedData.length > 0) {
+          console.log('Sample data point:', formattedData[0]);
+        }
       } else {
-        console.error('Invalid response format:', response);
-        setError('No data received from the API for this symbol.');
+        console.error('Invalid response format or empty response:', response);
+        setError('No data received for this symbol. Check API key or try another symbol.');
         setChartData([]);
       }
     } catch (err: any) {
       console.error('Error loading market data:', err);
-      setError(`Failed to load market data: ${err.message}. Check API key and network.`);
+      setError(`Failed to load market data: ${err.message || 'Unknown error'}`);
       setChartData([]);
     } finally {
       setIsLoading(false);
@@ -130,15 +154,22 @@ export default function BrokeragePage() {
 
   // Handle symbol change initiated from the TradingInterface component
   const handleSymbolChange = (newSymbol: string) => {
+    if (!newSymbol || newSymbol.trim() === '') {
+      console.error('Invalid symbol provided');
+      return;
+    }
+    
     console.log('BrokeragePage: Symbol changed to', newSymbol);
-    setSymbol(newSymbol);
+    setSymbol(newSymbol.toUpperCase().trim());
+    
     if (polygonService) {
-      loadMarketData(polygonService, newSymbol);
+      loadMarketData(polygonService, newSymbol.toUpperCase().trim());
     }
   };
 
   const toggleFullScreen = () => {
-    console.log("Toggle fullscreen clicked (not implemented)");
+    setIsChartFullScreen(!isChartFullScreen);
+    console.log("Toggle fullscreen:", isChartFullScreen);
   };
 
   // Get the latest closing price from chart data
@@ -147,53 +178,51 @@ export default function BrokeragePage() {
   // Handler for manual order simulation from OrderEntryPanel
   const handleManualOrder = (order: ManualOrder) => {
     console.log('[BrokeragePage] Received manual order simulation:', order);
-    // We need to add timestamp/price info based on when it would execute
-    // For now, just store the intent
-    // TODO: Enhance this to simulate execution price/time better
-    setManualTrades(prev => [...prev, { ...order, timestamp: Date.now() }]);
+    // Add timestamp and current price
+    setManualTrades(prev => [...prev, { 
+      ...order, 
+      timestamp: Date.now(),
+      entryPrice: latestClosePrice || 0
+    }]);
   };
 
   // Handler for AI opening a new position
   const handleNewAIPosition = (newPosition: Position) => {
     console.log('[BrokeragePage] Adding new AI position:', newPosition);
     setAiPositions(prev => [...prev, newPosition]);
-    // Note: Performance update logic might need refinement here or rely on useEffect
   };
 
-  // Handler for AI closing a position
+  // Handler for closing AI positions
   const handleCloseAIPosition = (positionId: string) => {
-    console.log('[BrokeragePage] Closing AI position:', positionId);
-    setAiPositions(prevPositions => {
-      const positionToClose = prevPositions.find(p => p.id === positionId);
-      if (!positionToClose || positionToClose.status !== 'open') {
-        console.warn('[BrokeragePage] Position to close not found or not open.');
-        return prevPositions;
-      }
-      // Simulate exit price and calculate P/L
-      const exitPrice = positionToClose.entryPrice * (0.98 + Math.random() * 0.04); // Simple random exit
-      const profitLoss = (exitPrice - positionToClose.entryPrice) * positionToClose.quantity * (positionToClose.type === 'buy' ? 1 : -1);
-      
-      const updatedPosition: Position = {
-        ...positionToClose,
-        exitPrice,
-        closeDate: new Date(),
-        status: 'closed',
-        profit: profitLoss,
-      };
-      console.log('[BrokeragePage] Position closed with P/L:', profitLoss);
-      return prevPositions.map(p => p.id === positionId ? updatedPosition : p);
-    });
+    console.log('[BrokeragePage] Closing position:', positionId);
+    setAiPositions(prev => 
+      prev.map(pos => 
+        pos.id === positionId 
+          ? { 
+              ...pos, 
+              status: 'closed', 
+              closeDate: new Date(),
+              exitPrice: latestClosePrice || pos.entryPrice,
+              profit: latestClosePrice 
+                ? (pos.type === 'buy' 
+                  ? (latestClosePrice - pos.entryPrice) * pos.quantity 
+                  : (pos.entryPrice - latestClosePrice) * pos.quantity)
+                : 0
+            } 
+          : pos
+      )
+    );
   };
 
   return (
     <div className="container mx-auto px-4 py-6 text-white">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
         <div className="lg:col-span-2 flex flex-col gap-4">
-          <div className="bg-gray-900 rounded-lg p-1 flex flex-col h-[60vh] relative">
+          <div className={`bg-gray-900 rounded-lg p-1 flex flex-col ${isChartFullScreen ? 'h-[80vh]' : 'h-[60vh]'} relative`}>
             <button 
               onClick={toggleFullScreen}
               className="absolute top-2 right-2 z-10 p-1 bg-gray-700/50 hover:bg-gray-600/80 rounded text-gray-300"
-              title="Maximize Chart (Not Implemented)"
+              title={isChartFullScreen ? "Minimize Chart" : "Maximize Chart"}
             >
               <Maximize2 size={18} />
             </button>
@@ -218,7 +247,7 @@ export default function BrokeragePage() {
               </div>
             ) : (
               <div className="flex-grow flex items-center justify-center">
-                <p className="text-gray-500">{error ? 'Error loading data' : `No data available for ${symbol}`}</p>
+                <p className="text-gray-500">{error || `No data available for ${symbol}`}</p>
               </div>
             )}
           </div>
