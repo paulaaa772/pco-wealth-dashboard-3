@@ -185,8 +185,12 @@ export class PolygonService {
       
       const response = await this.client.get(endpoint);
       
-      if (response.data.status === 'OK' && response.data.resultsCount > 0 && response.data.results) {
-        console.log(`[POLYGON] Received ${response.data.results.length} real candles from API`);
+      // Accept 'OK' or 'DELAYED' status if results exist
+      if ((response.data.status === 'OK' || response.data.status === 'DELAYED') && response.data.resultsCount > 0 && response.data.results) {
+        if (response.data.status === 'DELAYED') {
+            console.warn(`[POLYGON] Using DELAYED data for ${symbol} (${from} to ${to})`);
+        }
+        console.log(`[POLYGON] Received ${response.data.results.length} candles from API (Status: ${response.data.status})`);
         return response.data.results.map((candle: any) => ({
           o: candle.o,
           h: candle.h,
@@ -195,8 +199,8 @@ export class PolygonService {
           t: candle.t,
           v: candle.v
         }));
-      } else if (response.data.status === 'OK') {
-         console.warn(`[POLYGON] API returned OK status but no results for ${symbol} (${from} to ${to}). Returning null.`);
+      } else if (response.data.status === 'OK' || response.data.status === 'DELAYED') {
+         console.warn(`[POLYGON] API returned ${response.data.status} status but no results for ${symbol} (${from} to ${to}). Returning null.`);
          return null; // No data found for the range
       } else {
          // Handle other non-OK statuses from Polygon if necessary

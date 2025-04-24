@@ -341,24 +341,19 @@ export class AITradingEngine {
             this.stochasticKPeriod + this.stochasticDPeriod,
             this.obvSmaPeriod 
         );
-        const historyDays = historyNeeded + 40; 
-        
-        // ** FINAL DATE FIX **
-        const endDate = new Date(); 
+        const historyDays = historyNeeded + 40;
+
+        // ** DATE FIX ATTEMPT #7 - Simplified Formatting **
+        const endDate = new Date(); // Today
         const startDate = new Date(); 
-        startDate.setDate(endDate.getDate() - historyDays);
+        startDate.setDate(endDate.getDate() - historyDays); // Subtract days from today
         
-        const formatDate = (date: Date): string => { 
-            // Ensure month and day are two digits
-            const month = (date.getMonth() + 1).toString().padStart(2, '0');
-            const day = date.getDate().toString().padStart(2, '0');
-            return `${date.getFullYear()}-${month}-${day}`;
-        }
-        const startDateStr = formatDate(startDate);
-        const endDateStr = formatDate(endDate); 
+        // Use simple ISOString format (YYYY-MM-DD) - generally reliable
+        const startDateStr = startDate.toISOString().split('T')[0];
+        const endDateStr = endDate.toISOString().split('T')[0]; 
         // ** END DATE FIX **
 
-        console.log(`[AI Engine] ---> FETCHING CANDLES from ${startDateStr} to ${endDateStr} <---`); 
+        console.log(`[AI Engine] ---> FETCHING CANDLES from ${startDateStr} to ${endDateStr} <---`);
         const candles: PolygonCandle[] | null = await this.polygonService.getStockCandles(targetSymbol, startDateStr, endDateStr, 'day');
         
         // Updated Check: Explicitly check for null return from service
