@@ -35,30 +35,24 @@ export class AITradingEngine {
   }
 
   async analyzeMarket(symbol?: string): Promise<TradeSignal | null> {
-    // Use the provided symbol or fall back to the class property
     const targetSymbol = symbol || this.symbol;
-    
-    // Simulate market analysis with random signals
     console.log(`Analyzing market for ${targetSymbol}...`);
-    
-    // Simulated delay for API call
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    // 30% chance of generating a signal
-    if (Math.random() > 0.7) {
+    await new Promise(resolve => setTimeout(resolve, 500)); // Simulated delay
+
+    // Increase signal generation chance to 70%
+    if (Math.random() > 0.3) { 
       const isBuy = Math.random() > 0.5;
       const signal: TradeSignal = {
         symbol: targetSymbol,
         direction: isBuy ? 'buy' : 'sell',
         price: parseFloat((100 + Math.random() * 50).toFixed(2)),
-        confidence: parseFloat((0.6 + Math.random() * 0.4).toFixed(2)),
+        confidence: parseFloat((0.6 + Math.random() * 0.4).toFixed(2)), // Keep confidence random
         timestamp: Date.now()
       };
-      
       console.log(`Signal generated: ${signal.direction} ${signal.symbol} at $${signal.price} (${(signal.confidence * 100).toFixed(0)}% confidence)`);
       return signal;
     }
-    
+
     console.log(`No trading signals for ${targetSymbol}`);
     return null;
   }

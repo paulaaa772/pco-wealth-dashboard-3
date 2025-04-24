@@ -1,8 +1,8 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react';
-import { AITradingEngine, TradeSignal } from '../../lib/trading-engine/AITradingEngine';
-import { TradingMode } from '../../lib/trading-engine/TradingMode';
+import { AITradingEngine, TradeSignal } from '@/lib/trading-engine/AITradingEngine';
+import { TradingMode } from '@/lib/trading-engine/TradingMode';
 
 // Define the Position interface locally since the imported one has issues
 interface Position {
@@ -122,30 +122,44 @@ export default function TradingInterface({ onSymbolChange, currentSymbol = 'AAPL
   // Execute a trade signal
   const executeTradeSignal = async (signal: TradeSignal) => {
     try {
-      console.log(`Executing ${signal.direction} signal for ${signal.symbol}`);
+      console.log(`[TRADING UI] Attempting to execute ${signal.direction} signal for ${signal.symbol}`);
       
-      const success = await aiEngine.current!.executeTradeSignal(signal);
+      // Ensure aiEngine exists
+      if (!aiEngine.current) {
+        console.error('[TRADING UI] AI Engine not initialized!');
+        return;
+      }
+
+      const success = await aiEngine.current.executeTradeSignal(signal);
       
       if (success) {
-        // For demo purposes, simulate the position
-        const shares = aiEngine.current!.calculatePositionSize(signal.price);
+        console.log(`[TRADING UI] ${signal.direction} signal execution successful (Simulated).`);
+        const shares = aiEngine.current.calculatePositionSize(signal.price);
         
+        if (shares <= 0) {
+          console.warn('[TRADING UI] Calculated position size is zero or less. No position opened.');
+          return;
+        }
+
         const newPosition: Position = {
           symbol: signal.symbol,
           type: signal.direction,
           entryPrice: signal.price,
           quantity: shares,
           timestamp: Date.now(),
-          id: `pos-${Date.now()}`
+          id: `pos-${Date.now()}`,
+          status: 'open' // Mark position as open
         };
         
         setPositions(prevPositions => [...prevPositions, newPosition]);
-        
-        // Update performance tracking
-        updatePerformance();
+        console.log('[TRADING UI] New position added:', newPosition);
+
+        // Update performance tracking for the NEW trade
+        updatePerformance(newPosition); // Pass the new position
       }
     } catch (error) {
-      console.error('Error executing trade signal:', error);
+      console.error('[TRADING UI] Error executing trade signal:', error);
+      setErrorMessage('Error executing trade signal.');
     }
   };
 
@@ -160,47 +174,70 @@ export default function TradingInterface({ onSymbolChange, currentSymbol = 'AAPL
   };
 
   // Close a position (simulated in demo mode)
-  const closePosition = (position: Position) => {
-    console.log('[TRADING UI] Closing position:', position);
+  const closePosition = (positionId: string) => {
+    console.log('[TRADING UI] Closing position with ID:', positionId);
     
-    // Calculate a random exit price (±2%)
-    const exitPrice = position.entryPrice * (0.98 + Math.random() * 0.04);
-    
-    // Update the position
-    const updatedPosition: Position = {
-      ...position,
-      exitPrice,
-      closeDate: new Date(),
-      status: 'closed',
-      profit: (exitPrice - position.entryPrice) * position.quantity * (position.type === 'buy' ? 1 : -1),
-    };
-    
-    // Update our positions list
-    setPositions(prevPositions => 
-      prevPositions.map(p => p.id === position.id ? updatedPosition : p)
-    );
-    
-    // Update performance metrics
-    updatePerformance(updatedPosition);
+    setPositions(prevPositions => {
+      // Find the position to close
+      const positionToClose = prevPositions.find(p => p.id === positionId);
+      if (!positionToClose || positionToClose.status !== 'open') {
+        console.warn('[TRADING UI] Position not found or already closed.');
+        return prevPositions;
+      }
+
+      // Calculate a random exit price (±2%)
+      const exitPrice = positionToClose.entryPrice * (0.98 + Math.random() * 0.04);
+      
+      // Update the position
+      const updatedPosition: Position = {
+        ...positionToClose,
+        exitPrice,
+        closeDate: new Date(),
+        status: 'closed',
+        profit: (exitPrice - positionToClose.entryPrice) * positionToClose.quantity * (positionToClose.type === 'buy' ? 1 : -1),
+      };
+      
+      console.log('[TRADING UI] Position closed:', updatedPosition);
+      
+      // Update performance metrics with the closed position
+      updatePerformance(undefined, updatedPosition); // Pass closed position
+      
+      // Return the updated list of positions
+      return prevPositions.map(p => p.id === positionId ? updatedPosition : p);
+    });
   };
 
-  // Update performance metrics based on closed positions
-  const updatePerformance = (closedPosition?: Position) => {
-    if (closedPosition && !closedPosition.profit) return;
-    
+  // Update performance metrics based on opened or closed positions
+  const updatePerformance = (openedPosition?: Position, closedPosition?: Position) => {
     setPerformance(prev => {
-      if (!closedPosition) return prev;
+      let newTotalTrades = prev.totalTrades;
+      let newProfitLoss = prev.profitLoss;
+      let wins = prev.winRate * prev.totalTrades; // Calculate current number of wins
       
-      const totalTrades = prev.totalTrades + 1;
-      const isWin = closedPosition.profit! > 0;
-      const wins = prev.winRate * prev.totalTrades + (isWin ? 1 : 0);
-      const newWinRate = totalTrades > 0 ? wins / totalTrades : 0;
-      const newProfitLoss = prev.profitLoss + closedPosition.profit!;
+      // If a new position was opened, just increment trade count
+      if (openedPosition) {
+        newTotalTrades = prev.totalTrades + 1;
+        console.log(`[TRADING UI] Performance: New trade opened. Total trades: ${newTotalTrades}`);
+      }
+
+      // If a position was closed, calculate P/L and update win rate
+      if (closedPosition && closedPosition.profit !== undefined) {
+        console.log(`[TRADING UI] Performance: Trade closed. Profit: ${closedPosition.profit.toFixed(2)}`);
+        newProfitLoss += closedPosition.profit;
+        if (closedPosition.profit > 0) {
+          wins += 1;
+        }
+      } else if (closedPosition) {
+        console.warn('[TRADING UI] Performance: Closed position received without profit calculated.');
+      }
+
+      // Calculate new win rate (avoid division by zero)
+      const newWinRate = newTotalTrades > 0 ? wins / newTotalTrades : 0;
       
       return {
-        winRate: Math.round(newWinRate * 100) / 100,
+        winRate: Math.round(newWinRate * 1000) / 1000, // More precision for win rate
         profitLoss: Math.round(newProfitLoss * 100) / 100,
-        totalTrades,
+        totalTrades: newTotalTrades,
       };
     });
   };
@@ -351,15 +388,25 @@ export default function TradingInterface({ onSymbolChange, currentSymbol = 'AAPL
       
       <div className="bg-gray-800 rounded-lg p-4">
         <h3 className="text-lg font-medium text-white mb-4">Active Positions</h3>
-        {positions.length > 0 ? (
+        {positions.filter(p => p.status === 'open').length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {positions.filter(p => !p.status || p.status === 'open').map(position => (
+            {positions.filter(p => p.status === 'open').map(position => (
               <div 
                 key={position.id}
-                className={`p-3 rounded-lg ${
+                className={`p-3 rounded-lg relative ${ // Added relative positioning
                   position.type === 'buy' ? 'bg-green-900/30 border border-green-700' : 'bg-red-900/30 border border-red-700'
                 }`}
               >
+                {/* Close Button - Added */}
+                <button 
+                  onClick={() => closePosition(position.id)}
+                  className="absolute top-1 right-1 bg-gray-600 hover:bg-gray-500 text-white text-xs px-1.5 py-0.5 rounded"
+                  title="Close Position (Demo)"
+                >
+                  X
+                </button>
+
+                {/* Position Details */}
                 <div className="flex justify-between">
                   <span className="text-gray-300">Symbol:</span>
                   <span className="font-semibold text-white">{position.symbol}</span>
