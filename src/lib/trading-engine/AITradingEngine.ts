@@ -5,39 +5,38 @@ import { TradingMode, TradingSignal, Position, TradeScenario } from './types';
 
 export class AITradingEngine {
   private mode: TradingMode;
-  private polygonService: PolygonService | null;
+  private polygonService: PolygonService;
 
   constructor(mode: TradingMode = 'demo') {
     this.mode = mode;
     this.polygonService = PolygonService.getInstance();
+    console.log('[MOCK AI] Trading engine initialized in', mode, 'mode');
   }
 
   async analyzeMarket(symbol: string): Promise<TradingSignal | null> {
     try {
-      if (!this.polygonService) {
-        console.error('Market data service not available');
-        return null;
-      }
+      console.log('[MOCK AI] Analyzing market for', symbol);
 
+      // Get price data from our mock service
       const lastPrice = await this.polygonService.getLatestPrice(symbol);
-      if (!lastPrice) return null;
+      console.log('[MOCK AI] Current price for', symbol, 'is', lastPrice);
 
       // Generate a trading scenario based on symbol and market data
       const scenario = this.generateTradingScenario(symbol, lastPrice);
+      console.log('[MOCK AI] Generated trading scenario:', scenario);
       
       return {
         symbol,
         scenario
       };
     } catch (error) {
-      console.error('Error analyzing market:', error);
+      console.error('[MOCK AI] Error analyzing market:', error);
       return null;
     }
   }
 
   private generateTradingScenario(symbol: string, currentPrice: number): TradeScenario {
     // This is a simplified mock implementation
-    // In a real system, this would use technical analysis algorithms
     
     // Randomly decide position type
     const rand = Math.random();

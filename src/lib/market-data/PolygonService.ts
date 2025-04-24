@@ -1,10 +1,11 @@
 'use client';
 
-import axios, { AxiosError } from 'axios';
+// No need for axios import for mock data
+// import axios, { AxiosError } from 'axios';
 
 // Mock data generator functions
 const generateMockCandles = (symbol: string, from: string, to: string) => {
-  console.log(`Generating mock candles for ${symbol} from ${from} to ${to}`);
+  console.log(`[MOCK] Generating candles for ${symbol} from ${from} to ${to}`);
   
   const data = [];
   const basePrice = symbol === 'AAPL' ? 180 : 
@@ -53,6 +54,7 @@ const generateMockCandles = (symbol: string, from: string, to: string) => {
 };
 
 const generateMockPrice = (symbol: string) => {
+  console.log(`[MOCK] Generating price for ${symbol}`);
   const basePrice = symbol === 'AAPL' ? 180.42 : 
                    symbol === 'MSFT' ? 379.89 : 
                    symbol === 'GOOG' ? 141.12 : 
@@ -72,6 +74,7 @@ interface CompanyDetails {
 }
 
 const generateMockCompanyDetails = (symbol: string): CompanyDetails => {
+  console.log(`[MOCK] Generating company details for ${symbol}`);
   const companies: Record<string, CompanyDetails> = {
     'AAPL': {
       name: 'Apple Inc.',
@@ -130,96 +133,72 @@ export interface PolygonCandle {
 
 export class PolygonService {
   private static instance: PolygonService;
-  private mockedMode: boolean = true;
-
+  
+  // Always use mock data - no need to toggle
   private constructor() {
-    console.log('PolygonService initialized in mock mode');
+    console.log('[MOCK] PolygonService initialized in mock mode');
   }
 
-  static getInstance(): PolygonService | null {
-    if (typeof window === 'undefined') {
-      // Skip during SSR/build
-      return null;
+  static getInstance(): PolygonService {
+    if (!this.instance) {
+      console.log('[MOCK] Creating new PolygonService instance');
+      this.instance = new PolygonService();
     }
-    
-    try {
-      if (!this.instance) {
-        console.log('Creating new PolygonService instance');
-        this.instance = new PolygonService();
-      }
-      return this.instance;
-    } catch (error) {
-      console.error('Failed to initialize PolygonService:', error);
-      return null;
-    }
+    return this.instance;
   }
 
-  async getStockCandles(symbol: string, from: string, to: string, timespan = '1min'): Promise<PolygonCandle[]> {
+  async getStockCandles(symbol: string, from: string, to: string, timespan = 'day'): Promise<PolygonCandle[]> {
     try {
-      console.log(`Fetching ${timespan} candles for ${symbol} from ${from} to ${to}`);
+      // Just generate mock data - no real API calls
+      console.log(`[MOCK] Fetching ${timespan} candles for ${symbol}`);
       
-      if (this.mockedMode) {
-        console.log('Using mocked data for candles');
-        // Add a slight delay to simulate network request
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
-        const mockData = generateMockCandles(symbol, from, to);
-        console.log(`Generated ${mockData.length} mock candles`);
-        return mockData;
-      }
+      // Add a slight delay to simulate network request
+      await new Promise(resolve => setTimeout(resolve, 500));
       
-      // This code would never run in mocked mode
-      throw new Error('API access disabled');
+      const mockData = generateMockCandles(symbol, from, to);
+      console.log(`[MOCK] Generated ${mockData.length} candles for ${symbol}`);
+      return mockData;
     } catch (error) {
-      console.error('Error fetching stock candles:', error);
-      // Always return mock data even on error
-      return generateMockCandles(symbol, from, to);
+      console.error('[MOCK] Error generating mock candles:', error);
+      return [];
     }
   }
 
-  async getLatestPrice(symbol: string): Promise<number | null> {
+  async getLatestPrice(symbol: string): Promise<number> {
     try {
-      console.log(`Fetching latest price for ${symbol}`);
+      console.log(`[MOCK] Fetching latest price for ${symbol}`);
       
-      if (this.mockedMode) {
-        console.log('Using mocked data for price');
-        // Add a slight delay to simulate network request
-        await new Promise(resolve => setTimeout(resolve, 300));
-        
-        const mockPrice = generateMockPrice(symbol);
-        console.log(`Generated mock price: ${mockPrice}`);
-        return mockPrice;
-      }
+      // Add a slight delay to simulate network request
+      await new Promise(resolve => setTimeout(resolve, 300));
       
-      // This code would never run in mocked mode
-      throw new Error('API access disabled');
+      const mockPrice = generateMockPrice(symbol);
+      console.log(`[MOCK] Generated mock price: ${mockPrice}`);
+      return mockPrice;
     } catch (error) {
-      console.error('Error fetching latest price:', error);
-      // Always return mock data even on error
-      return generateMockPrice(symbol);
+      console.error('[MOCK] Error generating mock price:', error);
+      return 0;
     }
   }
 
-  async getCompanyDetails(symbol: string) {
+  async getCompanyDetails(symbol: string): Promise<CompanyDetails> {
     try {
-      console.log(`Fetching company details for ${symbol}`);
+      console.log(`[MOCK] Fetching company details for ${symbol}`);
       
-      if (this.mockedMode) {
-        console.log('Using mocked data for company details');
-        // Add a slight delay to simulate network request
-        await new Promise(resolve => setTimeout(resolve, 400));
-        
-        const mockDetails = generateMockCompanyDetails(symbol);
-        console.log('Generated mock company details');
-        return mockDetails;
-      }
+      // Add a slight delay to simulate network request
+      await new Promise(resolve => setTimeout(resolve, 400));
       
-      // This code would never run in mocked mode
-      throw new Error('API access disabled');
+      const mockDetails = generateMockCompanyDetails(symbol);
+      console.log('[MOCK] Generated mock company details');
+      return mockDetails;
     } catch (error) {
-      console.error('Error fetching company details:', error);
-      // Always return mock data even on error
-      return generateMockCompanyDetails(symbol);
+      console.error('[MOCK] Error generating mock company details:', error);
+      return {
+        name: 'Unknown Company',
+        description: 'No data available',
+        market_cap: 0,
+        employees: 0,
+        industry: 'Unknown'
+      };
     }
   }
 } 

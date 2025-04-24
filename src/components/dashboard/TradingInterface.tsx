@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import { AITradingEngine } from '../../lib/trading-engine/AITradingEngine';
 import { TradingMode, TradingSignal, Position } from '../../lib/trading-engine/types';
-import { PolygonService } from '../../lib/market-data/PolygonService';
 
 interface TradingInterfaceProps {
   onSymbolChange?: (symbol: string) => void;
@@ -23,45 +22,21 @@ export default function TradingInterface({ onSymbolChange }: TradingInterfacePro
   });
 
   useEffect(() => {
-    const initInterface = async () => {
-      try {
-        console.log('TradingInterface mounted');
-        if (!symbol) {
-          console.error('No symbol provided');
-          return;
-        }
-        await analyzeMarket();
-      } catch (error) {
-        console.error('Error initializing interface:', error);
-        setError(error instanceof Error ? error.message : 'Failed to initialize interface');
+    console.log('[MOCK UI] TradingInterface mounted');
+    
+    // Initialize the interface with a market analysis
+    analyzeMarket();
+    
+    // Set up a refresh interval for the demo
+    const interval = setInterval(() => {
+      if (aiEnabled) {
+        console.log('[MOCK UI] Running automated analysis');
+        analyzeMarket();
       }
-    };
-
-    initInterface();
-  }, []);
-
-  useEffect(() => {
-    let intervalId: NodeJS.Timeout;
-
-    if (aiEnabled && symbol) {
-      console.log('AI trading enabled for symbol:', symbol);
-      intervalId = setInterval(async () => {
-        try {
-          await analyzeMarket();
-        } catch (error) {
-          console.error('Error in AI trading interval:', error);
-          setError(error instanceof Error ? error.message : 'AI trading error');
-          setAiEnabled(false); // Disable AI trading on error
-        }
-      }, 60000); // Analyze every minute when AI is enabled
-    }
-
-    return () => {
-      if (intervalId) {
-        clearInterval(intervalId);
-      }
-    };
-  }, [aiEnabled, symbol]);
+    }, 30000); // Every 30 seconds
+    
+    return () => clearInterval(interval);
+  }, [aiEnabled]);
 
   const handleSymbolChange = (newSymbol: string) => {
     if (!newSymbol) {
@@ -69,46 +44,39 @@ export default function TradingInterface({ onSymbolChange }: TradingInterfacePro
       return;
     }
 
-    console.log('Symbol input changed:', newSymbol);
+    console.log('[MOCK UI] Symbol changed to:', newSymbol);
     const upperSymbol = newSymbol.toUpperCase();
     setSymbol(upperSymbol);
     setError(null);
     onSymbolChange?.(upperSymbol);
+    
+    // Analyze the new symbol
+    analyzeMarket();
   };
 
   const analyzeMarket = async () => {
-    if (!symbol) {
-      setError('Please enter a symbol');
-      return;
-    }
-
     try {
       setIsAnalyzing(true);
       setError(null);
-
-      console.log('Analyzing market for symbol:', symbol);
-      const aiEngine = new AITradingEngine(mode);
       
-      if (!aiEngine) {
-        throw new Error('Failed to initialize AI engine');
-      }
-
+      console.log('[MOCK UI] Analyzing market for symbol:', symbol);
+      const aiEngine = new AITradingEngine(mode);
       const signal = await aiEngine.analyzeMarket(symbol);
       
       if (signal) {
-        console.log('Received trading signal:', signal);
+        console.log('[MOCK UI] Received trading signal:', signal);
         setLastSignal(signal);
+        
         if (aiEnabled) {
           await executeTradeSignal(signal);
         }
       } else {
-        console.log('No trading signals available');
+        console.log('[MOCK UI] No trading signals available');
         setError('No trading signals available');
       }
     } catch (err) {
-      console.error('Error analyzing market:', err);
-      setError(err instanceof Error ? err.message : 'Error analyzing market');
-      setLastSignal(null);
+      console.error('[MOCK UI] Error analyzing market:', err);
+      setError('Error analyzing market - using mock data only');
     } finally {
       setIsAnalyzing(false);
     }
@@ -116,36 +84,38 @@ export default function TradingInterface({ onSymbolChange }: TradingInterfacePro
 
   const executeTradeSignal = async (signal: TradingSignal) => {
     if (!signal || !signal.scenario) {
-      console.error('Invalid signal received');
+      console.error('[MOCK UI] Invalid signal received');
       return;
     }
 
     try {
-      console.log('Executing trade signal:', signal);
-      if (mode === 'demo') {
-        // Simulate trade execution in demo mode
-        const newPosition: Position = {
-          symbol: signal.symbol,
-          quantity: calculatePositionSize(signal),
-          entryPrice: signal.scenario.entryPrice,
-          currentPrice: signal.scenario.entryPrice,
-          entryDate: new Date(),
-          lastUpdated: new Date(),
-          type: signal.scenario.position,
-          stopLoss: signal.scenario.stopLoss,
-          takeProfit: signal.scenario.takeProfit,
-          unrealizedPnL: 0,
-          realizedPnL: 0,
-        };
+      console.log('[MOCK UI] Executing trade signal:', signal);
+      
+      // Create a new mock position
+      const newPosition: Position = {
+        symbol: signal.symbol,
+        quantity: calculatePositionSize(signal),
+        entryPrice: signal.scenario.entryPrice,
+        currentPrice: signal.scenario.entryPrice,
+        entryDate: new Date(),
+        lastUpdated: new Date(),
+        type: signal.scenario.position,
+        stopLoss: signal.scenario.stopLoss,
+        takeProfit: signal.scenario.takeProfit,
+        unrealizedPnL: 0,
+        realizedPnL: 0,
+      };
 
-        setPositions(prev => [...prev, newPosition]);
-        updatePerformance();
-      } else {
-        console.log('Live trading not implemented yet');
-      }
+      // Add to positions
+      setPositions(prev => [...prev, newPosition]);
+      
+      // Update performance metrics
+      updatePerformance();
+      
+      console.log('[MOCK UI] Trade executed successfully');
     } catch (error) {
-      console.error('Error executing trade signal:', error);
-      setError(error instanceof Error ? error.message : 'Failed to execute trade');
+      console.error('[MOCK UI] Error executing trade signal:', error);
+      setError('Failed to execute trade - demo mode only');
     }
   };
 
@@ -169,20 +139,20 @@ export default function TradingInterface({ onSymbolChange }: TradingInterfacePro
         profitLoss: totalPnL,
       });
     } catch (error) {
-      console.error('Error updating performance:', error);
+      console.error('[MOCK UI] Error updating performance:', error);
     }
   };
 
   const handleModeToggle = () => {
     const newMode = mode === 'demo' ? 'live' : 'demo';
-    console.log('Trading mode changed to:', newMode);
+    console.log('[MOCK UI] Trading mode changed to:', newMode);
     setMode(newMode);
     setError(null);
   };
 
   const handleAIToggle = () => {
     const newState = !aiEnabled;
-    console.log('AI trading toggled:', newState);
+    console.log('[MOCK UI] AI trading toggled:', newState);
     setAiEnabled(newState);
     setError(null);
   };
@@ -279,7 +249,7 @@ export default function TradingInterface({ onSymbolChange }: TradingInterfacePro
                 </div>
               </div>
             ) : (
-              <p className="text-gray-400">No signals available</p>
+              <p className="text-gray-400">Generating signals...</p>
             )}
           </div>
         </div>
