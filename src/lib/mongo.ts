@@ -1,10 +1,6 @@
 import mongoose from 'mongoose'
 
-const MONGODB_URI = process.env.MONGODB_URI
-
-if (!MONGODB_URI) {
-  throw new Error('Please define MONGODB_URI in .env.local')
-}
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://placeholder:27017/placeholder'
 
 interface MongooseCache {
   conn: typeof mongoose | null
@@ -20,10 +16,16 @@ let cached = globalThis.mongooseCache || { conn: null, promise: null }
 globalThis.mongooseCache = cached
 
 export async function connectDB() {
+  // Skip actual connection if URI is the placeholder
+  if (MONGODB_URI.includes('placeholder')) {
+    console.warn('Using placeholder MongoDB connection - data will not be saved');
+    return mongoose;
+  }
+
   if (cached.conn) return cached.conn
 
   if (!cached.promise) {
-    cached.promise = mongoose.connect(MONGODB_URI!)
+    cached.promise = mongoose.connect(MONGODB_URI)
   }
 
   cached.conn = await cached.promise
