@@ -11,7 +11,7 @@ export default function TestChart() {
   return (
     <div className="p-8">
       <h1 className="text-2xl font-bold mb-6">Chart Test</h1>
-      <TradingChart data={sampleData} />
+      <TradingChart data={sampleData} symbol="TEST" />
     </div>
   )
 }
