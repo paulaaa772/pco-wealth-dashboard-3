@@ -1,3 +1,5 @@
+'use client';
+
 import { Line } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
@@ -8,6 +10,7 @@ import {
   Title,
   Tooltip,
   Filler,
+  ChartOptions,
 } from 'chart.js';
 
 ChartJS.register(
@@ -44,9 +47,9 @@ export default function PortfolioChart() {
     maintainAspectRatio: false,
     scales: {
       x: {
+        display: true,
         grid: {
           display: false,
-          drawBorder: false,
         },
         ticks: {
           color: '#9CA3AF',
@@ -54,13 +57,13 @@ export default function PortfolioChart() {
       },
       y: {
         position: 'right' as const,
+        display: true,
         grid: {
           color: 'rgba(156, 163, 175, 0.1)',
-          drawBorder: false,
         },
         ticks: {
           color: '#9CA3AF',
-          callback: (value: number) => `$${value.toLocaleString()}`,
+          callback: (value: number) => '$' + value.toLocaleString(),
         },
       },
     },
@@ -72,11 +75,14 @@ export default function PortfolioChart() {
         mode: 'index' as const,
         intersect: false,
         callbacks: {
-          label: (context: any) => `$${context.raw.toLocaleString()}`,
+          label: (context: any) => {
+            const value = context.parsed.y;
+            return `$${value.toLocaleString()}`;
+          },
         },
       },
     },
-  };
+  } as ChartOptions<'line'>;
 
   return (
     <div className="space-y-4">

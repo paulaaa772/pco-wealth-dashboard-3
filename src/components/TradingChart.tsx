@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createChart, LineStyle, CrosshairMode } from 'lightweight-charts'
 import IndicatorSelector from './IndicatorSelector'
-import { indicatorDefinitions } from './indicators/IndicatorComponents'
+import { indicatorDefinitions } from '@/app/components/indicators/IndicatorComponents'
 
 type Props = {
   data: any[]

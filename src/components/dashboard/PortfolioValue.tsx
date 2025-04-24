@@ -1,3 +1,5 @@
+'use client';
+
 export default function PortfolioValue() {
   return (
     <div className="space-y-2">
