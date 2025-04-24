@@ -356,16 +356,11 @@ export class AITradingEngine {
         // Updated Check: Explicitly check for null return from service
         if (candles === null) {
             console.error(`[AI Engine] !!! FAILED TO FETCH REAL CANDLES for ${targetSymbol} from ${startDateStr} to ${endDateStr}. Check API Key/Entitlements.`);
-            this.setError(`Failed to fetch market data for ${targetSymbol}. Check API key or network.`); // Update UI error state
             return null; 
         } else if (candles.length < historyNeeded) {
             console.warn(`[AI Engine] Insufficient REAL candle data for ${targetSymbol} (${candles.length} received). Needed >= ${historyNeeded}.`);
-            this.setError(`Insufficient history for ${targetSymbol} analysis.`); // Update UI error state
             return null;
         }
-        
-        // Clear any previous error message if data fetch is successful
-        this.setError(null); 
         
         console.log(`[AI Engine] Successfully fetched ${candles.length} real candles for ${targetSymbol}.`);
         candles.sort((a, b) => a.t - b.t); 
@@ -405,75 +400,93 @@ export class AITradingEngine {
         }
         console.log(`[OBV] Latest OBV: ${latestObv}, SMA(${this.obvSmaPeriod}): ${obvSmaValue.toFixed(0)}`);
         
-        // --- Strategy Checks with ADX Filter --- 
+        // --- Strategy Checks with ADX Filter and OBV Confirmation --- 
         
+        let confirmedSignal: TradeSignal | null = null;
+
         // Trend-Following Strategies (MA, MACD)
         if (isTrending) {
             console.log("[AI Engine] Trend detected (ADX > threshold), checking trend strategies...");
             const maSignal = this.checkMACrossover(fastSMA, slowSMA, latestIndex, targetSymbol, latestPrice);
-            if (maSignal) return maSignal;
+            if (maSignal) {
+                // OBV Confirmation for BUY signal
+                if (maSignal.direction === 'buy' && latestObv > obvSmaValue) {
+                     console.log("[OBV Confirmed] MA Crossover Buy Signal.");
+                     confirmedSignal = maSignal;
+                } 
+                // OBV Confirmation for SELL signal
+                else if (maSignal.direction === 'sell' && latestObv < obvSmaValue) {
+                     console.log("[OBV Confirmed] MA Crossover Sell Signal.");
+                     confirmedSignal = maSignal;
+                } else {
+                    console.log("[OBV Rejected] MA Crossover Signal.");
+                }
+            }
 
-            const macdSignal = this.checkMACDCrossover(macdResult, latestIndex, targetSymbol, latestPrice);
-            if (macdSignal) return macdSignal;
+            // Check MACD only if MA didn't produce a confirmed signal
+            if (!confirmedSignal) {
+                const macdSignal = this.checkMACDCrossover(macdResult, latestIndex, targetSymbol, latestPrice);
+                if (macdSignal) {
+                     if (macdSignal.direction === 'buy' && latestObv > obvSmaValue) {
+                         console.log("[OBV Confirmed] MACD Buy Signal.");
+                         confirmedSignal = macdSignal;
+                     } else if (macdSignal.direction === 'sell' && latestObv < obvSmaValue) {
+                         console.log("[OBV Confirmed] MACD Sell Signal.");
+                         confirmedSignal = macdSignal;
+                     } else {
+                         console.log("[OBV Rejected] MACD Signal.");
+                     }
+                }
+            }
         } else {
             console.log("[AI Engine] No trend detected (ADX <= threshold), skipping trend strategies.");
         }
 
         // Mean-Reversion / Oscillator Strategies (RSI, BBands)
-        if (!isTrending) {
+        if (!confirmedSignal && !isTrending) { // Only check if no signal yet and not trending
             console.log("[AI Engine] Range detected (ADX <= threshold), checking mean-reversion strategies...");
             const rsiSignal = this.checkRSIConditions(rsi, latestIndex, targetSymbol, latestPrice);
-            if (rsiSignal) return rsiSignal;
-
-            const bbandsSignal = this.checkBollingerBands(bbandsResult, latestIndex, targetSymbol, latestPrice, prevPrice);
-            if (bbandsSignal) return bbandsSignal;
-        } else {
+            if (rsiSignal) {
+                // OBV Confirmation (Consider if OBV confirms momentum *fading* - requires different logic, skipping for now)
+                 // Let's take RSI signals without OBV confirm for mean reversion for now
+                 console.log("[RSI Signal - No OBV Check] RSI Signal generated.");
+                 confirmedSignal = rsiSignal; 
+            }
+            
+            // Check BBands only if RSI didn't produce a confirmed signal
+            if (!confirmedSignal) {
+                const bbandsSignal = this.checkBollingerBands(bbandsResult, latestIndex, targetSymbol, latestPrice, prevPrice);
+                if (bbandsSignal) {
+                    // OBV Confirmation (Skipping for now for mean reversion)
+                    console.log("[BBands Signal - No OBV Check] BBands Signal generated.");
+                    confirmedSignal = bbandsSignal;
+                }
+            }
+        } else if (!confirmedSignal) { // Log skipping only if no signal found yet
              console.log("[AI Engine] Trend detected (ADX > threshold), skipping mean-reversion strategies.");
         }
         
-        // Stochastic Oscillator (Check regardless of trend for now)
-        const stochSignal = this.checkStochastic(stochResult, latestIndex, targetSymbol, latestPrice);
-        if (stochSignal) return stochSignal;
+        // Stochastic Oscillator (Check last, regardless of trend, no OBV confirm for now)
+        if (!confirmedSignal) {
+            const stochSignal = this.checkStochastic(stochResult, latestIndex, targetSymbol, latestPrice);
+            if (stochSignal) {
+                console.log("[Stoch Signal - No OBV Check] Stoch Signal generated.");
+                confirmedSignal = stochSignal;
+            }
+        }
 
-      // --- No signals --- 
-      console.log(`[AI Engine] No live signal generated for ${targetSymbol}.`);
-      return null;
+      // --- Return Final Signal --- 
+      if (confirmedSignal) {
+          console.log("[AI Engine] Final Confirmed Signal:", confirmedSignal);
+          return confirmedSignal;
+      } else {
+          console.log(`[AI Engine] No confirmed signal generated for ${targetSymbol}.`);
+          return null;
+      }
 
     } catch (error) {
         console.error(`[AI Engine] Error analyzing market for ${targetSymbol}:`, error);
-        this.setError(`Analysis error: ${error instanceof Error ? error.message : 'Unknown error'}`); // Update UI error state
         return null;
     }
   }
-
-  // --- Other Methods --- 
-  setSymbol(symbol: string): void { this.symbol = symbol; }
-  setMode(mode: TradingMode): void { this.mode = mode; }
-  calculatePositionSize(price: number, risk: number = 0.02): number {
-    const accountSize = 10000; // Simulated account size
-    const riskAmount = accountSize * risk;
-    if (price <= 0) return 0;
-    const shares = Math.floor(riskAmount / price);
-    return shares > 0 ? shares : 0;
-  }
-  async executeTradeSignal(signal: TradeSignal): Promise<boolean> {
-    console.log(`Executing ${signal.direction} signal for ${signal.symbol} at $${signal.price} (Strategy: ${signal.strategy})`);
-    if (this.mode === TradingModeEnum.DEMO) {
-      console.log('Demo mode: Simulating trade execution');
-      await new Promise(resolve => setTimeout(resolve, 300));
-      return true;
-    } else {
-      console.log('Live mode: Connecting to brokerage API (Not implemented)');
-      await new Promise(resolve => setTimeout(resolve, 500));
-      console.log('Live trade simulated successfully (No actual execution)');
-      return true;
-    }
-  }
-
-  // Need to pass the setError function from the component if we want to update UI state
-  // For now, errors are logged, but not directly shown in UI from engine errors
-  private setError(message: string | null) {
-      // Placeholder - In a real scenario, this might use a callback passed during construction
-      console.log("[AITradingEngine] Setting error state (placeholder):", message);
-  }
-} 
+}
