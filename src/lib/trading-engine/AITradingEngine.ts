@@ -338,6 +338,28 @@ const calculateStochastic = (
     };
 };
 
+const calculateOBV = (candles: PolygonCandle[]): number[] => {
+    if (!candles || candles.length === 0) return [];
+
+    const obv: number[] = [0]; // Start OBV at 0 for the first available point
+
+    for (let i = 1; i < candles.length; i++) {
+        const currentClose = candles[i].c;
+        const prevClose = candles[i-1].c;
+        const currentVolume = candles[i].v;
+        const prevObv = obv[obv.length - 1];
+
+        if (currentClose > prevClose) {
+            obv.push(prevObv + currentVolume);
+        } else if (currentClose < prevClose) {
+            obv.push(prevObv - currentVolume);
+        } else { // Close is the same
+            obv.push(prevObv);
+        }
+    }
+    return obv;
+};
+
 // --- AI Trading Engine Class ---
 
 export class AITradingEngine {
@@ -362,12 +384,13 @@ export class AITradingEngine {
   private stochasticDPeriod = 3;
   private stochasticOverbought = 80;
   private stochasticOversold = 20;
+  private obvSmaPeriod = 20; // For calculating SMA of OBV later
 
   constructor(symbol: string = 'AAPL', mode: TradingMode = TradingModeEnum.DEMO) {
     this.symbol = symbol;
     this.mode = mode;
     this.polygonService = PolygonService.getInstance();
-    console.log(`AI Engine initialized for ${symbol} (${mode}). Strategies: MA(${this.fastSMAPeriod}/${this.slowSMAPeriod}), RSI(${this.rsiPeriod}), MACD(${this.macdFast}/${this.macdSlow}/${this.macdSignal}), BBands(${this.bbandsPeriod}/${this.bbandsStdDev}), ADX(${this.adxPeriod}), Stoch(${this.stochasticKPeriod}/${this.stochasticDPeriod})`);
+    console.log(`AI Engine initialized for ${symbol} (${mode}). Strategies: MA(${this.fastSMAPeriod}/${this.slowSMAPeriod}), RSI(${this.rsiPeriod}), MACD(${this.macdFast}/${this.macdSlow}/${this.macdSignal}), BBands(${this.bbandsPeriod}/${this.bbandsStdDev}), ADX(${this.adxPeriod}), Stoch(${this.stochasticKPeriod}/${this.stochasticDPeriod}), OBV`);
   }
 
   // --- Helper methods for individual strategy checks --- 
@@ -506,7 +529,8 @@ export class AITradingEngine {
           this.macdSlow + this.macdSignal, 
           this.bbandsPeriod, // BBands period needed
           this.adxPeriod + this.adxPeriod, // ADX needs period + period for smoothing DX
-          this.stochasticKPeriod + this.stochasticDPeriod // Need K period + D smoothing for Stoch
+          this.stochasticKPeriod + this.stochasticDPeriod, // Need K period + D smoothing for Stoch
+          this.obvSmaPeriod // Need enough for OBV SMA calculation buffer
       );
       const historyDays = historyNeeded + 40; // Ample buffer
       const endDate = new Date();
@@ -546,61 +570,67 @@ export class AITradingEngine {
       const isTrending = adxValue > this.adxTrendThreshold;
       console.log(`[AI Engine] Market Trending (ADX > ${this.adxTrendThreshold}): ${isTrending}`);
 
-       // --- Strategy Checks (Using helper methods defined above) --- 
-        // if (isTrending) {
-            const maSignal = this.checkMACrossover(closingPrices, targetSymbol, latestPrice);
-            if (maSignal) return maSignal;
-        // }
+       // --- Strategy Checks --- 
+        
+        // Note: OBV is not used for direct signals here yet,
+        // but could be used to confirm signals from other strategies later.
+        // Example: if (maSignal && maSignal.direction === 'buy' && latestObv > obvSmaValue) { return maSignal; }
+
+        // Strategy 1: MA Crossover
+        const maSignal = this.checkMACrossover(closingPrices, targetSymbol, latestPrice);
+        if (maSignal) return maSignal;
+
+        // Strategy 2: RSI
         const rsiSignal = this.checkRSIConditions(closingPrices, targetSymbol, latestPrice);
         if (rsiSignal) return rsiSignal;
-        // if (isTrending) {
-            const macdSignal = this.checkMACDCrossover(closingPrices, targetSymbol, latestPrice);
-            if (macdSignal) return macdSignal;
-        // }
-        // if (!isTrending) {
-            const bbandsSignal = this.checkBollingerBands(closingPrices, targetSymbol, latestPrice);
-            if (bbandsSignal) return bbandsSignal;
-        // }
         
-        // --- Strategy 5: Stochastic Oscillator Crossover --- 
-        console.log(`[AI Engine] Checking Stochastic (${this.stochasticKPeriod}/${this.stochasticDPeriod})...`);
+        // Strategy 3: MACD Crossover
+        const macdSignal = this.checkMACDCrossover(closingPrices, targetSymbol, latestPrice);
+        if (macdSignal) return macdSignal;
+      
+        // Strategy 4: Bollinger Bands Cross
+        const bbandsSignal = this.checkBollingerBands(closingPrices, targetSymbol, latestPrice);
+        if (bbandsSignal) return bbandsSignal;
+        
+        // Strategy 5: Stochastic Oscillator Crossover
+        const stochSignal = this.checkStochastic(candles, targetSymbol, latestPrice);
+        if (stochSignal) return stochSignal;
+
+      // --- No signals from implemented strategies ---
+      console.log(`[AI Engine] No signals generated for ${targetSymbol}.`);
+      return null;
+
+    } catch (error) {
+      console.error(`[AI Engine] Error analyzing market for ${targetSymbol}:`, error);
+      return null;
+    }
+  }
+
+  // --- Helper methods for individual strategy checks --- 
+  // ... (checkMACrossover, checkRSIConditions, checkMACDCrossover, checkBollingerBands remain the same) ...
+  
+  // Added Stochastic check helper method
+  private checkStochastic(candles: PolygonCandle[], targetSymbol: string, latestPrice: number): TradeSignal | null {
+      console.log(`[AI Engine] Checking Stochastic (${this.stochasticKPeriod}/${this.stochasticDPeriod})...`);
         const stochResult = calculateStochastic(candles, this.stochasticKPeriod, this.stochasticDPeriod);
-        if (stochResult && stochResult.percentK.length >= 2) { // Need 2 points for crossover check
+        if (stochResult && stochResult.percentK.length >= 2) { 
             const k_last = stochResult.percentK[stochResult.percentK.length - 1];
             const k_prev = stochResult.percentK[stochResult.percentK.length - 2];
             const d_last = stochResult.percentD[stochResult.percentD.length - 1];
             const d_prev = stochResult.percentD[stochResult.percentD.length - 2];
             console.log(`[Stoch] Latest %K: ${k_last.toFixed(2)}, %D: ${d_last.toFixed(2)}`);
 
-            // Bullish Crossover (in oversold territory)
+            // Bullish Crossover 
             if (k_prev <= d_prev && k_last > d_last && k_prev < this.stochasticOversold && d_prev < this.stochasticOversold) {
-                const signal: TradeSignal = {
-                    symbol: targetSymbol, direction: 'buy', price: latestPrice,
-                    confidence: 0.70, timestamp: Date.now(), strategy: `Stoch (${this.stochasticKPeriod}/${this.stochasticDPeriod}) Oversold Cross`
-                };
-                console.log(`[AI Engine] Stoch signal generated:`, signal);
-                return signal;
+                return { symbol: targetSymbol, direction: 'buy', price: latestPrice, confidence: 0.70, timestamp: Date.now(), strategy: `Stoch (${this.stochasticKPeriod}/${this.stochasticDPeriod}) Oversold Cross` };
             }
-            
-            // Bearish Crossover (in overbought territory)
+            // Bearish Crossover 
             if (k_prev >= d_prev && k_last < d_last && k_prev > this.stochasticOverbought && d_prev > this.stochasticOverbought) {
-                const signal: TradeSignal = {
-                    symbol: targetSymbol, direction: 'sell', price: latestPrice,
-                    confidence: 0.70, timestamp: Date.now(), strategy: `Stoch (${this.stochasticKPeriod}/${this.stochasticDPeriod}) Overbought Cross`
-                };
-                console.log(`[AI Engine] Stoch signal generated:`, signal);
-                return signal;
+                return { symbol: targetSymbol, direction: 'sell', price: latestPrice, confidence: 0.70, timestamp: Date.now(), strategy: `Stoch (${this.stochasticKPeriod}/${this.stochasticDPeriod}) Overbought Cross` };
             }
         }
         console.log(`[AI Engine] No Stoch signal.`);
-
-        console.log(`[AI Engine] No signals generated for ${targetSymbol}.`);
         return null;
-
-    } catch (error) {
-      console.error(`[AI Engine] Error analyzing market for ${targetSymbol}:`, error);
-      return null;
-    }
   }
 
   // --- Other Methods --- 
