@@ -344,22 +344,21 @@ export class AITradingEngine {
         );
         const historyDays = historyNeeded + 40;
 
-        // ** ADDING UNIQUE LOG BEFORE DATE CALCULATION **
-        console.log("<<<<< CHECKING DATE LOGIC v7 >>>>>"); 
-        
-        // ** FINAL DYNAMIC DATE CALCULATION - Using toLocaleDateString **
-        const endDate = new Date();
-        const startDate = new Date();
+        // ** DATE FIX ATTEMPT #8 - Manual Formatting **
+        const endDate = new Date(); 
+        const startDate = new Date(); 
         startDate.setDate(endDate.getDate() - historyDays);
 
-        // Format YYYY-MM-DD using locale conversion (less prone to timezone issues for DATE ONLY)
-        // Note: Specify 'en-CA' for guaranteed YYYY-MM-DD, or rely on server locale carefully.
-        const formatDate = (date: Date): string => {
-            return date.toLocaleDateString('en-CA'); // YYYY-MM-DD format
+        // Manual YYYY-MM-DD formatting
+        const formatDD = (date: Date): string => {
+            const y = date.getFullYear();
+            const m = (date.getMonth() + 1).toString().padStart(2, '0'); // Month is 0-indexed
+            const d = date.getDate().toString().padStart(2, '0');
+            return `${y}-${m}-${d}`;
         }
-        const startDateStr = formatDate(startDate);
-        const endDateStr = formatDate(endDate);
-        // ** END DYNAMIC DATE FIX **
+        const startDateStr = formatDD(startDate);
+        const endDateStr = formatDD(endDate);
+        // ** END DATE FIX **
 
         console.log(`[AI Engine] ---> FETCHING CANDLES from ${startDateStr} to ${endDateStr} <---`);
         const candles: PolygonCandle[] | null = await this.polygonService.getStockCandles(targetSymbol, startDateStr, endDateStr, 'day');
