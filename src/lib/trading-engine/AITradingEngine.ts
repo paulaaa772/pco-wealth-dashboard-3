@@ -344,24 +344,11 @@ export class AITradingEngine {
         );
         const historyDays = historyNeeded + 40;
 
-        // ** DIAGNOSTIC LOG for current Date() **
-        console.log(`[AI Engine] Environment Date() Check: ${new Date().toString()}`);
-
-        // ** FINAL DYNAMIC DATE CALCULATION - Using Manual Formatting **
-        const endDate = new Date(); 
-        const startDate = new Date(); 
-        startDate.setDate(endDate.getDate() - historyDays);
-
-        // Manual YYYY-MM-DD formatting
-        const formatDD = (date: Date): string => {
-            const y = date.getFullYear();
-            const m = (date.getMonth() + 1).toString().padStart(2, '0'); // Month is 0-indexed
-            const d = date.getDate().toString().padStart(2, '0');
-            return `${y}-${m}-${d}`;
-        }
-        const startDateStr = formatDD(startDate);
-        const endDateStr = formatDD(endDate);
-        // ** END DATE FIX **
+        // ** REVERTING TO HARDCODED DATE RANGE FOR DEBUGGING **
+        const startDateStr = '2024-01-01'; // Fixed past start date
+        const endDateStr = '2024-03-31';   // Fixed past end date
+        console.warn(`[AI Engine] USING HARDCODED DATE RANGE FOR DEBUG: ${startDateStr} to ${endDateStr}`);
+        // ** END HARDCODED DATES **
 
         console.log(`[AI Engine] ---> FETCHING CANDLES from ${startDateStr} to ${endDateStr} <---`);
         const candles: PolygonCandle[] | null = await this.polygonService.getStockCandles(targetSymbol, startDateStr, endDateStr, 'day');
