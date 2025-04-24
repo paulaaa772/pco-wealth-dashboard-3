@@ -341,31 +341,38 @@ export class AITradingEngine {
           this.stochasticKPeriod + this.stochasticDPeriod,
           this.obvSmaPeriod 
         );
-        const historyDays = historyNeeded + 40; 
+        const historyDays = historyNeeded + 40;
         
-        // ** ENSURE DATE CALCULATION IS CORRECT - FINAL ATTEMPT **
-        const endDate = new Date(); // Use current date as end date
-        const startDate = new Date(); // Create start date object
-        startDate.setDate(endDate.getDate() - historyDays); // Subtract days from today
+        // ** DATE CALCULATION - SIMPLIFIED AND VERIFIED **
+        const endDate = new Date(); // Today
+        const startDate = new Date(endDate); // Clone today's date
+        startDate.setDate(startDate.getDate() - historyDays); // Subtract days correctly
         
-        // Format dates as YYYY-MM-DD
-        const formatDate = (date: Date) => {
-            const year = date.getFullYear();
-            const month = (date.getMonth() + 1).toString().padStart(2, '0');
-            const day = date.getDate().toString().padStart(2, '0');
-            return `${year}-${month}-${day}`;
+        // Format YYYY-MM-DD (ensure this format is correct for Polygon)
+        const formatDate = (date: Date): string => {
+            return date.toISOString().split('T')[0]; 
         }
         const startDateStr = formatDate(startDate);
         const endDateStr = formatDate(endDate); 
-        // ** END DATE CORRECTION **
+        // ** END DATE FIX **
 
-        console.log(`[AI Engine] Fetching candles from ${startDateStr} to ${endDateStr}`); // Log corrected dates
+        console.log(`[AI Engine] ---> FETCHING CANDLES from ${startDateStr} to ${endDateStr} <---`); // Emphasize log
         const candles: PolygonCandle[] = await this.polygonService.getStockCandles(targetSymbol, startDateStr, endDateStr, 'day');
         
-        if (!candles || candles.length < historyNeeded) {
-            console.warn(`[AI Engine] Insufficient candle data for ${targetSymbol} (${candles?.length || 0} received). Needed >= ${historyNeeded}.`);
+        if (!candles || candles.length === 0) {
+            // If still no candles after date fix, log specific warning
+            console.error(`[AI Engine] !!! FAILED TO FETCH REAL CANDLES for ${targetSymbol} from ${startDateStr} to ${endDateStr}. Falling back to mock/error.`);
+            // We might need to check API key or Polygon service status if this persists
+            // For now, prevent further analysis if real data fails
+            return null; 
+        } else if (candles.length < historyNeeded) {
+            // Log if we got *some* data but not enough
+            console.warn(`[AI Engine] Insufficient REAL candle data for ${targetSymbol} (${candles.length} received). Needed >= ${historyNeeded}.`);
             return null;
         }
+        
+        // If we reach here, we should have real candles
+        console.log(`[AI Engine] Successfully fetched ${candles.length} real candles for ${targetSymbol}.`);
         candles.sort((a, b) => a.t - b.t); 
         const closingPrices = candles.map(candle => candle.c);
         const latestIndex = closingPrices.length - 1;
