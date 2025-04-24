@@ -333,45 +333,48 @@ export class AITradingEngine {
     try {
         // 1. Fetch historical data
         const historyNeeded = Math.max(
-          this.slowSMAPeriod + 1, 
-          this.rsiPeriod + 1, 
-          this.macdSlow + this.macdSignal, 
-          this.bbandsPeriod, 
-          this.adxPeriod + this.adxPeriod,
-          this.stochasticKPeriod + this.stochasticDPeriod,
-          this.obvSmaPeriod 
+            this.slowSMAPeriod + 1, 
+            this.rsiPeriod + 1, 
+            this.macdSlow + this.macdSignal, 
+            this.bbandsPeriod, 
+            this.adxPeriod + this.adxPeriod,
+            this.stochasticKPeriod + this.stochasticDPeriod,
+            this.obvSmaPeriod 
         );
-        const historyDays = historyNeeded + 40;
+        const historyDays = historyNeeded + 40; 
         
-        // ** DATE CALCULATION - SIMPLIFIED AND VERIFIED **
-        const endDate = new Date(); // Today
-        const startDate = new Date(endDate); // Clone today's date
-        startDate.setDate(startDate.getDate() - historyDays); // Subtract days correctly
+        // ** FINAL DATE FIX **
+        const endDate = new Date(); 
+        const startDate = new Date(); 
+        startDate.setDate(endDate.getDate() - historyDays);
         
-        // Format YYYY-MM-DD (ensure this format is correct for Polygon)
-        const formatDate = (date: Date): string => {
-            return date.toISOString().split('T')[0]; 
+        const formatDate = (date: Date): string => { 
+            // Ensure month and day are two digits
+            const month = (date.getMonth() + 1).toString().padStart(2, '0');
+            const day = date.getDate().toString().padStart(2, '0');
+            return `${date.getFullYear()}-${month}-${day}`;
         }
         const startDateStr = formatDate(startDate);
         const endDateStr = formatDate(endDate); 
         // ** END DATE FIX **
 
-        console.log(`[AI Engine] ---> FETCHING CANDLES from ${startDateStr} to ${endDateStr} <---`); // Emphasize log
-        const candles: PolygonCandle[] = await this.polygonService.getStockCandles(targetSymbol, startDateStr, endDateStr, 'day');
+        console.log(`[AI Engine] ---> FETCHING CANDLES from ${startDateStr} to ${endDateStr} <---`); 
+        const candles: PolygonCandle[] | null = await this.polygonService.getStockCandles(targetSymbol, startDateStr, endDateStr, 'day');
         
-        if (!candles || candles.length === 0) {
-            // If still no candles after date fix, log specific warning
-            console.error(`[AI Engine] !!! FAILED TO FETCH REAL CANDLES for ${targetSymbol} from ${startDateStr} to ${endDateStr}. Falling back to mock/error.`);
-            // We might need to check API key or Polygon service status if this persists
-            // For now, prevent further analysis if real data fails
+        // Updated Check: Explicitly check for null return from service
+        if (candles === null) {
+            console.error(`[AI Engine] !!! FAILED TO FETCH REAL CANDLES for ${targetSymbol} from ${startDateStr} to ${endDateStr}. Check API Key/Entitlements.`);
+            this.setError(`Failed to fetch market data for ${targetSymbol}. Check API key or network.`); // Update UI error state
             return null; 
         } else if (candles.length < historyNeeded) {
-            // Log if we got *some* data but not enough
             console.warn(`[AI Engine] Insufficient REAL candle data for ${targetSymbol} (${candles.length} received). Needed >= ${historyNeeded}.`);
+            this.setError(`Insufficient history for ${targetSymbol} analysis.`); // Update UI error state
             return null;
         }
         
-        // If we reach here, we should have real candles
+        // Clear any previous error message if data fetch is successful
+        this.setError(null); 
+        
         console.log(`[AI Engine] Successfully fetched ${candles.length} real candles for ${targetSymbol}.`);
         candles.sort((a, b) => a.t - b.t); 
         const closingPrices = candles.map(candle => candle.c);
@@ -446,6 +449,7 @@ export class AITradingEngine {
 
     } catch (error) {
         console.error(`[AI Engine] Error analyzing market for ${targetSymbol}:`, error);
+        this.setError(`Analysis error: ${error instanceof Error ? error.message : 'Unknown error'}`); // Update UI error state
         return null;
     }
   }
@@ -472,5 +476,12 @@ export class AITradingEngine {
       console.log('Live trade simulated successfully (No actual execution)');
       return true;
     }
+  }
+
+  // Need to pass the setError function from the component if we want to update UI state
+  // For now, errors are logged, but not directly shown in UI from engine errors
+  private setError(message: string | null) {
+      // Placeholder - In a real scenario, this might use a callback passed during construction
+      console.log("[AITradingEngine] Setting error state (placeholder):", message);
   }
 } 

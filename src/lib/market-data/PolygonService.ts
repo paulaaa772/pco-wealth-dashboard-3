@@ -165,10 +165,10 @@ export class PolygonService {
     return this.instance;
   }
 
-  async getStockCandles(symbol: string, from: string, to: string, timespan = 'day'): Promise<PolygonCandle[]> {
+  async getStockCandles(symbol: string, from: string, to: string, timespan = 'day'): Promise<PolygonCandle[] | null> {
     if (this.useMockData) {
-      // Use mock data
-      console.log(`[MOCK] Fetching ${timespan} candles for ${symbol}`);
+      // Use mock data only if explicitly configured (no API key)
+      console.log(`[MOCK] Fetching ${timespan} candles for ${symbol} (No API Key)`);
       await new Promise(resolve => setTimeout(resolve, 500));
       const mockData = generateMockCandles(symbol, from, to);
       console.log(`[MOCK] Generated ${mockData.length} candles for ${symbol}`);
@@ -177,26 +177,16 @@ export class PolygonService {
     
     try {
       console.log(`[POLYGON] Fetching ${timespan} candles for ${symbol} from ${from} to ${to}`);
+      if (!this.client) throw new Error('API client not initialized');
       
-      if (!this.client) {
-        throw new Error('API client not initialized');
-      }
-      
-      // Format request URL
       const endpoint = `/v2/aggs/ticker/${symbol}/range/1/${timespan}/${from}/${to}`;
-      console.log(`[POLYGON] Calling endpoint: ${endpoint}`);
-      
-      // Log the API key being used (first 4 chars only for security)
       const apiKeyPreview = this.apiKey ? `${this.apiKey.substring(0, 4)}...` : 'null';
-      console.log(`[POLYGON] Using API key: ${apiKeyPreview}`);
+      console.log(`[POLYGON] Calling endpoint: ${endpoint} with key ${apiKeyPreview}`);
       
-      // Make the request
       const response = await this.client.get(endpoint);
       
-      if (response.data.status === 'OK' && response.data.results) {
-        console.log(`[POLYGON] Received ${response.data.results.length} candles from API`);
-        
-        // Map API response to our interface
+      if (response.data.status === 'OK' && response.data.resultsCount > 0 && response.data.results) {
+        console.log(`[POLYGON] Received ${response.data.results.length} real candles from API`);
         return response.data.results.map((candle: any) => ({
           o: candle.o,
           h: candle.h,
@@ -205,25 +195,29 @@ export class PolygonService {
           t: candle.t,
           v: candle.v
         }));
+      } else if (response.data.status === 'OK') {
+         console.warn(`[POLYGON] API returned OK status but no results for ${symbol} (${from} to ${to}). Returning null.`);
+         return null; // No data found for the range
       } else {
-        console.warn('[POLYGON] API returned no results, falling back to mock data');
-        return generateMockCandles(symbol, from, to);
+         // Handle other non-OK statuses from Polygon if necessary
+         console.error(`[POLYGON] API Error Status: ${response.data.status} for ${symbol}`, response.data);
+         // Consider throwing a specific error or returning null based on status
+         return null; 
       }
     } catch (error) {
-      console.error('[POLYGON] Error fetching candles, falling back to mock data:', error);
-      
-      if (axios.isAxiosError(error)) {
-        console.error(`[POLYGON] Status: ${error.response?.status}, Data:`, error.response?.data);
-      }
-      
-      return generateMockCandles(symbol, from, to);
+      console.error(`[POLYGON] Network/Request Error fetching candles for ${symbol}:`, error);
+      // Log specific Axios error details if available
+       if (axios.isAxiosError(error)) {
+         console.error(`[POLYGON] Axios Error Details: Status=${error.response?.status}, Data=`, error.response?.data);
+       }
+      // **Crucially, return null here instead of mock data**
+      return null; 
     }
   }
 
-  async getLatestPrice(symbol: string): Promise<number> {
+  async getLatestPrice(symbol: string): Promise<number | null> {
     if (this.useMockData) {
-      // Use mock data
-      console.log(`[MOCK] Fetching latest price for ${symbol}`);
+      console.log(`[MOCK] Fetching latest price for ${symbol} (No API Key)`);
       await new Promise(resolve => setTimeout(resolve, 300));
       const mockPrice = generateMockPrice(symbol);
       console.log(`[MOCK] Generated mock price: ${mockPrice}`);
@@ -232,25 +226,24 @@ export class PolygonService {
     
     try {
       console.log(`[POLYGON] Fetching latest price for ${symbol}`);
+      if (!this.client) throw new Error('API client not initialized');
       
-      if (!this.client) {
-        throw new Error('API client not initialized');
-      }
-      
-      // Get the latest quote
       const response = await this.client.get(`/v2/last/trade/${symbol}`);
       
-      if (response.data.status === 'OK' && response.data.results) {
+      if (response.data.status === 'OK' && response.data.results && typeof response.data.results.p === 'number') {
         const price = response.data.results.p;
         console.log(`[POLYGON] Latest price for ${symbol}: ${price}`);
         return price;
       } else {
-        console.warn('[POLYGON] API returned no price data, falling back to mock data');
-        return generateMockPrice(symbol);
+        console.warn(`[POLYGON] API returned no valid latest price data for ${symbol}. Status: ${response.data.status}`);
+        return null;
       }
     } catch (error) {
-      console.error('[POLYGON] Error fetching latest price, falling back to mock data:', error);
-      return generateMockPrice(symbol);
+      console.error(`[POLYGON] Error fetching latest price for ${symbol}:`, error);
+       if (axios.isAxiosError(error)) {
+         console.error(`[POLYGON] Axios Error Details: Status=${error.response?.status}, Data=`, error.response?.data);
+       }
+      return null;
     }
   }
 
