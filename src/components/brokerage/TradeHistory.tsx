@@ -2,13 +2,17 @@
 
 import React from 'react';
 
-const TradeHistory = () => {
+interface TradeHistoryProps {
+    symbol?: string;
+}
+
+const TradeHistory: React.FC<TradeHistoryProps> = ({ symbol = 'BTC' }) => {
   return (
     <div className="bg-gray-800 rounded-lg p-4 h-full text-gray-300">
       <h3 className="text-lg font-semibold text-white mb-3">Trade History</h3>
        {/* Placeholder content - Replace with actual data later */}
       <div className="flex justify-between text-xs mb-1 text-gray-500">
-        <span>Amount (BTC)</span>
+        <span>Amount ({symbol})</span>
         <span>Price (USD)</span>
         <span>Time</span>
       </div>
