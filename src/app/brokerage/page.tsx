@@ -7,6 +7,7 @@ import TradingInterface from '../../components/dashboard/TradingInterface';
 import OrderBook from '@/components/brokerage/OrderBook';
 import TradeHistory from '@/components/brokerage/TradeHistory';
 import OrderEntryPanel from '@/components/brokerage/OrderEntryPanel';
+import { Maximize2 } from 'lucide-react';
 
 // Import the TradingChart component with dynamic import to avoid SSR issues
 const TradingChart = dynamic(
@@ -45,6 +46,7 @@ export default function BrokeragePage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [polygonService, setPolygonService] = useState<PolygonService | null>(null);
+  const [isChartFullScreen, setIsChartFullScreen] = useState(false);
 
   // Initialize the page
   useEffect(() => {
@@ -131,41 +133,56 @@ export default function BrokeragePage() {
     }
   };
 
+  const toggleFullScreen = () => {
+    console.log("Toggle fullscreen clicked (not implemented)");
+  };
+
   return (
-    <div className="container mx-auto px-4 py-8 text-white">
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6 h-[70vh]">
-        <div className="lg:col-span-2 bg-gray-900 rounded-lg p-1 flex flex-col h-full">
-          {error && !isLoading && (
-            <div className="bg-red-900/30 border border-red-700 text-red-400 px-3 py-1 rounded mb-2 text-sm">
-              {error}
-            </div>
-          )}
-          {isLoading ? (
-            <div className="flex-grow flex items-center justify-center">
-              <Spinner />
-              <p className="ml-2 text-gray-400">Loading chart data...</p>
-            </div>
-          ) : chartData.length > 0 ? (
-            <div className="flex-grow h-full w-full min-h-0">
-              <TradingChart symbol={symbol} data={chartData} />
-            </div>
-          ) : (
-            <div className="flex-grow flex items-center justify-center">
-              <p className="text-gray-500">{error ? 'Error loading data' : `No data available for ${symbol}`}</p>
-            </div>
-          )}
+    <div className="container mx-auto px-4 py-6 text-white">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+        <div className="lg:col-span-2 flex flex-col gap-4">
+          <div className="bg-gray-900 rounded-lg p-1 flex flex-col h-[60vh] relative">
+            <button 
+              onClick={toggleFullScreen}
+              className="absolute top-2 right-2 z-10 p-1 bg-gray-700/50 hover:bg-gray-600/80 rounded text-gray-300"
+              title="Maximize Chart (Not Implemented)"
+            >
+              <Maximize2 size={18} />
+            </button>
+
+            {error && !isLoading && (
+              <div className="bg-red-900/30 border border-red-700 text-red-400 px-3 py-1 rounded mb-2 text-sm">
+                {error}
+              </div>
+            )}
+            {isLoading ? (
+              <div className="flex-grow flex items-center justify-center">
+                <Spinner />
+                <p className="ml-2 text-gray-400">Loading chart data...</p>
+              </div>
+            ) : chartData.length > 0 ? (
+              <div className="flex-grow h-full w-full min-h-0">
+                <TradingChart symbol={symbol} data={chartData} />
+              </div>
+            ) : (
+              <div className="flex-grow flex items-center justify-center">
+                <p className="text-gray-500">{error ? 'Error loading data' : `No data available for ${symbol}`}</p>
+              </div>
+            )}
+          </div>
+
+          <div className="">
+            <TradingInterface 
+              currentSymbol={symbol} 
+              onSymbolChange={handleSymbolChange} 
+            />
+          </div>
         </div>
         <div className="lg:col-span-1 flex flex-col gap-4 h-full">
-          <div className="flex-shrink-0"><OrderBook /></div>
-          <div className="flex-shrink-0"><TradeHistory /></div>
-          <div className="flex-grow min-h-0"><OrderEntryPanel /></div>
+          <div className="flex-1 min-h-0"><OrderBook /></div>
+          <div className="flex-1 min-h-0"><TradeHistory /></div>
+          <div className="flex-1 min-h-0"><OrderEntryPanel /></div>
         </div>
-      </div>
-      <div className="mt-8">
-        <TradingInterface 
-          currentSymbol={symbol} 
-          onSymbolChange={handleSymbolChange} 
-        />
       </div>
     </div>
   );
