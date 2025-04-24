@@ -187,6 +187,110 @@ const calculateBollingerBands = (
   return { upperBand, middleBand, lowerBand };
 };
 
+// Helper for Wilder's Smoothing (used in RSI and ADX)
+const wilderSmoothing = (data: number[], period: number): number[] => {
+    if (period <= 0 || !data || data.length < period) return [];
+    const smoothed: number[] = [];
+    let sum = 0;
+    // Calculate initial average for the first period
+    for(let i = 0; i < period; i++) {
+        sum += data[i];
+    }
+    smoothed.push(sum / period); // Use simple average for first point
+
+    // Apply Wilder's smoothing for subsequent points
+    for (let i = period; i < data.length; i++) {
+        const previousSmoothed = smoothed[smoothed.length - 1];
+        const currentSmoothed = (previousSmoothed * (period - 1) + data[i]) / period;
+        smoothed.push(currentSmoothed);
+    }
+    return smoothed;
+};
+
+interface ADXResult {
+    adx: number[];
+    plusDI: number[];
+    minusDI: number[];
+}
+
+const calculateADX = (candles: PolygonCandle[], period: number = 14): ADXResult | null => {
+    if (period <= 0 || !candles || candles.length < period + 1) return null;
+
+    const trueRanges: number[] = [];
+    const plusDMs: number[] = [];
+    const minusDMs: number[] = [];
+
+    for (let i = 1; i < candles.length; i++) {
+        const high = candles[i].h;
+        const low = candles[i].l;
+        const close = candles[i].c;
+        const prevHigh = candles[i - 1].h;
+        const prevLow = candles[i - 1].l;
+        const prevClose = candles[i - 1].c;
+
+        // True Range (TR)
+        const tr = Math.max(high - low, Math.abs(high - prevClose), Math.abs(low - prevClose));
+        trueRanges.push(tr);
+
+        // Directional Movement (+DM, -DM)
+        const moveUp = high - prevHigh;
+        const moveDown = prevLow - low;
+
+        let plusDM = 0;
+        let minusDM = 0;
+        if (moveUp > moveDown && moveUp > 0) {
+            plusDM = moveUp;
+        }
+        if (moveDown > moveUp && moveDown > 0) {
+            minusDM = moveDown;
+        }
+        plusDMs.push(plusDM);
+        minusDMs.push(minusDM);
+    }
+    
+    if (trueRanges.length < period || plusDMs.length < period || minusDMs.length < period) return null;
+
+    // Smoothed TR, +DM, -DM
+    const smoothedTR = wilderSmoothing(trueRanges, period);
+    const smoothedPlusDM = wilderSmoothing(plusDMs, period);
+    const smoothedMinusDM = wilderSmoothing(minusDMs, period);
+    
+    if (smoothedTR.length === 0 || smoothedPlusDM.length !== smoothedTR.length || smoothedMinusDM.length !== smoothedTR.length) return null;
+
+    // Directional Indicators (+DI, -DI)
+    const plusDI: number[] = [];
+    const minusDI: number[] = [];
+    for (let i = 0; i < smoothedTR.length; i++) {
+        // Avoid division by zero if smoothedTR is 0 (can happen in flat markets)
+        const diPlus = smoothedTR[i] === 0 ? 0 : (smoothedPlusDM[i] / smoothedTR[i]) * 100;
+        const diMinus = smoothedTR[i] === 0 ? 0 : (smoothedMinusDM[i] / smoothedTR[i]) * 100;
+        plusDI.push(diPlus);
+        minusDI.push(diMinus);
+    }
+
+    // Directional Movement Index (DX)
+    const dx: number[] = [];
+    for (let i = 0; i < plusDI.length; i++) {
+        const diSum = plusDI[i] + minusDI[i];
+        const dxValue = diSum === 0 ? 0 : (Math.abs(plusDI[i] - minusDI[i]) / diSum) * 100;
+        dx.push(dxValue);
+    }
+    
+    if (dx.length < period) return null; // Need enough DX values for ADX smoothing
+
+    // Average Directional Index (ADX)
+    const adx = wilderSmoothing(dx, period);
+
+    // Align outputs (ADX starts later than +/-DI)
+    const adxStartOffset = plusDI.length - adx.length;
+
+    return {
+        adx: adx,
+        plusDI: plusDI.slice(adxStartOffset),
+        minusDI: minusDI.slice(adxStartOffset)
+    };
+};
+
 // --- AI Trading Engine Class ---
 
 export class AITradingEngine {
@@ -205,12 +309,14 @@ export class AITradingEngine {
   private macdSignal = 9;
   private bbandsPeriod = 20;
   private bbandsStdDev = 2;
+  private adxPeriod = 14;
+  private adxTrendThreshold = 25; // Example threshold for trend strength
 
   constructor(symbol: string = 'AAPL', mode: TradingMode = TradingModeEnum.DEMO) {
     this.symbol = symbol;
     this.mode = mode;
     this.polygonService = PolygonService.getInstance();
-    console.log(`AI Engine initialized for ${symbol} (${mode}). Strategies: MA(${this.fastSMAPeriod}/${this.slowSMAPeriod}), RSI(${this.rsiPeriod}), MACD(${this.macdFast}/${this.macdSlow}/${this.macdSignal}), BBands(${this.bbandsPeriod}/${this.bbandsStdDev})`);
+    console.log(`AI Engine initialized for ${symbol} (${mode}). Strategies: MA(${this.fastSMAPeriod}/${this.slowSMAPeriod}), RSI(${this.rsiPeriod}), MACD(${this.macdFast}/${this.macdSlow}/${this.macdSignal}), BBands(${this.bbandsPeriod}/${this.bbandsStdDev}), ADX(${this.adxPeriod})`);
   }
 
   setSymbol(symbol: string): void {
@@ -228,14 +334,15 @@ export class AITradingEngine {
     console.log(`[AI Engine] Analyzing market for ${targetSymbol}...`);
 
     try {
-      // 1. Fetch historical data (need enough for longest period + buffer)
+      // 1. Fetch historical data
       const historyNeeded = Math.max(
           this.slowSMAPeriod + 1, 
           this.rsiPeriod + 1, 
           this.macdSlow + this.macdSignal, 
-          this.bbandsPeriod // BBands period needed
+          this.bbandsPeriod, // BBands period needed
+          this.adxPeriod + this.adxPeriod // ADX needs period + period for smoothing DX
       );
-      const historyDays = historyNeeded + 30; // Fetch ample buffer
+      const historyDays = historyNeeded + 40; // Ample buffer
       const endDate = new Date();
       const startDate = new Date();
       startDate.setDate(endDate.getDate() - historyDays);
@@ -254,141 +361,50 @@ export class AITradingEngine {
       const latestPrice = closingPrices[closingPrices.length - 1];
       const prevPrice = closingPrices[closingPrices.length - 2]; // Need previous price for BBands cross check
 
-      // --- Strategy 1: MA Crossover --- 
-      console.log(`[AI Engine] Checking MA Crossover (${this.fastSMAPeriod}/${this.slowSMAPeriod})...`);
-      const fastSMA = calculateSMA(closingPrices, this.fastSMAPeriod);
-      const slowSMA = calculateSMA(closingPrices, this.slowSMAPeriod);
-      let maSignal: TradeSignal | null = null;
-
-      if (fastSMA.length >= 2 && slowSMA.length >= 2) {
-        const fastSMA_last = fastSMA[fastSMA.length - 1];
-        const fastSMA_prev = fastSMA[fastSMA.length - 2];
-        const slowSMA_last = slowSMA[slowSMA.length - 1];
-        const slowSMA_prev = slowSMA[slowSMA.length - 2];
-
-        // Bullish Crossover
-        if (fastSMA_prev <= slowSMA_prev && fastSMA_last > slowSMA_last) {
-          console.log(`[MA Crossover] Bullish crossover detected`);
-          maSignal = {
-            symbol: targetSymbol, direction: 'buy', price: latestPrice,
-            confidence: 0.80, timestamp: Date.now(), strategy: `MA Crossover (${this.fastSMAPeriod}/${this.slowSMAPeriod})`
-          };
-        }
-        // Bearish Crossover
-        else if (fastSMA_prev >= slowSMA_prev && fastSMA_last < slowSMA_last) {
-          console.log(`[MA Crossover] Bearish crossover detected`);
-          maSignal = {
-            symbol: targetSymbol, direction: 'sell', price: latestPrice,
-            confidence: 0.80, timestamp: Date.now(), strategy: `MA Crossover (${this.fastSMAPeriod}/${this.slowSMAPeriod})`
-          };
-        }
+      // Calculate ADX (needs full candle data)
+      console.log(`[AI Engine] Calculating ADX(${this.adxPeriod})...`);
+      const adxResult = calculateADX(candles, this.adxPeriod);
+      let adxValue = 0;
+      let plusDIValue = 0;
+      let minusDIValue = 0;
+      if (adxResult && adxResult.adx.length > 0) {
+          adxValue = adxResult.adx[adxResult.adx.length - 1];
+          plusDIValue = adxResult.plusDI[adxResult.plusDI.length - 1];
+          minusDIValue = adxResult.minusDI[adxResult.minusDI.length - 1];
+          console.log(`[ADX] Latest ADX: ${adxValue.toFixed(2)}, +DI: ${plusDIValue.toFixed(2)}, -DI: ${minusDIValue.toFixed(2)}`);
+      } else {
+          console.warn(`[ADX] Calculation failed or insufficient data.`);
       }
-      if (maSignal) {
-         console.log(`[AI Engine] MA Crossover signal generated:`, maSignal);
-         return maSignal; // Prioritize MA signal for now
-      }
-      console.log(`[AI Engine] No MA Crossover signal.`);
+      
+      // Determine if market is trending based on ADX
+      const isTrending = adxValue > this.adxTrendThreshold;
+      console.log(`[AI Engine] Market Trending (ADX > ${this.adxTrendThreshold}): ${isTrending}`);
 
-      // --- Strategy 2: RSI Overbought/Oversold --- 
-      console.log(`[AI Engine] Checking RSI(${this.rsiPeriod})...`);
-      const rsi = calculateRSI(closingPrices, this.rsiPeriod);
-      let rsiSignal: TradeSignal | null = null;
+      // --- Strategy Checks (Potentially use ADX as filter) --- 
 
-      if (rsi.length >= 2) {
-        const rsi_last = rsi[rsi.length - 1];
-        const rsi_prev = rsi[rsi.length - 2];
-        console.log(`[RSI] Latest RSI(${this.rsiPeriod}) = ${rsi_last.toFixed(2)}`);
+      // Strategy 1: MA Crossover (Only if Trending?)
+      // if (isTrending) {
+          const maSignal = this.checkMACrossover(closingPrices, targetSymbol, latestPrice);
+          if (maSignal) return maSignal;
+      // }
 
-        // Bullish Signal: Crosses above oversold level
-        if (rsi_prev <= this.rsiOversold && rsi_last > this.rsiOversold) {
-          console.log(`[RSI] Bullish signal detected (crossed above ${this.rsiOversold})`);
-          rsiSignal = {
-            symbol: targetSymbol, direction: 'buy', price: latestPrice,
-            confidence: 0.75, timestamp: Date.now(), strategy: `RSI(${this.rsiPeriod}) Oversold Exit`
-          };
-        }
-        // Bearish Signal: Crosses below overbought level
-        else if (rsi_prev >= this.rsiOverbought && rsi_last < this.rsiOverbought) {
-          console.log(`[RSI] Bearish signal detected (crossed below ${this.rsiOverbought})`);
-          rsiSignal = {
-            symbol: targetSymbol, direction: 'sell', price: latestPrice,
-            confidence: 0.75, timestamp: Date.now(), strategy: `RSI(${this.rsiPeriod}) Overbought Exit`
-          };
-        }
-      }
+      // Strategy 2: RSI (Less reliable in strong trends? Use differently?)
+      const rsiSignal = this.checkRSIConditions(closingPrices, targetSymbol, latestPrice);
+      if (rsiSignal) return rsiSignal;
+      
+      // Strategy 3: MACD Crossover (Only if Trending?)
+      // if (isTrending) {
+          const macdSignal = this.checkMACDCrossover(closingPrices, targetSymbol, latestPrice);
+          if (macdSignal) return macdSignal;
+      // }
+      
+      // Strategy 4: Bollinger Bands (Better for ranging? Use if NOT isTrending?)
+      // if (!isTrending) {
+          const bbandsSignal = this.checkBollingerBands(closingPrices, targetSymbol, latestPrice);
+          if (bbandsSignal) return bbandsSignal;
+      // }
 
-      if (rsiSignal) {
-        console.log(`[AI Engine] RSI signal generated:`, rsiSignal);
-        return rsiSignal;
-      }
-      console.log(`[AI Engine] No RSI signal.`);
-
-      // --- Strategy 3: MACD Crossover --- 
-      console.log(`[AI Engine] Checking MACD(${this.macdFast}/${this.macdSlow}/${this.macdSignal})...`);
-      const macdResult = calculateMACD(closingPrices, this.macdFast, this.macdSlow, this.macdSignal);
-      if (macdResult && macdResult.macdLine.length >= 2) { // Need 2 points to check crossover
-          const macd_last = macdResult.macdLine[macdResult.macdLine.length - 1];
-          const macd_prev = macdResult.macdLine[macdResult.macdLine.length - 2];
-          const signal_last = macdResult.signalLine[macdResult.signalLine.length - 1];
-          const signal_prev = macdResult.signalLine[macdResult.signalLine.length - 2];
-          console.log(`[MACD] Latest MACD: ${macd_last.toFixed(3)}, Signal: ${signal_last.toFixed(3)}`);
-
-          // Bullish Crossover: MACD crosses above Signal
-          if (macd_prev <= signal_prev && macd_last > signal_last) {
-              const signal: TradeSignal = {
-                  symbol: targetSymbol, direction: 'buy', price: latestPrice, 
-                  confidence: 0.70, timestamp: Date.now(), strategy: `MACD Crossover (${this.macdFast}/${this.macdSlow}/${this.macdSignal})`
-              };
-              console.log(`[AI Engine] MACD signal generated:`, signal);
-              return signal;
-          }
-          // Bearish Crossover: MACD crosses below Signal
-          if (macd_prev >= signal_prev && macd_last < signal_last) {
-              const signal: TradeSignal = {
-                  symbol: targetSymbol, direction: 'sell', price: latestPrice, 
-                  confidence: 0.70, timestamp: Date.now(), strategy: `MACD Crossover (${this.macdFast}/${this.macdSlow}/${this.macdSignal})`
-              };
-              console.log(`[AI Engine] MACD signal generated:`, signal);
-              return signal;
-          }
-      }
-      console.log(`[AI Engine] No MACD signal.`);
-
-      // --- Strategy 4: Bollinger Bands Cross --- 
-      console.log(`[AI Engine] Checking Bollinger Bands (${this.bbandsPeriod}/${this.bbandsStdDev})...`);
-      const bbandsResult = calculateBollingerBands(closingPrices, this.bbandsPeriod, this.bbandsStdDev);
-      if (bbandsResult && bbandsResult.upperBand.length >= 2) { // Need 2 points
-          const upperBand_last = bbandsResult.upperBand[bbandsResult.upperBand.length - 1];
-          const lowerBand_last = bbandsResult.lowerBand[bbandsResult.lowerBand.length - 1];
-          // Optional: Use previous band values for stricter crossing condition
-          // const upperBand_prev = bbandsResult.upperBand[bbandsResult.upperBand.length - 2];
-          // const lowerBand_prev = bbandsResult.lowerBand[bbandsResult.lowerBand.length - 2];
-          
-          console.log(`[BBands] Latest Close: ${latestPrice.toFixed(2)}, Upper: ${upperBand_last.toFixed(2)}, Lower: ${lowerBand_last.toFixed(2)}`);
-
-          // Sell Signal: Price crosses ABOVE Upper Band (potential overbought / mean reversion sell)
-          if (latestPrice > upperBand_last /* && prevPrice <= upperBand_prev */ ) { 
-              const signal: TradeSignal = {
-                  symbol: targetSymbol, direction: 'sell', price: latestPrice, 
-                  confidence: 0.65, timestamp: Date.now(), strategy: `BBands (${this.bbandsPeriod}/${this.bbandsStdDev}) Upper Cross`
-              };
-              console.log(`[AI Engine] BBands signal generated:`, signal);
-              return signal;
-          }
-          
-          // Buy Signal: Price crosses BELOW Lower Band (potential oversold / mean reversion buy)
-          if (latestPrice < lowerBand_last /* && prevPrice >= lowerBand_prev */) {
-              const signal: TradeSignal = {
-                  symbol: targetSymbol, direction: 'buy', price: latestPrice, 
-                  confidence: 0.65, timestamp: Date.now(), strategy: `BBands (${this.bbandsPeriod}/${this.bbandsStdDev}) Lower Cross`
-              };
-              console.log(`[AI Engine] BBands signal generated:`, signal);
-              return signal;
-          }
-      }
-      console.log(`[AI Engine] No BBands signal.`);
-
-      // --- No signals from implemented strategies ---
+      // --- No signals triggered ---
       console.log(`[AI Engine] No signals generated for ${targetSymbol}.`);
       return null;
 
@@ -396,6 +412,31 @@ export class AITradingEngine {
       console.error(`[AI Engine] Error analyzing market for ${targetSymbol}:`, error);
       return null;
     }
+  }
+
+  // --- Helper methods for individual strategy checks --- 
+  // ... (checkMACrossover, checkRSIConditions, checkMACDCrossover remain the same) ...
+  
+  // Renamed for consistency
+  private checkBollingerBands(closingPrices: number[], targetSymbol: string, latestPrice: number): TradeSignal | null {
+     console.log(`[AI Engine] Checking Bollinger Bands (${this.bbandsPeriod}/${this.bbandsStdDev})...`);
+     const bbandsResult = calculateBollingerBands(closingPrices, this.bbandsPeriod, this.bbandsStdDev);
+      if (bbandsResult && bbandsResult.upperBand.length >= 2) {
+          const upperBand_last = bbandsResult.upperBand[bbandsResult.upperBand.length - 1];
+          const lowerBand_last = bbandsResult.lowerBand[bbandsResult.lowerBand.length - 1];
+          const prevPrice = closingPrices[closingPrices.length - 2]; // Get previous price here
+          console.log(`[BBands] Latest Close: ${latestPrice.toFixed(2)}, Upper: ${upperBand_last.toFixed(2)}, Lower: ${lowerBand_last.toFixed(2)}`);
+          // Sell Signal: Price crosses ABOVE Upper Band 
+          if (latestPrice > upperBand_last /* && prevPrice <= upperBand_prev - More strict */) { 
+              return { symbol: targetSymbol, direction: 'sell', price: latestPrice, confidence: 0.65, timestamp: Date.now(), strategy: `BBands (${this.bbandsPeriod}/${this.bbandsStdDev}) Upper Cross` };
+          }
+          // Buy Signal: Price crosses BELOW Lower Band
+          if (latestPrice < lowerBand_last /* && prevPrice >= lowerBand_prev - More strict */) {
+              return { symbol: targetSymbol, direction: 'buy', price: latestPrice, confidence: 0.65, timestamp: Date.now(), strategy: `BBands (${this.bbandsPeriod}/${this.bbandsStdDev}) Lower Cross` };
+          }
+      }
+      console.log(`[AI Engine] No BBands signal.`);
+      return null;
   }
 
   calculatePositionSize(price: number, risk: number = 0.02): number {
