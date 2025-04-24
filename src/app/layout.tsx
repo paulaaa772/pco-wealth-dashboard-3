@@ -1,25 +1,29 @@
 import './globals.css'
-import { ReactNode } from 'react'
-import { ThemeProvider } from './components/ThemeProvider'
-import { AdminProvider } from '../context/AdminProvider'
-import SidebarLayout from './components/SidebarLayout'
+import { Inter } from 'next/font/google'
+import type { Metadata } from 'next'
 
-export const metadata = {
-  title: 'AI Wealth Dashboard',
-  description: 'Track and optimize your portfolio with AI insights.',
+const inter = Inter({ subsets: ['latin'] })
+
+export const metadata: Metadata = {
+  title: 'PCO Wealth Dashboard',
+  description: 'AI-Powered Long-Term Wealth Building Dashboard',
 }
 
-export default function RootLayout({ children }: { children: ReactNode }) {
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body className="bg-white text-black dark:bg-zinc-900 dark:text-white transition-colors duration-300">
-        <ThemeProvider>
-          <AdminProvider>
-            <SidebarLayout>
-              {children}
-            </SidebarLayout>
-          </AdminProvider>
-        </ThemeProvider>
+    <html lang="en">
+      <head>
+        <link
+          href="https://fonts.googleapis.com/icon?family=Material+Icons"
+          rel="stylesheet"
+        />
+      </head>
+      <body className={inter.className}>
+        {children}
       </body>
     </html>
   )

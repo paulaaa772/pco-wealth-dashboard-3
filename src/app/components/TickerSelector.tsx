@@ -6,7 +6,7 @@ type Props = {
 }
 
 export default function TickerSelector({ symbol, setSymbol }: Props) {
-  const options = ['AAPL', 'NVDA', 'TSLA', 'QQQ', 'BTC-USD', 'ETH-USD']
+  const options = ['AAPL', 'MSFT', 'TSLA', 'QQQ', 'BTC-USD', 'ETH-USD']
 
   return (
     <select

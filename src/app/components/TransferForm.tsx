@@ -2,60 +2,46 @@
 
 import { useState } from 'react'
 
-export default function TransferForm() {
-  const [destination, setDestination] = useState('')
-  const [asset, setAsset] = useState('')
-  const [amount, setAmount] = useState('')
+const symbols = ['AAPL', 'MSFT', 'TSLA', 'NVDA', 'AMZN']
+
+export default function TradeSimulator() {
+  const [symbol, setSymbol] = useState('AAPL')
+  const [action, setAction] = useState<'Buy' | 'Sell'>('Buy')
+  const [quantity, setQuantity] = useState('')
+  const [price, setPrice] = useState('')
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    alert(`Transferring ${amount} of ${asset} to ${destination}`)
+    const trade = { symbol, action, quantity: Number(quantity), price: Number(price) }
+    console.log('Simulated Trade:', trade)
+    alert(`Simulated ${action} of ${quantity} ${symbol} @ $${price}`)
   }
 
   return (
-    <div className="mt-4">
-      <h2 className="text-lg font-semibold mb-2">Transfer Assets</h2>
-      <form onSubmit={handleSubmit} className="space-y-3 text-sm">
+    <div>
+      <h2 className="text-md font-semibold mb-2">🧪 Trade Simulator</h2>
+      <form onSubmit={handleSubmit} className="space-y-2 text-sm">
         <div>
-          <label className="block mb-1 font-medium">Destination</label>
-          <select
-            className="w-full border rounded px-3 py-2"
-            value={destination}
-            onChange={(e) => setDestination(e.target.value)}
-          >
-            <option value="">Select...</option>
-            <option value="Brokerage A">Brokerage A</option>
-            <option value="Brokerage B">Brokerage B</option>
+          <label className="block mb-1">Ticker</label>
+          <select value={symbol} onChange={e => setSymbol(e.target.value)} className="w-full border px-2 py-1 rounded">
+            {symbols.map(sym => (
+              <option key={sym} value={sym}>{sym}</option>
+            ))}
           </select>
         </div>
-        <div>
-          <label className="block mb-1 font-medium">Asset</label>
-          <select
-            className="w-full border rounded px-3 py-2"
-            value={asset}
-            onChange={(e) => setAsset(e.target.value)}
-          >
-            <option value="">Select...</option>
-            <option value="BTC">BTC</option>
-            <option value="ETH">ETH</option>
-            <option value="NVDA">NVDA</option>
-          </select>
+        <div className="flex gap-2">
+          <button type="button" onClick={() => setAction('Buy')} className={`flex-1 px-2 py-1 rounded border ${action === 'Buy' ? 'bg-green-500 text-white' : ''}`}>Buy</button>
+          <button type="button" onClick={() => setAction('Sell')} className={`flex-1 px-2 py-1 rounded border ${action === 'Sell' ? 'bg-red-500 text-white' : ''}`}>Sell</button>
         </div>
         <div>
-          <label className="block mb-1 font-medium">Amount</label>
-          <input
-            type="number"
-            className="w-full border rounded px-3 py-2"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-          />
+          <label className="block mb-1">Quantity</label>
+          <input type="number" value={quantity} onChange={e => setQuantity(e.target.value)} className="w-full border px-2 py-1 rounded" required />
         </div>
-        <button
-          type="submit"
-          className="bg-blue-600 text-white rounded px-4 py-2 w-full hover:bg-blue-700"
-        >
-          Submit Transfer
-        </button>
+        <div>
+          <label className="block mb-1">Price</label>
+          <input type="number" value={price} onChange={e => setPrice(e.target.value)} className="w-full border px-2 py-1 rounded" required />
+        </div>
+        <button type="submit" className="bg-blue-600 text-white w-full py-2 rounded hover:bg-blue-700">Submit Trade</button>
       </form>
     </div>
   )

@@ -1,36 +1,53 @@
-import { useState, useEffect, useRef } from 'react'
-import { createChart, IChartApi, Time, LineStyle } from 'lightweight-charts'
-import { IndicatorComponents } from './indicators/IndicatorComponents'
+'use client'
 
-export default function TradingChart({ data, selectedIndicators = [] }) {
+import { useEffect, useRef, useState } from 'react'
+import {
+  createChart,
+  IChartApi,
+  LineStyle,
+  CrosshairMode,
+  CandlestickData
+} from 'lightweight-charts'
+import IndicatorSelector from './IndicatorSelector'
+import { indicatorDefinitions } from './indicators/IndicatorComponents'
+
+type Props = {
+  data: CandlestickData[]
+  selectedIndicators?: string[]
+}
+
+export default function TradingChart({ data, selectedIndicators = [] }: Props) {
   const chartRef = useRef<HTMLDivElement | null>(null)
   const chartApi = useRef<IChartApi | null>(null)
+  const [indicators, setIndicators] = useState<string[]>(selectedIndicators)
 
   useEffect(() => {
-    if (!chartRef.current) return
-    chartApi.current?.remove()
+    if (!chartRef.current || data.length === 0) return
+
     chartApi.current = createChart(chartRef.current, {
       height: 400,
-      layout: { background: { color: '#000' }, textColor: '#fff' },
-      grid: { vertLines: { color: '#222' }, horzLines: { color: '#222' } },
-      timeScale: { borderColor: '#333' },
+      layout: { background: { color: '#ffffff' }, textColor: '#000' },
+      grid: { vertLines: { color: '#eee' }, horzLines: { color: '#eee' } },
+      crosshair: { mode: CrosshairMode.Normal },
     })
 
-    const series = chartApi.current.addCandlestickSeries()
-    series.setData(data)
+    const candleSeries = chartApi.current.addCandlestickSeries()
+    candleSeries.setData(data)
 
-    // 🔍 Debugging: log selectedIndicators and Component check
-    console.log('Selected Indicators:', selectedIndicators)
-
-    selectedIndicators.forEach((name: string) => {
-      const Comp = IndicatorComponents[name]
-      if (typeof Comp !== 'function') {
-        console.warn(`Skipping invalid indicator: ${name}`, Comp)
-        return
-      }
-      Comp(chartApi.current!, data)
+    indicators.forEach((name) => {
+      const match = indicatorDefinitions.find((i) => i.name === name)
+      if (match && chartApi.current) match.create(chartApi.current, data)
     })
-  }, [data, selectedIndicators])
 
-  return <div ref={chartRef} className="w-full h-[400px]" />
+    return () => chartApi.current?.remove()
+  }, [data, indicators])
+
+  return (
+    <div className="mt-6">
+      <div ref={chartRef} className="w-full border h-[400px]" />
+      <IndicatorSelector
+        onChange={(names: string[]) => setIndicators(names)}
+      />
+    </div>
+  )
 }
