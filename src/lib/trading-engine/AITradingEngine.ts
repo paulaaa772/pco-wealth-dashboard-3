@@ -101,6 +101,47 @@ export class AITradingEngine {
     console.log(`AI Engine initialized for ${symbol} (${mode}). Strategies: MA(${this.fastSMAPeriod}/${this.slowSMAPeriod}), RSI(${this.rsiPeriod}), MACD(${this.macdFast}/${this.macdSlow}/${this.macdSignal}), BBands(${this.bbandsPeriod}/${this.bbandsStdDev}), ADX(${this.adxPeriod}), Stoch(${this.stochasticKPeriod}/${this.stochasticDPeriod}), OBV`);
   }
 
+  // Add a method to update the symbol
+  public setSymbol(newSymbol: string): void {
+    if (newSymbol && newSymbol !== this.symbol) {
+      console.log(`[AI Engine] Symbol changed from ${this.symbol} to ${newSymbol}`);
+      this.symbol = newSymbol;
+    }
+  }
+
+  // Method to set trading mode
+  public setMode(newMode: TradingMode): void {
+    if (newMode !== this.mode) {
+      console.log(`[AI Engine] Mode changed from ${this.mode} to ${newMode}`);
+      this.mode = newMode;
+    }
+  }
+
+  // Calculate position size based on risk
+  public calculatePositionSize(price: number): number {
+    // Simple position sizing logic
+    const accountBalance = 10000; // Demo account balance
+    const riskPercent = 0.02; // 2% risk per trade
+    
+    return Math.floor(accountBalance * riskPercent / price);
+  }
+
+  // Execute a trade signal (simulated in demo mode)
+  public async executeTradeSignal(signal: TradeSignal): Promise<boolean> {
+    console.log(`[AI Engine] Executing ${signal.direction} signal for ${signal.symbol} at $${signal.price.toFixed(2)}`);
+    
+    if (this.mode === 'live') {
+      console.log('[AI Engine] LIVE MODE: Would execute real trade here.');
+      // In a real implementation, this would call an actual broker API
+      return true;
+    } else {
+      console.log('[AI Engine] DEMO MODE: Simulating trade execution.');
+      // Simulate delay for realism
+      await new Promise(resolve => setTimeout(resolve, 500));
+      return true;
+    }
+  }
+
   // --- Helper methods for individual strategy checks --- 
 
   // Refactored to accept pre-calculated indicator values and the current index
