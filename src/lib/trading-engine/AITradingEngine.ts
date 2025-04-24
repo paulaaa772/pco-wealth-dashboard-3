@@ -27,6 +27,28 @@ const calculateSMA = (data: number[], period: number): number[] => {
   return sma;
 };
 
+const calculateEMA = (data: number[], period: number): number[] => {
+  if (period <= 0 || !data || data.length < period) return [];
+  const ema: number[] = [];
+  const multiplier = 2 / (period + 1);
+  
+  // Calculate initial SMA for the first EMA value
+  let sum = 0;
+  for(let i = 0; i < period; i++) {
+      sum += data[i];
+  }
+  let previousEma = sum / period;
+  ema.push(previousEma);
+
+  // Calculate subsequent EMAs
+  for (let i = period; i < data.length; i++) {
+    const currentEma = (data[i] - previousEma) * multiplier + previousEma;
+    ema.push(currentEma);
+    previousEma = currentEma;
+  }
+  return ema;
+};
+
 const calculateRSI = (data: number[], period: number = 14): number[] => {
   if (period <= 0 || !data || data.length < period + 1) return [];
 
@@ -74,6 +96,53 @@ const calculateRSI = (data: number[], period: number = 14): number[] => {
   return rsi;
 };
 
+interface MACDResult {
+  macdLine: number[];
+  signalLine: number[];
+  histogram: number[];
+}
+
+const calculateMACD = (
+  data: number[], 
+  fastPeriod: number = 12, 
+  slowPeriod: number = 26, 
+  signalPeriod: number = 9
+): MACDResult | null => {
+  if (slowPeriod <= fastPeriod || signalPeriod <= 0 || !data || data.length < slowPeriod) {
+    return null; // Not enough data or invalid periods
+  }
+
+  const emaFast = calculateEMA(data, fastPeriod);
+  const emaSlow = calculateEMA(data, slowPeriod);
+
+  // Align arrays: MACD line starts where the slower EMA starts
+  const macdLine: number[] = [];
+  const startOffset = emaFast.length - emaSlow.length; // Difference in starting points
+  for (let i = 0; i < emaSlow.length; i++) {
+    macdLine.push(emaFast[i + startOffset] - emaSlow[i]);
+  }
+
+  if (macdLine.length < signalPeriod) {
+    return null; // Not enough MACD points for signal line
+  }
+
+  const signalLine = calculateEMA(macdLine, signalPeriod);
+
+  // Align signal line and calculate histogram
+  const histogram: number[] = [];
+  const signalStartOffset = macdLine.length - signalLine.length;
+  for (let i = 0; i < signalLine.length; i++) {
+      histogram.push(macdLine[i + signalStartOffset] - signalLine[i]);
+  }
+
+  // Return aligned results (all starting from the same logical point)
+   return {
+      macdLine: macdLine.slice(signalStartOffset), // Trim beginning to match signal/hist
+      signalLine: signalLine,
+      histogram: histogram
+   };
+};
+
 // --- AI Trading Engine Class ---
 
 export class AITradingEngine {
@@ -87,12 +156,15 @@ export class AITradingEngine {
   private rsiPeriod = 14;
   private rsiOverbought = 70;
   private rsiOversold = 30;
+  private macdFast = 12;
+  private macdSlow = 26;
+  private macdSignal = 9;
 
   constructor(symbol: string = 'AAPL', mode: TradingMode = TradingModeEnum.DEMO) {
     this.symbol = symbol;
     this.mode = mode;
     this.polygonService = PolygonService.getInstance();
-    console.log(`AI Engine initialized for ${symbol} (${mode}). Strategies: MA Crossover (${this.fastSMAPeriod}/${this.slowSMAPeriod}), RSI(${this.rsiPeriod})`);
+    console.log(`AI Engine initialized for ${symbol} (${mode}). Strategies: MA(${this.fastSMAPeriod}/${this.slowSMAPeriod}), RSI(${this.rsiPeriod}), MACD(${this.macdFast}/${this.macdSlow}/${this.macdSignal})`);
   }
 
   setSymbol(symbol: string): void {
@@ -111,8 +183,8 @@ export class AITradingEngine {
 
     try {
       // 1. Fetch historical data (need enough for longest period + buffer)
-      const historyNeeded = Math.max(this.slowSMAPeriod + 1, this.rsiPeriod + 1);
-      const historyDays = historyNeeded + 20; // Fetch extra for safety
+      const historyNeeded = Math.max(this.slowSMAPeriod + 1, this.rsiPeriod + 1, this.macdSlow + this.macdSignal);
+      const historyDays = historyNeeded + 30; // Fetch ample buffer
       const endDate = new Date();
       const startDate = new Date();
       startDate.setDate(endDate.getDate() - historyDays);
@@ -123,7 +195,7 @@ export class AITradingEngine {
       const candles: PolygonCandle[] = await this.polygonService.getStockCandles(targetSymbol, startDateStr, endDateStr, 'day');
 
       if (!candles || candles.length < historyNeeded) {
-        console.warn(`[AI Engine] Insufficient candle data for ${targetSymbol} (${candles?.length || 0} received). Needed ${historyNeeded}.`);
+        console.warn(`[AI Engine] Insufficient candle data for ${targetSymbol} (${candles?.length || 0} received). Needed >= ${historyNeeded}.`);
         return null;
       }
       candles.sort((a, b) => a.t - b.t); // Ensure chronological order
@@ -198,6 +270,37 @@ export class AITradingEngine {
         return rsiSignal;
       }
       console.log(`[AI Engine] No RSI signal.`);
+
+      // --- Strategy 3: MACD Crossover --- 
+      console.log(`[AI Engine] Checking MACD(${this.macdFast}/${this.macdSlow}/${this.macdSignal})...`);
+      const macdResult = calculateMACD(closingPrices, this.macdFast, this.macdSlow, this.macdSignal);
+      if (macdResult && macdResult.macdLine.length >= 2) { // Need 2 points to check crossover
+          const macd_last = macdResult.macdLine[macdResult.macdLine.length - 1];
+          const macd_prev = macdResult.macdLine[macdResult.macdLine.length - 2];
+          const signal_last = macdResult.signalLine[macdResult.signalLine.length - 1];
+          const signal_prev = macdResult.signalLine[macdResult.signalLine.length - 2];
+          console.log(`[MACD] Latest MACD: ${macd_last.toFixed(3)}, Signal: ${signal_last.toFixed(3)}`);
+
+          // Bullish Crossover: MACD crosses above Signal
+          if (macd_prev <= signal_prev && macd_last > signal_last) {
+              const signal: TradeSignal = {
+                  symbol: targetSymbol, direction: 'buy', price: latestPrice, 
+                  confidence: 0.70, timestamp: Date.now(), strategy: `MACD Crossover (${this.macdFast}/${this.macdSlow}/${this.macdSignal})`
+              };
+              console.log(`[AI Engine] MACD signal generated:`, signal);
+              return signal;
+          }
+          // Bearish Crossover: MACD crosses below Signal
+          if (macd_prev >= signal_prev && macd_last < signal_last) {
+              const signal: TradeSignal = {
+                  symbol: targetSymbol, direction: 'sell', price: latestPrice, 
+                  confidence: 0.70, timestamp: Date.now(), strategy: `MACD Crossover (${this.macdFast}/${this.macdSlow}/${this.macdSignal})`
+              };
+              console.log(`[AI Engine] MACD signal generated:`, signal);
+              return signal;
+          }
+      }
+      console.log(`[AI Engine] No MACD signal.`);
 
       // --- No signals from implemented strategies ---
       console.log(`[AI Engine] No signals generated for ${targetSymbol}.`);
