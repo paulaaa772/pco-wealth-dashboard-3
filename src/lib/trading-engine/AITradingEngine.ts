@@ -22,6 +22,13 @@ import {
 // Define TradingMode type locally if the import causes issues
 export type TradingMode = 'demo' | 'live';
 
+// Make sure Position is exported if defined here
+export interface Position {
+  id: string;
+  symbol: string;
+  // ... rest of Position interface
+}
+
 export interface TradeSignal {
   symbol: string;
   direction: 'buy' | 'sell';

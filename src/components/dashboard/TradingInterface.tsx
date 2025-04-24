@@ -22,15 +22,23 @@ interface Position {
 export interface TradingInterfaceProps {
   onSymbolChange: (symbol: string) => void;
   currentSymbol?: string; // Add this prop for two-way binding
+  positions: Position[]; // Receive positions from parent
+  onClosePosition: (positionId: string) => void; // Callback to parent to close
+  onNewAIPosition: (position: Position) => void; // Callback when AI creates position
 }
 
-export default function TradingInterface({ onSymbolChange, currentSymbol = 'AAPL' }: TradingInterfaceProps) {
+export default function TradingInterface({ 
+    onSymbolChange, 
+    currentSymbol = 'AAPL', 
+    positions, // Use prop
+    onClosePosition, // Use prop
+    onNewAIPosition // Use prop
+}: TradingInterfaceProps) {
   // Setup state for the trading interface
   const [mode, setMode] = useState<TradingMode>(TradingMode.DEMO);
   const [symbol, setSymbol] = useState<string>(currentSymbol);
   const [aiEnabled, setAiEnabled] = useState<boolean>(true);
   const [lastSignal, setLastSignal] = useState<TradeSignal | null>(null);
-  const [positions, setPositions] = useState<Position[]>([]);
   const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [performance, setPerformance] = useState({
@@ -40,6 +48,12 @@ export default function TradingInterface({ onSymbolChange, currentSymbol = 'AAPL
   });
   const aiEngine = useRef<AITradingEngine | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Recalculate performance whenever the positions prop changes
+  useEffect(() => {
+      console.log("[TRADING UI] Positions prop updated, recalculating performance.");
+      updatePerformanceDisplay(positions);
+  }, [positions]);
 
   // When currentSymbol prop changes, update our local state
   useEffect(() => {
@@ -159,11 +173,9 @@ export default function TradingInterface({ onSymbolChange, currentSymbol = 'AAPL
           status: 'open' // Mark position as open
         };
         
-        setPositions(prevPositions => [...prevPositions, newPosition]);
-        console.log('[TRADING UI] New position added:', newPosition);
-
-        // Update performance tracking for the NEW trade
-        updatePerformance(newPosition); // Pass the new position
+        // Instead of setPositions, call the parent's handler
+        onNewAIPosition(newPosition); 
+        console.log('[TRADING UI] Notified parent of new AI position:', newPosition);
       }
     } catch (error) {
       console.error('[TRADING UI] Error executing trade signal:', error);
@@ -181,73 +193,21 @@ export default function TradingInterface({ onSymbolChange, currentSymbol = 'AAPL
     return Math.floor(accountBalance * riskPerTrade / price);
   };
 
-  // Close a position (simulated in demo mode)
-  const closePosition = (positionId: string) => {
-    console.log('[TRADING UI] Closing position with ID:', positionId);
-    
-    setPositions(prevPositions => {
-      // Find the position to close
-      const positionToClose = prevPositions.find(p => p.id === positionId);
-      if (!positionToClose || positionToClose.status !== 'open') {
-        console.warn('[TRADING UI] Position not found or already closed.');
-        return prevPositions;
-      }
+  // Renamed to avoid confusion, recalculates display based on props
+  const updatePerformanceDisplay = (currentPositions: Position[]) => {
+      let closedTrades = currentPositions.filter(p => p.status === 'closed' && p.profit !== undefined);
+      let totalPnl = closedTrades.reduce((sum, trade) => sum + (trade.profit ?? 0), 0);
+      let wins = closedTrades.filter(p => (p.profit ?? 0) > 0).length;
+      let totalClosed = closedTrades.length;
+      // Count open trades towards total count if needed, or adjust definition
+      let totalOpenedOrClosed = currentPositions.length; 
 
-      // Calculate a random exit price (±2%)
-      const exitPrice = positionToClose.entryPrice * (0.98 + Math.random() * 0.04);
-      
-      // Update the position
-      const updatedPosition: Position = {
-        ...positionToClose,
-        exitPrice,
-        closeDate: new Date(),
-        status: 'closed',
-        profit: (exitPrice - positionToClose.entryPrice) * positionToClose.quantity * (positionToClose.type === 'buy' ? 1 : -1),
-      };
-      
-      console.log('[TRADING UI] Position closed:', updatedPosition);
-      
-      // Update performance metrics with the closed position
-      updatePerformance(undefined, updatedPosition); // Pass closed position
-      
-      // Return the updated list of positions
-      return prevPositions.map(p => p.id === positionId ? updatedPosition : p);
-    });
-  };
-
-  // Update performance metrics based on opened or closed positions
-  const updatePerformance = (openedPosition?: Position, closedPosition?: Position) => {
-    setPerformance(prev => {
-      let newTotalTrades = prev.totalTrades;
-      let newProfitLoss = prev.profitLoss;
-      let wins = prev.winRate * prev.totalTrades; // Calculate current number of wins
-      
-      // If a new position was opened, just increment trade count
-      if (openedPosition) {
-        newTotalTrades = prev.totalTrades + 1;
-        console.log(`[TRADING UI] Performance: New trade opened. Total trades: ${newTotalTrades}`);
-      }
-
-      // If a position was closed, calculate P/L and update win rate
-      if (closedPosition && closedPosition.profit !== undefined) {
-        console.log(`[TRADING UI] Performance: Trade closed. Profit: ${closedPosition.profit.toFixed(2)}`);
-        newProfitLoss += closedPosition.profit;
-        if (closedPosition.profit > 0) {
-          wins += 1;
-        }
-      } else if (closedPosition) {
-        console.warn('[TRADING UI] Performance: Closed position received without profit calculated.');
-      }
-
-      // Calculate new win rate (avoid division by zero)
-      const newWinRate = newTotalTrades > 0 ? wins / newTotalTrades : 0;
-      
-      return {
-        winRate: Math.round(newWinRate * 1000) / 1000, // More precision for win rate
-        profitLoss: Math.round(newProfitLoss * 100) / 100,
-        totalTrades: newTotalTrades,
-      };
-    });
+      setPerformance({
+          winRate: totalClosed > 0 ? wins / totalClosed : 0,
+          profitLoss: Math.round(totalPnl * 100) / 100,
+          totalTrades: totalOpenedOrClosed // Display total positions attempted/managed
+      });
+      console.log(`[TRADING UI] Performance updated: Trades=${totalOpenedOrClosed}, Wins=${wins}, P/L=${totalPnl.toFixed(2)}`);
   };
 
   // Toggle between demo and live modes
@@ -401,7 +361,7 @@ export default function TradingInterface({ onSymbolChange, currentSymbol = 'AAPL
                 }`}
               >
                 <button 
-                  onClick={() => closePosition(position.id)}
+                  onClick={() => onClosePosition(position.id)}
                   className="absolute top-1 right-1 p-0.5 bg-gray-600 hover:bg-gray-500 text-white text-xs rounded leading-none"
                   title="Close Position (Demo)"
                 >

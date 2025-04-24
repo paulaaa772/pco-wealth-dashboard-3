@@ -9,6 +9,7 @@ import TradeHistory from '@/components/brokerage/TradeHistory';
 import OrderEntryPanel from '@/components/brokerage/OrderEntryPanel';
 import { Maximize2 } from 'lucide-react';
 import { ManualOrder } from '@/components/brokerage/OrderEntryPanel';
+import { Position } from '@/lib/trading-engine/AITradingEngine';
 
 // Import the TradingChart component with dynamic import to avoid SSR issues
 const TradingChart = dynamic(
@@ -49,6 +50,7 @@ export default function BrokeragePage() {
   const [polygonService, setPolygonService] = useState<PolygonService | null>(null);
   const [isChartFullScreen, setIsChartFullScreen] = useState(false);
   const [manualTrades, setManualTrades] = useState<ManualOrder[]>([]);
+  const [aiPositions, setAiPositions] = useState<Position[]>([]);
 
   // Initialize the page
   useEffect(() => {
@@ -151,6 +153,38 @@ export default function BrokeragePage() {
     setManualTrades(prev => [...prev, { ...order, timestamp: Date.now() }]);
   };
 
+  // Handler for AI opening a new position
+  const handleNewAIPosition = (newPosition: Position) => {
+    console.log('[BrokeragePage] Adding new AI position:', newPosition);
+    setAiPositions(prev => [...prev, newPosition]);
+    // Note: Performance update logic might need refinement here or rely on useEffect
+  };
+
+  // Handler for AI closing a position
+  const handleCloseAIPosition = (positionId: string) => {
+    console.log('[BrokeragePage] Closing AI position:', positionId);
+    setAiPositions(prevPositions => {
+      const positionToClose = prevPositions.find(p => p.id === positionId);
+      if (!positionToClose || positionToClose.status !== 'open') {
+        console.warn('[BrokeragePage] Position to close not found or not open.');
+        return prevPositions;
+      }
+      // Simulate exit price and calculate P/L
+      const exitPrice = positionToClose.entryPrice * (0.98 + Math.random() * 0.04); // Simple random exit
+      const profitLoss = (exitPrice - positionToClose.entryPrice) * positionToClose.quantity * (positionToClose.type === 'buy' ? 1 : -1);
+      
+      const updatedPosition: Position = {
+        ...positionToClose,
+        exitPrice,
+        closeDate: new Date(),
+        status: 'closed',
+        profit: profitLoss,
+      };
+      console.log('[BrokeragePage] Position closed with P/L:', profitLoss);
+      return prevPositions.map(p => p.id === positionId ? updatedPosition : p);
+    });
+  };
+
   return (
     <div className="container mx-auto px-4 py-6 text-white">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
@@ -192,13 +226,16 @@ export default function BrokeragePage() {
           <div className="">
             <TradingInterface 
               currentSymbol={symbol} 
-              onSymbolChange={handleSymbolChange} 
+              onSymbolChange={handleSymbolChange}
+              positions={aiPositions}
+              onClosePosition={handleCloseAIPosition}
+              onNewAIPosition={handleNewAIPosition}
             />
           </div>
         </div>
         <div className="lg:col-span-1 flex flex-col gap-4 h-full">
           <div className="flex-1 min-h-0"><OrderBook symbol={symbol} latestPrice={latestClosePrice} /></div>
-          <div className="flex-1 min-h-0"><TradeHistory symbol={symbol} /></div>
+          <div className="flex-1 min-h-0"><TradeHistory symbol={symbol} positions={aiPositions} /></div>
           <div className="flex-1 min-h-0">
             <OrderEntryPanel 
               symbol={symbol} 
