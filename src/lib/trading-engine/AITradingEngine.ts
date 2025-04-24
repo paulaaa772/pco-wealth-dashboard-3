@@ -390,26 +390,33 @@ export class AITradingEngine {
         }
         console.log(`[OBV] Latest OBV: ${latestObv}, SMA(${this.obvSmaPeriod}): ${obvSmaValue.toFixed(0)}`);
         
-        // --- Strategy Checks (using refactored helpers) --- 
+        // --- Strategy Checks with ADX Filter --- 
         
-        // if (isTrending) { // Example: Apply ADX filter
+        // Trend-Following Strategies (MA, MACD)
+        if (isTrending) {
+            console.log("[AI Engine] Trend detected (ADX > threshold), checking trend strategies...");
             const maSignal = this.checkMACrossover(fastSMA, slowSMA, latestIndex, targetSymbol, latestPrice);
             if (maSignal) return maSignal;
-        // }
 
-        const rsiSignal = this.checkRSIConditions(rsi, latestIndex, targetSymbol, latestPrice);
-        if (rsiSignal) return rsiSignal;
-        
-        // if (isTrending) { // Example: Apply ADX filter
             const macdSignal = this.checkMACDCrossover(macdResult, latestIndex, targetSymbol, latestPrice);
             if (macdSignal) return macdSignal;
-        // }
-      
-        // if (!isTrending) { // Example: Apply ADX filter (for ranging)
+        } else {
+            console.log("[AI Engine] No trend detected (ADX <= threshold), skipping trend strategies.");
+        }
+
+        // Mean-Reversion / Oscillator Strategies (RSI, BBands)
+        if (!isTrending) {
+            console.log("[AI Engine] Range detected (ADX <= threshold), checking mean-reversion strategies...");
+            const rsiSignal = this.checkRSIConditions(rsi, latestIndex, targetSymbol, latestPrice);
+            if (rsiSignal) return rsiSignal;
+
             const bbandsSignal = this.checkBollingerBands(bbandsResult, latestIndex, targetSymbol, latestPrice, prevPrice);
             if (bbandsSignal) return bbandsSignal;
-        // }
+        } else {
+             console.log("[AI Engine] Trend detected (ADX > threshold), skipping mean-reversion strategies.");
+        }
         
+        // Stochastic Oscillator (Check regardless of trend for now)
         const stochSignal = this.checkStochastic(stochResult, latestIndex, targetSymbol, latestPrice);
         if (stochSignal) return stochSignal;
 
