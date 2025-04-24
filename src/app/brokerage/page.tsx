@@ -20,8 +20,8 @@ interface ChartDataPoint {
 
 export default function BrokeragePage() {
   const [chartData, setChartData] = useState<ChartDataPoint[]>([]);
-  const [selectedSymbol, setSelectedSymbol] = useState('AAPL');
-  const [isLoading, setIsLoading] = useState(true);
+  const [selectedSymbol, setSelectedSymbol] = useState<string>('AAPL');
+  const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -29,6 +29,11 @@ export default function BrokeragePage() {
       try {
         console.log('Initializing brokerage page');
         const polygonService = PolygonService.getInstance();
+        if (!polygonService) {
+          console.error('Failed to initialize PolygonService');
+          setError('Service initialization failed');
+          return;
+        }
         await loadMarketData(polygonService);
       } catch (error) {
         console.error('Error initializing page:', error);
@@ -40,6 +45,12 @@ export default function BrokeragePage() {
   }, [selectedSymbol]);
 
   const loadMarketData = async (polygonService: PolygonService) => {
+    if (!selectedSymbol) {
+      console.error('No symbol selected');
+      setError('Please select a symbol');
+      return;
+    }
+
     try {
       setIsLoading(true);
       setError(null);
@@ -55,22 +66,35 @@ export default function BrokeragePage() {
       const candles = await polygonService.getStockCandles(selectedSymbol, from, to, '1day');
       console.log('Received candles:', candles);
       
-      if (!candles || candles.length === 0) {
+      if (!candles || !Array.isArray(candles) || candles.length === 0) {
         console.log('No data available for symbol:', selectedSymbol);
         setError('No data available for this symbol');
         setChartData([]);
         return;
       }
 
-      const formattedData = candles.map(candle => ({
-        time: new Date(candle.t).toISOString().split('T')[0],
-        open: candle.o,
-        high: candle.h,
-        low: candle.l,
-        close: candle.c,
-      }));
+      const formattedData = candles.map(candle => {
+        if (!candle || typeof candle.t === 'undefined') {
+          console.error('Invalid candle data:', candle);
+          return null;
+        }
+        
+        return {
+          time: new Date(candle.t).toISOString().split('T')[0],
+          open: Number(candle.o) || 0,
+          high: Number(candle.h) || 0,
+          low: Number(candle.l) || 0,
+          close: Number(candle.c) || 0,
+        };
+      }).filter(Boolean) as ChartDataPoint[];
       
       console.log('Formatted data:', formattedData);
+      
+      if (formattedData.length === 0) {
+        setError('Invalid data received from server');
+        return;
+      }
+      
       setChartData(formattedData);
       
     } catch (error) {
@@ -93,6 +117,11 @@ export default function BrokeragePage() {
     <div className="p-6 space-y-6 bg-gray-800 min-h-screen">
       <div className="max-w-7xl mx-auto">
         <div className="grid grid-cols-1 gap-6">
+          {error && (
+            <div className="bg-red-500/10 border border-red-500 rounded-lg p-4">
+              <p className="text-red-500">{error}</p>
+            </div>
+          )}
           <TradingInterface onSymbolChange={handleSymbolChange} />
           <div className="bg-gray-900 rounded-lg p-6">
             <div className="flex justify-between items-center mb-4">

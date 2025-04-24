@@ -1,7 +1,5 @@
 import axios, { AxiosError } from 'axios';
-import getConfig from 'next/config';
 
-const { publicRuntimeConfig } = getConfig();
 const BASE_URL = 'https://api.polygon.io';
 
 export interface PolygonCandle {
@@ -18,13 +16,13 @@ export class PolygonService {
   private apiKey: string;
 
   private constructor() {
-    // Get API key from runtime config
-    this.apiKey = publicRuntimeConfig.NEXT_PUBLIC_POLYGON_API_KEY || '';
+    // Get API key directly from environment variable
+    this.apiKey = process.env.NEXT_PUBLIC_POLYGON_API_KEY || '';
     
     if (!this.apiKey) {
       console.error('Polygon API key is not configured in environment variables');
     } else {
-      console.log('Polygon API key is configured');
+      console.log('Polygon API key is configured:', this.apiKey.substring(0, 4) + '...');
     }
   }
 
@@ -50,8 +48,20 @@ export class PolygonService {
       const endpoint = `/v2/aggs/ticker/${symbol}/range/1/${timespan}/${from}/${to}`;
       const url = this.getApiUrl(endpoint);
       
+      console.log('Fetching candles for:', symbol);
       const response = await axios.get(url);
+      
+      if (response.status !== 200) {
+        throw new Error(`API request failed with status ${response.status}`);
+      }
+      
+      if (!response.data || !response.data.results) {
+        throw new Error('Invalid response format from API');
+      }
+      
       console.log('API Response Status:', response.status);
+      console.log('Received candles count:', response.data.results.length);
+      
       return response.data.results || [];
     } catch (error: unknown) {
       const axiosError = error as AxiosError;
@@ -60,7 +70,7 @@ export class PolygonService {
         data: axiosError.response?.data,
         message: axiosError.message
       });
-      return [];
+      throw error; // Re-throw to handle in component
     }
   }
 
@@ -72,7 +82,18 @@ export class PolygonService {
 
       const endpoint = `/v2/last/trade/${symbol}`;
       const url = this.getApiUrl(endpoint);
+      
+      console.log('Fetching latest price for:', symbol);
       const response = await axios.get(url);
+      
+      if (response.status !== 200) {
+        throw new Error(`API request failed with status ${response.status}`);
+      }
+      
+      if (!response.data || !response.data.results) {
+        throw new Error('Invalid response format from API');
+      }
+      
       return response.data.results.p || null;
     } catch (error: unknown) {
       const axiosError = error as AxiosError;
@@ -81,7 +102,7 @@ export class PolygonService {
         data: axiosError.response?.data,
         message: axiosError.message
       });
-      return null;
+      throw error; // Re-throw to handle in component
     }
   }
 
@@ -93,7 +114,18 @@ export class PolygonService {
 
       const endpoint = `/v3/reference/tickers/${symbol}`;
       const url = this.getApiUrl(endpoint);
+      
+      console.log('Fetching company details for:', symbol);
       const response = await axios.get(url);
+      
+      if (response.status !== 200) {
+        throw new Error(`API request failed with status ${response.status}`);
+      }
+      
+      if (!response.data || !response.data.results) {
+        throw new Error('Invalid response format from API');
+      }
+      
       return response.data.results || null;
     } catch (error: unknown) {
       const axiosError = error as AxiosError;
@@ -102,7 +134,7 @@ export class PolygonService {
         data: axiosError.response?.data,
         message: axiosError.message
       });
-      return null;
+      throw error; // Re-throw to handle in component
     }
   }
 } 
