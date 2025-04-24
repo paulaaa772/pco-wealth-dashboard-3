@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { PolygonService } from '../../lib/market-data/PolygonService';
 import dynamic from 'next/dynamic';
+import TradingInterface from '../../components/dashboard/TradingInterface';
 
 // Import the TradingChart component with dynamic import to avoid SSR issues
 const TradingChart = dynamic(
@@ -46,15 +47,12 @@ export default function BrokeragePage() {
   useEffect(() => {
     console.log('Initializing brokerage page');
     try {
-      // Create a new instance of PolygonService
       const service = PolygonService.getInstance();
       setPolygonService(service);
-      
-      // Load initial market data
       loadMarketData(service, symbol);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to initialize brokerage page:', err);
-      setError('Failed to initialize the brokerage page. Please check the console for details.');
+      setError(`Failed to initialize: ${err.message}`);
       setIsLoading(false);
     }
   }, []);
@@ -108,51 +106,30 @@ export default function BrokeragePage() {
         setChartData(formattedData);
       } else {
         console.error('Invalid response format:', response);
-        setError('Invalid data format received from the API');
+        setError('No data received from the API for this symbol.');
+        setChartData([]);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error loading market data:', err);
-      setError('Failed to load market data. Please check your API key and network connection.');
+      setError(`Failed to load market data: ${err.message}. Check API key and network.`);
+      setChartData([]);
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Handle symbol change
-  const handleSymbolChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSymbol(e.target.value.toUpperCase());
-  };
-
-  // Handle form submission
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (polygonService && symbol) {
-      loadMarketData(polygonService, symbol);
+  // Handle symbol change initiated from the TradingInterface component
+  const handleSymbolChange = (newSymbol: string) => {
+    console.log('BrokeragePage: Symbol changed to', newSymbol);
+    setSymbol(newSymbol);
+    if (polygonService) {
+      loadMarketData(polygonService, newSymbol);
     }
   };
 
   return (
     <div className="container mx-auto px-4 py-8">
       <h1 className="text-3xl font-bold mb-6">Brokerage Dashboard</h1>
-      
-      {/* Symbol input form */}
-      <form onSubmit={handleSubmit} className="mb-6">
-        <div className="flex items-center gap-2">
-          <input
-            type="text"
-            value={symbol}
-            onChange={handleSymbolChange}
-            placeholder="Enter symbol (e.g., AAPL)"
-            className="border border-gray-300 rounded px-3 py-2 flex-1"
-          />
-          <button 
-            type="submit"
-            className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
-          >
-            Load Chart
-          </button>
-        </div>
-      </form>
       
       {/* Error message */}
       {error && (
@@ -162,20 +139,26 @@ export default function BrokeragePage() {
       )}
       
       {/* Chart container */}
-      <div className="border border-gray-300 rounded p-4 h-[500px]">
+      <div className="border border-gray-700 bg-gray-900 rounded p-4 h-[500px] mb-6">
         {isLoading ? (
           <div className="flex items-center justify-center h-full">
             <Spinner />
-            <p className="ml-2">Loading chart data...</p>
+            <p className="ml-2 text-gray-400">Loading chart data...</p>
           </div>
         ) : chartData.length > 0 ? (
           <TradingChart symbol={symbol} data={chartData} />
         ) : (
           <div className="flex items-center justify-center h-full">
-            <p className="text-gray-500">No data available for {symbol}</p>
+            <p className="text-gray-500">{error ? error : `No data available for ${symbol}`}</p>
           </div>
         )}
       </div>
+
+      {/* Trading Interface component */}
+      <TradingInterface 
+        currentSymbol={symbol} 
+        onSymbolChange={handleSymbolChange} 
+      />
     </div>
   );
 }
