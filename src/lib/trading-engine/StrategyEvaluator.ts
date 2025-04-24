@@ -46,17 +46,23 @@ interface SimulatedTrade {
 }
 
 // Dictionary to hold calculated indicator arrays
+// Separate explicitly known properties from the dynamic indicator results
+interface CalculatedIndicators {
+    [key: string]: any[]; // e.g., sma9: number[], rsi14: number[], macd_line: number[]
+}
+
 interface IndicatorData {
-    [key: string]: any[]; // e.g., sma9: number[], rsi14: number[], etc.
-    closingPrices?: number[];
-    volumes?: number[];
+    candles: PolygonCandle[]; // Keep original candles
+    closingPrices: number[]; // Explicitly store closing prices
+    volumes: number[];       // Explicitly store volumes
+    indicators: CalculatedIndicators; // Store calculated results here
 }
 
 // Adjusted strategy function signature to pass IndicatorData
 type BacktestStrategyFunction = (
     index: number,
-    candles: PolygonCandle[],
-    indicators: IndicatorData 
+    // candles: PolygonCandle[], // Pass full IndicatorData instead
+    data: IndicatorData 
 ) => 'buy' | 'sell' | null;
 
 // Mapping of indicator keys to calculation functions (example)
@@ -96,12 +102,12 @@ export class StrategyEvaluator {
             return null;
         }
 
-        const indicators: IndicatorData = {
-            // Pre-extract common data arrays
+        // Initialize IndicatorData structure
+        const indicatorData: IndicatorData = {
+            candles: candles,
             closingPrices: candles.map(c => c.c),
-            volumes: candles.map(c => c.v), 
-            // highs: candles.map(c => c.h), // Add if needed by indicators
-            // lows: candles.map(c => c.l),   // Add if needed by indicators
+            volumes: candles.map(c => c.v),
+            indicators: {} // Initialize empty calculated indicators
         };
 
         // 1. Calculate all required indicators based on config
@@ -118,26 +124,24 @@ export class StrategyEvaluator {
                 // Determine input data (most use close, some use candles)
                 let inputData: any;
                 if (['adx', 'stochastic', 'obv'].includes(config.funcKey)) {
-                    inputData = candles; // These need full candle data
+                    inputData = indicatorData.candles; // Pass full candle data
                 } else {
-                    inputData = indicators.closingPrices; // Default to closing prices
+                    inputData = indicatorData.closingPrices; // Default to closing prices
                 }
 
                 console.log(`[Backtest] Calculating ${key} using ${config.funcKey} with params:`, config.params);
                 const result = calcFunction(inputData, ...config.params);
                 
-                // Store the result(s)
+                // Store the result(s) in the nested 'indicators' object
                 if (result) {
-                    // Handle indicators returning objects (MACD, BBands, ADX, Stoch)
                     if (typeof result === 'object' && !Array.isArray(result)) {
                         for (const subKey in result) {
-                            // Store under a combined key like 'macd_line', 'bbands_upper'
-                            indicators[`${key}_${subKey}`] = result[subKey as keyof typeof result];
-                             console.log(`[Backtest] Stored ${key}_${subKey} (Length: ${result[subKey as keyof typeof result]?.length})`);
+                            indicatorData.indicators[`${key}_${subKey}`] = result[subKey as keyof typeof result];
+                            // console.log(`[Backtest] Stored ${key}_${subKey} (Length: ${result[subKey as keyof typeof result]?.length})`);
                         }
                     } else if (Array.isArray(result)) {
-                        indicators[key] = result;
-                        console.log(`[Backtest] Stored ${key} (Length: ${result.length})`);
+                        indicatorData.indicators[key] = result;
+                        // console.log(`[Backtest] Stored ${key} (Length: ${result.length})`);
                     }
                 } else {
                     console.warn(`[Backtest] Calculation failed for ${key}`);
@@ -165,7 +169,8 @@ export class StrategyEvaluator {
         for (let i = warmupPeriod; i < candles.length - 1; i++) { // Stop one bar early to use i+1 for entry/exit
             const currentCandle = candles[i];
             const nextCandle = candles[i+1]; // Used for entry/exit price simulation
-            const signalDirection = strategyFn(i, candles, indicators);
+            // Pass the full indicatorData object to the strategy function
+            const signalDirection = strategyFn(i, indicatorData);
 
             // --- Position Management --- 
             if (!activePosition) {
