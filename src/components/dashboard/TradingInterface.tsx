@@ -273,6 +273,11 @@ export default function TradingInterface({ onSymbolChange, currentSymbol = 'AAPL
               defaultValue={symbol}
               className="flex-1 bg-gray-700 text-white p-2 rounded-lg"
               placeholder="Enter stock symbol"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  handleSymbolChange();
+                }
+              }}
             />
             <button 
               onClick={handleSymbolChange}
