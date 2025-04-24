@@ -1,5 +1,7 @@
 import axios, { AxiosError } from 'axios';
+import getConfig from 'next/config';
 
+const { publicRuntimeConfig } = getConfig();
 const BASE_URL = 'https://api.polygon.io';
 
 export interface PolygonCandle {
@@ -16,9 +18,13 @@ export class PolygonService {
   private apiKey: string;
 
   private constructor() {
-    this.apiKey = process.env.NEXT_PUBLIC_POLYGON_API_KEY || '';
+    // Get API key from runtime config
+    this.apiKey = publicRuntimeConfig.NEXT_PUBLIC_POLYGON_API_KEY || '';
+    
     if (!this.apiKey) {
       console.error('Polygon API key is not configured in environment variables');
+    } else {
+      console.log('Polygon API key is configured');
     }
   }
 
@@ -30,27 +36,30 @@ export class PolygonService {
   }
 
   private getApiUrl(endpoint: string): string {
-    return `${BASE_URL}${endpoint}?apiKey=${this.apiKey}`;
+    const url = `${BASE_URL}${endpoint}?apiKey=${this.apiKey}`;
+    console.log('Generated API URL:', url.replace(this.apiKey, '[HIDDEN]'));
+    return url;
   }
 
   async getStockCandles(symbol: string, from: string, to: string, timespan = '1min'): Promise<PolygonCandle[]> {
     try {
       if (!this.apiKey) {
-        console.error('Polygon API key is not configured');
-        return [];
+        throw new Error('Polygon API key is not configured');
       }
 
       const endpoint = `/v2/aggs/ticker/${symbol}/range/1/${timespan}/${from}/${to}`;
       const url = this.getApiUrl(endpoint);
-      console.log('API Key present:', !!this.apiKey);
-      console.log('Making request to:', url.replace(this.apiKey, '[HIDDEN]'));
       
       const response = await axios.get(url);
-      console.log('Response status:', response.status);
+      console.log('API Response Status:', response.status);
       return response.data.results || [];
     } catch (error: unknown) {
       const axiosError = error as AxiosError;
-      console.error('Error fetching stock candles:', axiosError.response?.data || axiosError);
+      console.error('Error fetching stock candles:', {
+        status: axiosError.response?.status,
+        data: axiosError.response?.data,
+        message: axiosError.message
+      });
       return [];
     }
   }
@@ -58,8 +67,7 @@ export class PolygonService {
   async getLatestPrice(symbol: string): Promise<number | null> {
     try {
       if (!this.apiKey) {
-        console.error('Polygon API key is not configured');
-        return null;
+        throw new Error('Polygon API key is not configured');
       }
 
       const endpoint = `/v2/last/trade/${symbol}`;
@@ -68,7 +76,11 @@ export class PolygonService {
       return response.data.results.p || null;
     } catch (error: unknown) {
       const axiosError = error as AxiosError;
-      console.error('Error fetching latest price:', axiosError.response?.data || axiosError);
+      console.error('Error fetching latest price:', {
+        status: axiosError.response?.status,
+        data: axiosError.response?.data,
+        message: axiosError.message
+      });
       return null;
     }
   }
@@ -76,8 +88,7 @@ export class PolygonService {
   async getCompanyDetails(symbol: string) {
     try {
       if (!this.apiKey) {
-        console.error('Polygon API key is not configured');
-        return null;
+        throw new Error('Polygon API key is not configured');
       }
 
       const endpoint = `/v3/reference/tickers/${symbol}`;
@@ -86,7 +97,11 @@ export class PolygonService {
       return response.data.results || null;
     } catch (error: unknown) {
       const axiosError = error as AxiosError;
-      console.error('Error fetching company details:', axiosError.response?.data || axiosError);
+      console.error('Error fetching company details:', {
+        status: axiosError.response?.status,
+        data: axiosError.response?.data,
+        message: axiosError.message
+      });
       return null;
     }
   }
