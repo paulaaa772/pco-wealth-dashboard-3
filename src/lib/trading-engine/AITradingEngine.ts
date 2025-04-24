@@ -26,7 +26,15 @@ export type TradingMode = 'demo' | 'live';
 export interface Position {
   id: string;
   symbol: string;
-  // ... rest of Position interface
+  type: 'buy' | 'sell';
+  entryPrice: number;
+  quantity: number;
+  timestamp: number;
+  exitPrice?: number;
+  closeDate?: Date;
+  status?: 'open' | 'closed';
+  profit?: number;
+  stopLoss?: number;
 }
 
 export interface TradeSignal {
