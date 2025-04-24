@@ -489,4 +489,21 @@ export class AITradingEngine {
         return null;
     }
   }
+
+  // --- Other Methods --- 
+  setSymbol(symbol: string): void {
+      this.symbol = symbol;
+      console.log(`Trading symbol updated to: ${symbol}`);
+  }
+  setMode(mode: TradingMode): void {
+      this.mode = mode;
+      console.log(`Trading mode updated to: ${mode}`);
+  }
+
+  calculatePositionSize(price: number, risk: number = 0.02): number {
+    // ... (logic remains the same) ...
+  }
+  async executeTradeSignal(signal: TradeSignal): Promise<boolean> {
+    // ... (logic remains the same) ...
+  }
 }
