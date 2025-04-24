@@ -1,4 +1,4 @@
-import { PolygonCandle } from './market-data/PolygonService';
+import { PolygonCandle } from '../market-data/PolygonService';
 import { TradeSignal } from './AITradingEngine';
 // Import indicator calculation functions and types
 import {
