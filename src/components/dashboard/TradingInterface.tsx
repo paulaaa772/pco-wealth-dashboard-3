@@ -72,6 +72,13 @@ export default function TradingInterface({ onSymbolChange, currentSymbol = 'AAPL
     };
   }, []);
 
+  // Re-analyze when AI is toggled ON, if not already analyzing
+  useEffect(() => {
+    if (aiEnabled && !isAnalyzing) {
+      analyzeMarket();
+    }
+  }, [aiEnabled]);
+
   // Handle symbol change from input
   const handleSymbolChange = () => {
     if (!inputRef.current) return;
@@ -81,6 +88,7 @@ export default function TradingInterface({ onSymbolChange, currentSymbol = 'AAPL
       console.log('[TRADING UI] Symbol changed to:', newSymbol);
       setSymbol(newSymbol);
       onSymbolChange(newSymbol); // Notify parent
+      if (aiEngine.current) aiEngine.current.setSymbol(newSymbol); // Update engine symbol
       analyzeMarket(newSymbol);
     }
   };
@@ -98,7 +106,7 @@ export default function TradingInterface({ onSymbolChange, currentSymbol = 'AAPL
         aiEngine.current = new AITradingEngine(symbolToAnalyze, mode);
       }
       
-      const signal = await aiEngine.current.analyzeMarket(symbolToAnalyze);
+      const signal = await aiEngine.current.analyzeMarket();
       
       if (signal) {
         console.log('[TRADING UI] Signal received:', signal);
@@ -260,19 +268,19 @@ export default function TradingInterface({ onSymbolChange, currentSymbol = 'AAPL
   };
 
   return (
-    <div className="bg-gray-900 rounded-lg p-6">
+    <div className="bg-gray-900 rounded-lg p-4">
       <h2 className="text-2xl font-semibold text-white mb-4">Trading Interface</h2>
       
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-        <div className="bg-gray-800 rounded-lg p-4">
-          <h3 className="text-lg font-medium text-white mb-2">Symbol</h3>
-          <div className="flex space-x-2">
+      <div className="flex flex-wrap md:flex-nowrap gap-4 mb-4">
+        <div className="bg-gray-800 rounded-lg p-3 w-full md:w-auto md:min-w-[250px]">
+          <h3 className="text-sm font-medium text-gray-400 mb-2">Symbol Controls</h3>
+          <div className="flex space-x-2 mb-2">
             <input
               type="text"
               ref={inputRef}
               defaultValue={symbol}
-              className="flex-1 bg-gray-700 text-white p-2 rounded-lg"
-              placeholder="Enter stock symbol"
+              className="flex-1 bg-gray-700 text-white p-2 rounded-lg text-sm"
+              placeholder="Symbol"
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
                   handleSymbolChange();
@@ -281,23 +289,23 @@ export default function TradingInterface({ onSymbolChange, currentSymbol = 'AAPL
             />
             <button 
               onClick={handleSymbolChange}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg"
+              className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded-lg text-sm"
             >
               Search
             </button>
           </div>
-          <div className="mt-4 flex justify-between">
+          <div className="flex justify-between text-xs">
             <button 
               onClick={toggleMode} 
-              className={`px-3 py-1 rounded-lg ${
+              className={`px-2 py-1 rounded-md ${
                 mode === TradingMode.DEMO ? 'bg-purple-600 hover:bg-purple-700' : 'bg-green-600 hover:bg-green-700'
               } text-white`}
             >
-              {mode === TradingMode.DEMO ? 'Demo Mode' : 'Live Mode'}
+              {mode === TradingMode.DEMO ? 'Demo' : 'Live'} Mode
             </button>
             <button 
               onClick={toggleAI} 
-              className={`px-3 py-1 rounded-lg ${
+              className={`px-2 py-1 rounded-md ${
                 aiEnabled ? 'bg-blue-600 hover:bg-blue-700' : 'bg-gray-600 hover:bg-gray-700'
               } text-white`}
             >
@@ -306,137 +314,124 @@ export default function TradingInterface({ onSymbolChange, currentSymbol = 'AAPL
           </div>
         </div>
         
-        <div className="bg-gray-800 rounded-lg p-4">
-          <h3 className="text-lg font-medium text-white mb-2">AI Signal</h3>
+        <div className="bg-gray-800 rounded-lg p-3 flex-grow">
+          <h3 className="text-sm font-medium text-gray-400 mb-2">AI Signal</h3>
           {isAnalyzing ? (
             <div className="flex items-center justify-center h-16">
-              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
+              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
             </div>
           ) : lastSignal ? (
-            <div className={`p-3 rounded-lg ${
+            <div className={`p-2 rounded-md text-sm ${
               lastSignal.direction === 'buy' ? 'bg-green-900/30 border border-green-700' : 'bg-red-900/30 border border-red-700'
             }`}>
               <div className="flex justify-between">
-                <span className="text-gray-300">Symbol:</span>
+                <span className="text-gray-400">Symbol:</span>
                 <span className="font-semibold text-white">{lastSignal.symbol}</span>
               </div>
-              <div className="flex justify-between mt-1">
-                <span className="text-gray-300">Position:</span>
+              <div className="flex justify-between">
+                <span className="text-gray-400">Position:</span>
                 <span className={`font-semibold ${
                   lastSignal.direction === 'buy' ? 'text-green-400' : 'text-red-400'
                 }`}>
                   {lastSignal.direction.toUpperCase()}
                 </span>
               </div>
-              <div className="flex justify-between mt-1">
-                <span className="text-gray-300">Entry:</span>
+              <div className="flex justify-between">
+                <span className="text-gray-400">Entry:</span>
                 <span className="font-semibold text-white">${lastSignal.price.toFixed(2)}</span>
               </div>
-              <div className="flex justify-between mt-1">
-                <span className="text-gray-300">Confidence:</span>
-                <span className="font-semibold text-blue-400">{(lastSignal.confidence * 100).toFixed(0)}%</span>
+              <div className="flex justify-between">
+                <span className="text-gray-400">Strategy:</span>
+                <span className="font-semibold text-blue-400 text-xs">{lastSignal.strategy}</span>
               </div>
             </div>
           ) : (
-            <div className="flex items-center justify-center h-16 text-gray-500">
+            <div className="flex items-center justify-center h-16 text-gray-500 text-sm">
               No signals available
             </div>
           )}
-          {mode === TradingMode.DEMO && lastSignal && (
-            <button 
-              onClick={() => executeTradeSignal(lastSignal)}
-              className="mt-4 w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg"
-            >
-              Execute Signal
-            </button>
-          )}
           {errorMessage && (
-            <div className="mt-4 p-2 bg-red-900/30 border border-red-700 rounded-lg text-red-400 text-sm">
+            <div className="mt-2 p-1 text-xs bg-red-900/30 border border-red-700 rounded-md text-red-400">
               {errorMessage}
             </div>
           )}
         </div>
         
-        <div className="bg-gray-800 rounded-lg p-4">
-          <h3 className="text-lg font-medium text-white mb-2">Performance</h3>
-          <div className="p-3 bg-gray-700 rounded-lg">
+        <div className="bg-gray-800 rounded-lg p-3 w-full md:w-auto md:min-w-[200px]">
+          <h3 className="text-sm font-medium text-gray-400 mb-2">Performance</h3>
+          <div className="p-2 bg-gray-700 rounded-md text-sm mb-2">
             <div className="flex justify-between">
-              <span className="text-gray-300">Win Rate:</span>
+              <span className="text-gray-400">Win Rate:</span>
               <span className="font-semibold text-white">{(performance.winRate * 100).toFixed(1)}%</span>
             </div>
-            <div className="flex justify-between mt-1">
-              <span className="text-gray-300">P/L:</span>
+            <div className="flex justify-between">
+              <span className="text-gray-400">P/L:</span>
               <span className={`font-semibold ${
                 performance.profitLoss >= 0 ? 'text-green-400' : 'text-red-400'
               }`}>
                 ${performance.profitLoss.toFixed(2)}
               </span>
             </div>
-            <div className="flex justify-between mt-1">
-              <span className="text-gray-300">Trades:</span>
+            <div className="flex justify-between">
+              <span className="text-gray-400">Trades:</span>
               <span className="font-semibold text-white">{performance.totalTrades}</span>
             </div>
           </div>
           <button 
             onClick={() => analyzeMarket()}
             disabled={isAnalyzing}
-            className={`mt-4 w-full ${
-              isAnalyzing 
-                ? 'bg-blue-700/50 cursor-not-allowed' 
-                : 'bg-blue-600 hover:bg-blue-700'
-            } text-white px-4 py-2 rounded-lg`}
+            className={`w-full text-sm px-3 py-1 rounded-md ${
+              isAnalyzing ? 'bg-gray-600 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'
+            } text-white`}
           >
-            {isAnalyzing ? 'Analyzing...' : 'Analyze Market'}
+            {isAnalyzing ? 'Analyzing...' : 'Analyze Now'}
           </button>
         </div>
       </div>
       
-      <div className="bg-gray-800 rounded-lg p-4">
-        <h3 className="text-lg font-medium text-white mb-4">Active Positions</h3>
+      <div className="bg-gray-800 rounded-lg p-3">
+        <h3 className="text-sm font-medium text-gray-400 mb-2">Active Positions</h3>
         {positions.filter(p => p.status === 'open').length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
             {positions.filter(p => p.status === 'open').map(position => (
               <div 
                 key={position.id}
-                className={`p-3 rounded-lg relative ${ // Added relative positioning
+                className={`p-2 rounded-md relative text-sm ${
                   position.type === 'buy' ? 'bg-green-900/30 border border-green-700' : 'bg-red-900/30 border border-red-700'
                 }`}
               >
-                {/* Close Button - Added */}
                 <button 
                   onClick={() => closePosition(position.id)}
-                  className="absolute top-1 right-1 bg-gray-600 hover:bg-gray-500 text-white text-xs px-1.5 py-0.5 rounded"
+                  className="absolute top-1 right-1 p-0.5 bg-gray-600 hover:bg-gray-500 text-white text-xs rounded leading-none"
                   title="Close Position (Demo)"
                 >
                   X
                 </button>
-
-                {/* Position Details */}
                 <div className="flex justify-between">
-                  <span className="text-gray-300">Symbol:</span>
+                  <span className="text-gray-400">Symbol:</span>
                   <span className="font-semibold text-white">{position.symbol}</span>
                 </div>
-                <div className="flex justify-between mt-1">
-                  <span className="text-gray-300">Type:</span>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Type:</span>
                   <span className={`font-semibold ${
                     position.type === 'buy' ? 'text-green-400' : 'text-red-400'
                   }`}>
                     {position.type.toUpperCase()}
                   </span>
                 </div>
-                <div className="flex justify-between mt-1">
-                  <span className="text-gray-300">Entry:</span>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Entry:</span>
                   <span className="font-semibold text-white">${position.entryPrice.toFixed(2)}</span>
                 </div>
-                <div className="flex justify-between mt-1">
-                  <span className="text-gray-300">Size:</span>
-                  <span className="font-semibold text-white">{position.quantity} shares</span>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Size:</span>
+                  <span className="font-semibold text-white">{position.quantity} sh</span>
                 </div>
               </div>
             ))}
           </div>
         ) : (
-          <div className="flex items-center justify-center h-16 text-gray-500">
+          <div className="flex items-center justify-center h-16 text-gray-500 text-sm">
             No active positions
           </div>
         )}
