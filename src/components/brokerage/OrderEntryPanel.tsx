@@ -30,15 +30,27 @@ const OrderEntryPanel: React.FC<OrderEntryPanelProps> = ({
   const [stopPrice, setStopPrice] = useState('');
   const [amount, setAmount] = useState('');
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [statusType, setStatusType] = useState<'success' | 'error' | null>(null);
 
   const handlePlaceOrder = () => {
-      setStatusMessage(null); // Clear previous message
-      const orderAmount = parseFloat(amount);
-      const orderLimitPrice = parseFloat(limitPrice);
-      const orderStopPrice = parseFloat(stopPrice);
+      console.log("[OrderEntry] handlePlaceOrder called."); // Log entry
+      setStatusMessage(null); 
+      setStatusType(null);
+      
+      const amountStr = amount.trim();
+      const limitPriceStr = limitPrice.trim();
+      const stopPriceStr = stopPrice.trim();
+      
+      console.log(`[OrderEntry] Raw inputs: amount=${amountStr}, limit=${limitPriceStr}, stop=${stopPriceStr}`);
+
+      const orderAmount = parseFloat(amountStr);
+      const orderLimitPrice = parseFloat(limitPriceStr);
+      const orderStopPrice = parseFloat(stopPriceStr);
 
       if (isNaN(orderAmount) || orderAmount <= 0) {
+          console.error("[OrderEntry] Validation Error: Invalid amount.");
           setStatusMessage('Error: Invalid amount.');
+          setStatusType('error');
           return;
       }
       
@@ -51,40 +63,37 @@ const OrderEntryPanel: React.FC<OrderEntryPanelProps> = ({
 
       if (orderType === 'limit') {
           if (isNaN(orderLimitPrice) || orderLimitPrice <= 0) {
+             console.error("[OrderEntry] Validation Error: Invalid limit price.");
              setStatusMessage('Error: Invalid limit price.');
+             setStatusType('error');
              return;
           }
           simulatedOrder.limitPrice = orderLimitPrice;
       } else if (orderType === 'stop') {
            if (isNaN(orderStopPrice) || orderStopPrice <= 0) {
+             console.error("[OrderEntry] Validation Error: Invalid stop price.");
              setStatusMessage('Error: Invalid stop price.');
+             setStatusType('error');
              return;
           } 
-          // Stop-limit often requires a limit price too, simplifying for now
           simulatedOrder.stopPrice = orderStopPrice;
-          // Placeholder for limit price in a real stop-limit
           if (!isNaN(orderLimitPrice) && orderLimitPrice > 0) {
               simulatedOrder.limitPrice = orderLimitPrice;
           } else {
-              // Default: use stop price as limit for simple stop-limit
               simulatedOrder.limitPrice = orderStopPrice; 
           }
       }
-      // Market orders just need amount
 
       console.log('--- Manual Order Simulation ---', simulatedOrder);
       setStatusMessage(`Simulated ${side.toUpperCase()} ${orderType.toUpperCase()} order placed for ${orderAmount} ${symbol}.`);
+      setStatusType('success');
       
-      // Clear inputs after simulation
       setLimitPrice('');
       setStopPrice('');
       setAmount('');
 
-      // Hide status message after a few seconds
-      setTimeout(() => setStatusMessage(null), 4000);
-
-      // TODO: Later, call a prop function like onPlaceOrder(simulatedOrder)
-      // to notify the parent component to update positions or chart visuals.
+      // Message will persist until next action or clear
+      // setTimeout(() => setStatusMessage(null), 4000); // Remove timeout
   };
 
   return (
@@ -170,9 +179,9 @@ const OrderEntryPanel: React.FC<OrderEntryPanelProps> = ({
       </div>
       
       {/* Status Message */}
-      <div className="h-6 mt-2 flex-shrink-0"> {/* Fixed height for status */}
+      <div className="h-8 mt-2 flex-shrink-0 text-center"> 
         {statusMessage && (
-            <p className={`text-xs ${statusMessage.startsWith('Error') ? 'text-red-400' : 'text-green-400'}`}>
+            <p className={`text-sm font-medium ${statusType === 'error' ? 'text-red-400' : 'text-green-400'}`}>
               {statusMessage}
             </p>
         )}

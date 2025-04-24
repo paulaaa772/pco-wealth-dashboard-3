@@ -15,29 +15,30 @@ const OrderBook: React.FC<OrderBookProps> = ({ symbol = 'BTC' }) => {
   useEffect(() => {
     const fetchQuote = async () => {
       if (!symbol) return;
-      
+      console.log(`[OrderBook] Fetching quote for ${symbol}...`); // Log fetch start
       setIsLoading(true);
       setError(null);
+      setLatestQuote(null); // Clear previous quote
       try {
         const polygonService = PolygonService.getInstance();
-        // NOTE: PolygonService doesn't have a dedicated 'getQuote' method in our current code.
-        // We'll *simulate* getting a quote using getLatestPrice for now.
-        // A real implementation would likely use a different endpoint or websocket.
-        
         const price = await polygonService.getLatestPrice(symbol);
-        if (price) {
-            // Simulate bid/ask spread around the latest price
-            const spread = price * 0.0005; // Example spread
+        
+        if (price && typeof price === 'number') { // Check if price is valid number
+            console.log(`[OrderBook] Latest price fetched for ${symbol}: ${price}`);
+            const spread = price * 0.0005; 
             setLatestQuote({ ask: price + spread / 2, bid: price - spread / 2 });
         } else {
+             console.error(`[OrderBook] Invalid price received for ${symbol}:`, price);
              setError('Could not fetch quote.');
         }
       } catch (err: any) {
-        console.error('Error fetching quote for Order Book:', err);
-        setError('Failed to load quote.');
+        console.error(`[OrderBook] Error fetching quote for ${symbol}:`, err);
+        // Display specific error if available
+        setError(`Quote Error: ${err.message || 'Failed to load'}`); 
         setLatestQuote(null);
       } finally {
         setIsLoading(false);
+        console.log(`[OrderBook] Fetch quote finished for ${symbol}. Loading: ${isLoading}`);
       }
     };
 
@@ -72,7 +73,7 @@ const OrderBook: React.FC<OrderBookProps> = ({ symbol = 'BTC' }) => {
       {/* Mid Price Display */}
       <div className={`text-center text-lg font-bold my-1 py-1 border-y border-gray-700 flex-shrink-0 order-2 ${isLoading ? 'text-gray-500' : 'text-white'}`}>
          {isLoading ? 'Loading...' : midPrice }
-         {error && <span className="text-red-500 text-xs ml-2">({error})</span>}
+         {error && !isLoading && <span className="text-red-400 text-xs ml-2">({error})</span>}
       </div>
 
       {/* Bids (Buy Orders) - Static Mock Data */}
