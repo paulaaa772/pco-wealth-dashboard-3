@@ -8,6 +8,7 @@ import OrderBook from '@/components/brokerage/OrderBook';
 import TradeHistory from '@/components/brokerage/TradeHistory';
 import OrderEntryPanel from '@/components/brokerage/OrderEntryPanel';
 import { Maximize2 } from 'lucide-react';
+import { ManualOrder } from '@/components/brokerage/OrderEntryPanel';
 
 // Import the TradingChart component with dynamic import to avoid SSR issues
 const TradingChart = dynamic(
@@ -47,6 +48,7 @@ export default function BrokeragePage() {
   const [error, setError] = useState<string | null>(null);
   const [polygonService, setPolygonService] = useState<PolygonService | null>(null);
   const [isChartFullScreen, setIsChartFullScreen] = useState(false);
+  const [manualTrades, setManualTrades] = useState<ManualOrder[]>([]);
 
   // Initialize the page
   useEffect(() => {
@@ -140,6 +142,15 @@ export default function BrokeragePage() {
   // Get the latest closing price from chart data
   const latestClosePrice = chartData.length > 0 ? chartData[chartData.length - 1].close : null;
 
+  // Handler for manual order simulation from OrderEntryPanel
+  const handleManualOrder = (order: ManualOrder) => {
+    console.log('[BrokeragePage] Received manual order simulation:', order);
+    // We need to add timestamp/price info based on when it would execute
+    // For now, just store the intent
+    // TODO: Enhance this to simulate execution price/time better
+    setManualTrades(prev => [...prev, { ...order, timestamp: Date.now() }]);
+  };
+
   return (
     <div className="container mx-auto px-4 py-6 text-white">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
@@ -165,7 +176,11 @@ export default function BrokeragePage() {
               </div>
             ) : chartData.length > 0 ? (
               <div className="flex-grow h-full w-full min-h-0">
-                <TradingChart symbol={symbol} data={chartData} />
+                <TradingChart 
+                  symbol={symbol} 
+                  data={chartData} 
+                  manualTrades={manualTrades}
+                />
               </div>
             ) : (
               <div className="flex-grow flex items-center justify-center">
@@ -184,7 +199,12 @@ export default function BrokeragePage() {
         <div className="lg:col-span-1 flex flex-col gap-4 h-full">
           <div className="flex-1 min-h-0"><OrderBook symbol={symbol} latestPrice={latestClosePrice} /></div>
           <div className="flex-1 min-h-0"><TradeHistory /></div>
-          <div className="flex-1 min-h-0"><OrderEntryPanel symbol={symbol} /></div>
+          <div className="flex-1 min-h-0">
+            <OrderEntryPanel 
+              symbol={symbol} 
+              onPlaceOrder={handleManualOrder}
+            />
+          </div>
         </div>
       </div>
     </div>

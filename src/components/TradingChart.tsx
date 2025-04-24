@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import { createChart, LineStyle, CrosshairMode } from 'lightweight-charts'
 import IndicatorSelector from './IndicatorSelector'
 import { indicatorDefinitions } from '@/app/components/indicators/IndicatorComponents'
+import { ManualOrder } from './brokerage/OrderEntryPanel'
 
 interface ChartDataPoint {
   time: string;
@@ -17,9 +18,10 @@ type Props = {
   data: ChartDataPoint[];
   symbol: string;
   selectedIndicators?: string[];
+  manualTrades?: ManualOrder[];
 }
 
-export default function TradingChart({ data, symbol, selectedIndicators = [] }: Props) {
+export default function TradingChart({ data, symbol, selectedIndicators = [], manualTrades = [] }: Props) {
   const chartContainerRef = useRef<HTMLDivElement>(null)
   const chart = useRef<any>(null)
   const candleSeries = useRef<any>(null)
@@ -70,6 +72,18 @@ export default function TradingChart({ data, symbol, selectedIndicators = [] }: 
       close: Number(item.close),
     }));
 
+    // Format manual trades for plotting (map timestamp to time)
+    const tradeMarkers = manualTrades
+        .filter(trade => trade.timestamp && trade.entryPrice) // Ensure needed data exists
+        .map(trade => ({
+            time: new Date(trade.timestamp!).toISOString().split('T')[0], // Align with chart time format
+            position: trade.side === 'buy' ? 'belowBar' : 'aboveBar', // Position markers below/above bar
+            color: trade.side === 'buy' ? '#22c55e' : '#ef4444',
+            shape: trade.side === 'buy' ? 'arrowUp' : 'arrowDown',
+            text: `${trade.side.toUpperCase()} @ ${trade.entryPrice!.toFixed(2)}`, // Use entryPrice
+            size: 1 
+    }));
+
     // Initialize chart if it doesn't exist
     if (!chart.current) {
       try {
@@ -88,6 +102,11 @@ export default function TradingChart({ data, symbol, selectedIndicators = [] }: 
           wickUpColor: '#22c55e', wickDownColor: '#ef4444',
         });
 
+        // Apply markers AFTER series is created
+        if (tradeMarkers.length > 0) {
+            candleSeries.current.setMarkers(tradeMarkers);
+        }
+
         chart.current.timeScale().fitContent();
 
       } catch (err) {
@@ -97,18 +116,22 @@ export default function TradingChart({ data, symbol, selectedIndicators = [] }: 
       }
     }
 
-    // Update candle series data
+    // Update candle series data AND markers
     if (candleSeries.current) {
-        console.log('Updating chart data...');
+        console.log('Updating chart data and trade markers...');
         candleSeries.current.setData(formattedData);
-        // Optional: Re-fit content if necessary, maybe only on symbol change?
-        // chart.current.timeScale().fitContent(); 
+        // Update markers when data or manual trades change
+        if (tradeMarkers.length > 0) {
+            candleSeries.current.setMarkers(tradeMarkers);
+        } else {
+            candleSeries.current.setMarkers([]); // Clear markers if no trades
+        }
     }
 
     // TODO: Update/Add indicators logic here if needed
     // indicators.forEach(...)
 
-  }, [data, symbol, handleResize]); // Re-run on data/symbol change, handleResize dependency ensures latest resize logic
+  }, [data, symbol, handleResize, manualTrades]); // Re-run on data/symbol change, handleResize dependency ensures latest resize logic
 
   // Cleanup chart on component unmount
   useEffect(() => {

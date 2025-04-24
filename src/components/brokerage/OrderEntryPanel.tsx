@@ -6,23 +6,26 @@ import React, { useState } from 'react';
 interface OrderEntryPanelProps {
     symbol?: string; // e.g., BTC, AAPL
     baseCurrency?: string; // e.g., USD
-    // Add a function prop later to actually handle the order submission simulation
-    // onPlaceOrder: (order: ManualOrder) => void;
+    // Add callback for when an order is simulated
+    onPlaceOrder?: (order: ManualOrder) => void;
 }
 
-// Simple structure for the simulated order
-interface ManualOrder {
+// Simple structure for the simulated order - EXPORT this interface
+export interface ManualOrder {
     symbol: string;
     side: 'buy' | 'sell';
     type: 'limit' | 'market' | 'stop';
     amount: number;
     limitPrice?: number;
     stopPrice?: number;
+    timestamp?: number; // Add timestamp (when order was placed/simulated)
+    entryPrice?: number; // Add simulated entry price (for chart plotting)
 }
 
 const OrderEntryPanel: React.FC<OrderEntryPanelProps> = ({ 
     symbol = 'BTC', // Default symbol for placeholders
-    baseCurrency = 'USD' 
+    baseCurrency = 'USD', 
+    onPlaceOrder // Destructure the new prop
 }) => {
   const [orderType, setOrderType] = useState<'limit' | 'market' | 'stop'>('limit'); // limit, market, stop
   const [side, setSide] = useState<'buy' | 'sell'>('buy'); // buy, sell
@@ -88,6 +91,12 @@ const OrderEntryPanel: React.FC<OrderEntryPanelProps> = ({
       setStatusMessage(`Simulated ${side.toUpperCase()} ${orderType.toUpperCase()} order placed for ${orderAmount} ${symbol}.`);
       setStatusType('success');
       
+      // Call the callback function if provided
+      if (onPlaceOrder) {
+          onPlaceOrder(simulatedOrder);
+      }
+      
+      // Clear inputs after simulation
       setLimitPrice('');
       setStopPrice('');
       setAmount('');
