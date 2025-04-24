@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const POLYGON_API_KEY = process.env.NEXT_PUBLIC_POLYGON_API_KEY;
+const POLYGON_API_KEY = process.env.POLYGON_API_KEY;
 const BASE_URL = 'https://api.polygon.io';
 
 export interface PolygonCandle {
