@@ -1,3 +1,5 @@
+'use client';
+
 import axios, { AxiosError } from 'axios';
 
 const BASE_URL = 'https://api.polygon.io';
@@ -16,10 +18,7 @@ export class PolygonService {
   private apiKey: string;
 
   private constructor() {
-    // Get API key safely in both client and server contexts
-    this.apiKey = typeof window !== 'undefined' 
-      ? (window as any)?.__NEXT_DATA__?.props?.pageProps?.env?.NEXT_PUBLIC_POLYGON_API_KEY || process.env.NEXT_PUBLIC_POLYGON_API_KEY || ''
-      : process.env.NEXT_PUBLIC_POLYGON_API_KEY || '';
+    this.apiKey = process.env.NEXT_PUBLIC_POLYGON_API_KEY || '';
     
     if (!this.apiKey) {
       console.error('Polygon API key is not configured in environment variables');
@@ -30,6 +29,11 @@ export class PolygonService {
   }
 
   static getInstance(): PolygonService | null {
+    if (typeof window === 'undefined') {
+      console.error('PolygonService can only be used in client-side code');
+      return null;
+    }
+
     try {
       if (!this.instance) {
         this.instance = new PolygonService();
