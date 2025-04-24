@@ -421,78 +421,90 @@ export class AITradingEngine {
         }
         console.log(`[OBV] Latest OBV: ${latestObv}, SMA(${this.obvSmaPeriod}): ${obvSmaValue.toFixed(0)}`);
         
-        // --- Strategy Checks Temporarily WITHOUT ADX Filter or OBV Confirmation ---
-        console.log("[AI Engine] DEBUG: Running checks without ADX/OBV filters.");
+        // --- Strategy Checks with ADX Filter and OBV Confirmation ---
+        
+        let confirmedSignal: TradeSignal | null = null;
 
-        // Strategy 1: MA Crossover
-        const maSignal = this.checkMACrossover(fastSMA, slowSMA, latestIndex, targetSymbol, latestPrice);
-        if (maSignal) {
-            console.log("[AI Engine] MA Crossover Signal Found (OBV Check Bypassed).");
-            return maSignal; 
+        // Trend-Following Strategies (MA, MACD)
+        if (isTrending) {
+            console.log("[AI Engine] Trend detected (ADX > threshold), checking trend strategies...");
+            const maSignal = this.checkMACrossover(fastSMA, slowSMA, latestIndex, targetSymbol, latestPrice);
+            if (maSignal) {
+                // OBV Confirmation for BUY signal
+                if (maSignal.direction === 'buy' && latestObv > obvSmaValue) {
+                     console.log("[OBV Confirmed] MA Crossover Buy Signal.");
+                     confirmedSignal = maSignal;
+                } 
+                // OBV Confirmation for SELL signal
+                else if (maSignal.direction === 'sell' && latestObv < obvSmaValue) {
+                     console.log("[OBV Confirmed] MA Crossover Sell Signal.");
+                     confirmedSignal = maSignal;
+                } else {
+                    console.log("[OBV Rejected] MA Crossover Signal.");
+                }
+            }
+
+            // Check MACD only if MA didn't produce a confirmed signal
+            if (!confirmedSignal) {
+                const macdSignal = this.checkMACDCrossover(macdResult, latestIndex, targetSymbol, latestPrice);
+                if (macdSignal) {
+                     if (macdSignal.direction === 'buy' && latestObv > obvSmaValue) {
+                         console.log("[OBV Confirmed] MACD Buy Signal.");
+                         confirmedSignal = macdSignal;
+                     } else if (macdSignal.direction === 'sell' && latestObv < obvSmaValue) {
+                         console.log("[OBV Confirmed] MACD Sell Signal.");
+                         confirmedSignal = macdSignal;
+                     } else {
+                         console.log("[OBV Rejected] MACD Signal.");
+                     }
+                }
+            }
+        } else {
+            console.log("[AI Engine] No trend detected (ADX <= threshold), skipping trend strategies.");
         }
 
-        // Strategy 2: RSI
-        const rsiSignal = this.checkRSIConditions(rsi, latestIndex, targetSymbol, latestPrice);
-        if (rsiSignal) {
-            console.log("[AI Engine] RSI Signal Found.");
-            return rsiSignal; 
+        // Mean-Reversion / Oscillator Strategies (RSI, BBands)
+        if (!confirmedSignal && !isTrending) { // Only check if no signal yet and not trending
+            console.log("[AI Engine] Range detected (ADX <= threshold), checking mean-reversion strategies...");
+            const rsiSignal = this.checkRSIConditions(rsi, latestIndex, targetSymbol, latestPrice);
+            if (rsiSignal) {
+                 console.log("[RSI Signal - No OBV Check] RSI Signal generated.");
+                 confirmedSignal = rsiSignal; 
+            }
+            
+            // Check BBands only if RSI didn't produce a confirmed signal
+            if (!confirmedSignal) {
+                const bbandsSignal = this.checkBollingerBands(bbandsResult, latestIndex, targetSymbol, latestPrice, prevPrice);
+                if (bbandsSignal) {
+                    console.log("[BBands Signal - No OBV Check] BBands Signal generated.");
+                    confirmedSignal = bbandsSignal;
+                }
+            }
+        } else if (!confirmedSignal) { 
+             console.log("[AI Engine] Trend detected (ADX > threshold), skipping mean-reversion strategies.");
         }
         
-        // Strategy 3: MACD Crossover
-        const macdSignal = this.checkMACDCrossover(macdResult, latestIndex, targetSymbol, latestPrice);
-        if (macdSignal) {
-            console.log("[AI Engine] MACD Signal Found (OBV Check Bypassed).");
-            return macdSignal;
-        }
-      
-        // Strategy 4: Bollinger Bands Cross
-        const bbandsSignal = this.checkBollingerBands(bbandsResult, latestIndex, targetSymbol, latestPrice, prevPrice);
-        if (bbandsSignal) {
-             console.log("[AI Engine] BBands Signal Found.");
-            return bbandsSignal;
-        }
-        
-        // Strategy 5: Stochastic Oscillator (Still checked last)
-        const stochSignal = this.checkStochastic(stochResult, latestIndex, targetSymbol, latestPrice);
-        if (stochSignal) {
-            console.log("[AI Engine] Stoch Signal Found.");
-            return stochSignal;
+        // Stochastic Oscillator (Check last, regardless of trend, no OBV confirm for now)
+        if (!confirmedSignal) {
+            const stochSignal = this.checkStochastic(stochResult, latestIndex, targetSymbol, latestPrice);
+            if (stochSignal) {
+                console.log("[Stoch Signal - No OBV Check] Stoch Signal generated.");
+                confirmedSignal = stochSignal;
+            }
         }
 
-      // --- No signals --- 
-      console.log(`[AI Engine] No signal generated for ${targetSymbol} after all checks.`);
-      return null; // Explicitly return null if no strategy triggered
+      // --- Return Final Signal --- 
+      if (confirmedSignal) {
+          console.log("[AI Engine] Final Confirmed Signal:", confirmedSignal);
+          return confirmedSignal;
+      } else {
+          console.log(`[AI Engine] No confirmed signal generated for ${targetSymbol}.`);
+          return null;
+      }
 
     } catch (error) {
         console.error(`[AI Engine] Error analyzing market for ${targetSymbol}:`, error);
-        return null; // Ensure return null on error
+        return null; // Ensure return on error
     }
-  }
-
-  // --- Other Public Methods --- 
-  setSymbol(symbol: string): void {
-      this.symbol = symbol;
-      console.log(`Trading symbol updated to: ${symbol}`);
-  }
-  setMode(mode: TradingMode): void {
-      this.mode = mode;
-      console.log(`Trading mode updated to: ${mode}`);
-  }
-
-  calculatePositionSize(price: number, risk: number = 0.02): number {
-      const accountSize = 10000; 
-      const riskAmount = accountSize * risk;
-      if (price <= 0) return 0;
-      const shares = Math.floor(riskAmount / price);
-      return shares > 0 ? shares : 0;
-  }
-  
-  async executeTradeSignal(signal: TradeSignal): Promise<boolean> {
-      console.log(`Executing ${signal.direction} ...`);
-      if (this.mode === TradingModeEnum.DEMO) {
-          /*...*/ return true;
-      } else {
-          /*...*/ return true; 
-      }
   }
 }
