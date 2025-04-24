@@ -143,6 +143,50 @@ const calculateMACD = (
    };
 };
 
+interface BollingerBandsResult {
+  upperBand: number[];
+  middleBand: number[]; // SMA
+  lowerBand: number[];
+}
+
+const calculateBollingerBands = (
+  data: number[], 
+  period: number = 20, 
+  stdDevMultiplier: number = 2
+): BollingerBandsResult | null => {
+  if (period <= 0 || stdDevMultiplier <= 0 || !data || data.length < period) {
+    return null;
+  }
+
+  const middleBand = calculateSMA(data, period);
+  if (middleBand.length === 0) return null; // SMA calculation failed
+
+  const upperBand: number[] = [];
+  const lowerBand: number[] = [];
+  
+  // Standard deviation calculation needs to align with SMA output
+  const dataOffset = data.length - middleBand.length; // SMA starts later than raw data
+
+  for (let i = 0; i < middleBand.length; i++) {
+    const slice = data.slice(i + dataOffset - period + 1, i + dataOffset + 1);
+    if (slice.length !== period) continue; // Should not happen if logic is correct
+    
+    const mean = middleBand[i];
+    const variance = slice.reduce((acc, val) => acc + Math.pow(val - mean, 2), 0) / period;
+    const stdDev = Math.sqrt(variance);
+
+    upperBand.push(mean + stdDevMultiplier * stdDev);
+    lowerBand.push(mean - stdDevMultiplier * stdDev);
+  }
+
+  if (upperBand.length !== middleBand.length) {
+      console.error("[BBands] Length mismatch between bands!");
+      return null; // Error condition
+  }
+
+  return { upperBand, middleBand, lowerBand };
+};
+
 // --- AI Trading Engine Class ---
 
 export class AITradingEngine {
@@ -159,12 +203,14 @@ export class AITradingEngine {
   private macdFast = 12;
   private macdSlow = 26;
   private macdSignal = 9;
+  private bbandsPeriod = 20;
+  private bbandsStdDev = 2;
 
   constructor(symbol: string = 'AAPL', mode: TradingMode = TradingModeEnum.DEMO) {
     this.symbol = symbol;
     this.mode = mode;
     this.polygonService = PolygonService.getInstance();
-    console.log(`AI Engine initialized for ${symbol} (${mode}). Strategies: MA(${this.fastSMAPeriod}/${this.slowSMAPeriod}), RSI(${this.rsiPeriod}), MACD(${this.macdFast}/${this.macdSlow}/${this.macdSignal})`);
+    console.log(`AI Engine initialized for ${symbol} (${mode}). Strategies: MA(${this.fastSMAPeriod}/${this.slowSMAPeriod}), RSI(${this.rsiPeriod}), MACD(${this.macdFast}/${this.macdSlow}/${this.macdSignal}), BBands(${this.bbandsPeriod}/${this.bbandsStdDev})`);
   }
 
   setSymbol(symbol: string): void {
@@ -183,7 +229,12 @@ export class AITradingEngine {
 
     try {
       // 1. Fetch historical data (need enough for longest period + buffer)
-      const historyNeeded = Math.max(this.slowSMAPeriod + 1, this.rsiPeriod + 1, this.macdSlow + this.macdSignal);
+      const historyNeeded = Math.max(
+          this.slowSMAPeriod + 1, 
+          this.rsiPeriod + 1, 
+          this.macdSlow + this.macdSignal, 
+          this.bbandsPeriod // BBands period needed
+      );
       const historyDays = historyNeeded + 30; // Fetch ample buffer
       const endDate = new Date();
       const startDate = new Date();
@@ -201,6 +252,7 @@ export class AITradingEngine {
       candles.sort((a, b) => a.t - b.t); // Ensure chronological order
       const closingPrices = candles.map(candle => candle.c);
       const latestPrice = closingPrices[closingPrices.length - 1];
+      const prevPrice = closingPrices[closingPrices.length - 2]; // Need previous price for BBands cross check
 
       // --- Strategy 1: MA Crossover --- 
       console.log(`[AI Engine] Checking MA Crossover (${this.fastSMAPeriod}/${this.slowSMAPeriod})...`);
@@ -301,6 +353,40 @@ export class AITradingEngine {
           }
       }
       console.log(`[AI Engine] No MACD signal.`);
+
+      // --- Strategy 4: Bollinger Bands Cross --- 
+      console.log(`[AI Engine] Checking Bollinger Bands (${this.bbandsPeriod}/${this.bbandsStdDev})...`);
+      const bbandsResult = calculateBollingerBands(closingPrices, this.bbandsPeriod, this.bbandsStdDev);
+      if (bbandsResult && bbandsResult.upperBand.length >= 2) { // Need 2 points
+          const upperBand_last = bbandsResult.upperBand[bbandsResult.upperBand.length - 1];
+          const lowerBand_last = bbandsResult.lowerBand[bbandsResult.lowerBand.length - 1];
+          // Optional: Use previous band values for stricter crossing condition
+          // const upperBand_prev = bbandsResult.upperBand[bbandsResult.upperBand.length - 2];
+          // const lowerBand_prev = bbandsResult.lowerBand[bbandsResult.lowerBand.length - 2];
+          
+          console.log(`[BBands] Latest Close: ${latestPrice.toFixed(2)}, Upper: ${upperBand_last.toFixed(2)}, Lower: ${lowerBand_last.toFixed(2)}`);
+
+          // Sell Signal: Price crosses ABOVE Upper Band (potential overbought / mean reversion sell)
+          if (latestPrice > upperBand_last /* && prevPrice <= upperBand_prev */ ) { 
+              const signal: TradeSignal = {
+                  symbol: targetSymbol, direction: 'sell', price: latestPrice, 
+                  confidence: 0.65, timestamp: Date.now(), strategy: `BBands (${this.bbandsPeriod}/${this.bbandsStdDev}) Upper Cross`
+              };
+              console.log(`[AI Engine] BBands signal generated:`, signal);
+              return signal;
+          }
+          
+          // Buy Signal: Price crosses BELOW Lower Band (potential oversold / mean reversion buy)
+          if (latestPrice < lowerBand_last /* && prevPrice >= lowerBand_prev */) {
+              const signal: TradeSignal = {
+                  symbol: targetSymbol, direction: 'buy', price: latestPrice, 
+                  confidence: 0.65, timestamp: Date.now(), strategy: `BBands (${this.bbandsPeriod}/${this.bbandsStdDev}) Lower Cross`
+              };
+              console.log(`[AI Engine] BBands signal generated:`, signal);
+              return signal;
+          }
+      }
+      console.log(`[AI Engine] No BBands signal.`);
 
       // --- No signals from implemented strategies ---
       console.log(`[AI Engine] No signals generated for ${targetSymbol}.`);
