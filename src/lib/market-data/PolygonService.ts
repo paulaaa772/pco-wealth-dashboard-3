@@ -1,7 +1,13 @@
 import axios, { AxiosError } from 'axios';
 
+// Make sure we're using NEXT_PUBLIC prefix for client-side access
 const POLYGON_API_KEY = process.env.NEXT_PUBLIC_POLYGON_API_KEY;
 const BASE_URL = 'https://api.polygon.io';
+
+// Debug log to check if the API key is loaded
+console.log('Environment variables loaded:', {
+  NEXT_PUBLIC_POLYGON_API_KEY: process.env.NEXT_PUBLIC_POLYGON_API_KEY ? 'present' : 'missing'
+});
 
 export interface PolygonCandle {
   c: number; // close
@@ -16,7 +22,8 @@ export class PolygonService {
   private static instance: PolygonService;
 
   private constructor() {
-    console.log('PolygonService initialized with API key:', POLYGON_API_KEY); // Debug log
+    // Debug log when service is initialized
+    console.log('PolygonService initialized with API key present:', !!POLYGON_API_KEY);
   }
 
   static getInstance(): PolygonService {
@@ -28,10 +35,15 @@ export class PolygonService {
 
   async getStockCandles(symbol: string, from: string, to: string, timespan = '1min'): Promise<PolygonCandle[]> {
     try {
+      if (!POLYGON_API_KEY) {
+        console.error('Polygon API key is not configured');
+        return [];
+      }
+
       const url = `${BASE_URL}/v2/aggs/ticker/${symbol}/range/1/${timespan}/${from}/${to}?apiKey=${POLYGON_API_KEY}`;
-      console.log('Making request to:', url); // Debug log
+      console.log('Making request to:', url.replace(POLYGON_API_KEY, '[HIDDEN]')); // Hide API key in logs
+      
       const response = await axios.get(url);
-      console.log('API Response:', response.data); // Debug log
       return response.data.results || [];
     } catch (error: unknown) {
       const axiosError = error as AxiosError;
@@ -42,8 +54,12 @@ export class PolygonService {
 
   async getLatestPrice(symbol: string): Promise<number | null> {
     try {
+      if (!POLYGON_API_KEY) {
+        console.error('Polygon API key is not configured');
+        return null;
+      }
+
       const url = `${BASE_URL}/v2/last/trade/${symbol}?apiKey=${POLYGON_API_KEY}`;
-      console.log('Making request to:', url); // Debug log
       const response = await axios.get(url);
       return response.data.results.p || null;
     } catch (error: unknown) {
@@ -55,8 +71,12 @@ export class PolygonService {
 
   async getCompanyDetails(symbol: string) {
     try {
+      if (!POLYGON_API_KEY) {
+        console.error('Polygon API key is not configured');
+        return null;
+      }
+
       const url = `${BASE_URL}/v3/reference/tickers/${symbol}?apiKey=${POLYGON_API_KEY}`;
-      console.log('Making request to:', url); // Debug log
       const response = await axios.get(url);
       return response.data.results || null;
     } catch (error: unknown) {
