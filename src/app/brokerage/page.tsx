@@ -1,9 +1,14 @@
 'use client'
 
 import { useState, useEffect } from 'react';
-import TradingChart from '../../components/TradingChart'
-import TradingInterface from '../../components/dashboard/TradingInterface'
-import { PolygonService } from '../../lib/market-data/PolygonService'
+import dynamic from 'next/dynamic';
+import TradingInterface from '../../components/dashboard/TradingInterface';
+import { PolygonService } from '../../lib/market-data/PolygonService';
+
+// Dynamically import TradingChart with no SSR to avoid hydration issues
+const TradingChart = dynamic(() => import('../../components/TradingChart'), {
+  ssr: false,
+});
 
 interface ChartDataPoint {
   time: string;
@@ -18,26 +23,40 @@ export default function BrokeragePage() {
   const [selectedSymbol, setSelectedSymbol] = useState('AAPL');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const polygonService = PolygonService.getInstance();
 
   useEffect(() => {
-    loadMarketData();
+    const initPage = async () => {
+      try {
+        console.log('Initializing brokerage page');
+        const polygonService = PolygonService.getInstance();
+        await loadMarketData(polygonService);
+      } catch (error) {
+        console.error('Error initializing page:', error);
+        setError('Failed to initialize the page');
+      }
+    };
+
+    initPage();
   }, [selectedSymbol]);
 
-  const loadMarketData = async () => {
+  const loadMarketData = async (polygonService: PolygonService) => {
     try {
       setIsLoading(true);
       setError(null);
+
+      console.log('Loading market data for symbol:', selectedSymbol);
 
       // Calculate date range (last 30 days)
       const to = new Date().toISOString().split('T')[0];
       const from = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
       
-      console.log('Fetching data for:', selectedSymbol, 'from:', from, 'to:', to);
+      console.log('Date range:', { from, to });
       
       const candles = await polygonService.getStockCandles(selectedSymbol, from, to, '1day');
+      console.log('Received candles:', candles);
       
       if (!candles || candles.length === 0) {
+        console.log('No data available for symbol:', selectedSymbol);
         setError('No data available for this symbol');
         setChartData([]);
         return;
@@ -65,12 +84,13 @@ export default function BrokeragePage() {
 
   const handleSymbolChange = (symbol: string) => {
     if (symbol && symbol !== selectedSymbol) {
+      console.log('Symbol changed to:', symbol);
       setSelectedSymbol(symbol.toUpperCase());
     }
   };
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 space-y-6 bg-gray-800 min-h-screen">
       <div className="max-w-7xl mx-auto">
         <div className="grid grid-cols-1 gap-6">
           <TradingInterface onSymbolChange={handleSymbolChange} />
@@ -81,7 +101,7 @@ export default function BrokeragePage() {
                 {isLoading ? 'Loading...' : `${selectedSymbol} - Daily`}
               </div>
             </div>
-            <div className="h-[500px]">
+            <div className="h-[500px] relative">
               {error ? (
                 <div className="flex items-center justify-center h-full text-red-500">
                   {error}
@@ -102,5 +122,5 @@ export default function BrokeragePage() {
         </div>
       </div>
     </div>
-  )
+  );
 }

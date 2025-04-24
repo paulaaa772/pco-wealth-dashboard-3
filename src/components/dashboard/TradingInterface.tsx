@@ -1,3 +1,5 @@
+'use client'
+
 import { useState, useEffect } from 'react';
 import { AITradingEngine } from '../../lib/trading-engine/AITradingEngine';
 import { TradingMode, TradingSignal, Position } from '../../lib/trading-engine/types';
@@ -9,7 +11,7 @@ interface TradingInterfaceProps {
 
 export default function TradingInterface({ onSymbolChange }: TradingInterfaceProps) {
   const [mode, setMode] = useState<TradingMode>('demo');
-  const [symbol, setSymbol] = useState<string>('');
+  const [symbol, setSymbol] = useState<string>('AAPL');
   const [aiEnabled, setAiEnabled] = useState<boolean>(false);
   const [lastSignal, setLastSignal] = useState<TradingSignal | null>(null);
   const [positions, setPositions] = useState<Position[]>([]);
@@ -20,21 +22,33 @@ export default function TradingInterface({ onSymbolChange }: TradingInterfacePro
     profitLoss: 0,
   });
 
-  const aiEngine = new AITradingEngine(mode);
-  const polygonService = PolygonService.getInstance();
-
   useEffect(() => {
-    if (aiEnabled) {
-      const interval = setInterval(async () => {
+    console.log('TradingInterface mounted');
+    const initInterface = async () => {
+      try {
         if (symbol) {
           await analyzeMarket();
         }
+      } catch (error) {
+        console.error('Error initializing interface:', error);
+      }
+    };
+
+    initInterface();
+  }, []);
+
+  useEffect(() => {
+    if (aiEnabled && symbol) {
+      console.log('AI trading enabled for symbol:', symbol);
+      const interval = setInterval(async () => {
+        await analyzeMarket();
       }, 60000); // Analyze every minute when AI is enabled
       return () => clearInterval(interval);
     }
   }, [aiEnabled, symbol]);
 
   const handleSymbolChange = (newSymbol: string) => {
+    console.log('Symbol input changed:', newSymbol);
     const upperSymbol = newSymbol.toUpperCase();
     setSymbol(upperSymbol);
     onSymbolChange?.(upperSymbol);
@@ -50,51 +64,59 @@ export default function TradingInterface({ onSymbolChange }: TradingInterfacePro
         return;
       }
 
+      console.log('Analyzing market for symbol:', symbol);
+      const aiEngine = new AITradingEngine(mode);
       const signal = await aiEngine.analyzeMarket(symbol);
+      
       if (signal) {
+        console.log('Received trading signal:', signal);
         setLastSignal(signal);
         if (aiEnabled) {
           await executeTradeSignal(signal);
         }
       } else {
+        console.log('No trading signals available');
         setError('No trading signals available');
       }
     } catch (err) {
+      console.error('Error analyzing market:', err);
       setError('Error analyzing market');
-      console.error(err);
     } finally {
       setIsAnalyzing(false);
     }
   };
 
   const executeTradeSignal = async (signal: TradingSignal) => {
-    if (mode === 'demo') {
-      // Simulate trade execution in demo mode
-      const newPosition: Position = {
-        symbol: signal.symbol,
-        quantity: calculatePositionSize(signal),
-        entryPrice: signal.scenario.entryPrice,
-        currentPrice: signal.scenario.entryPrice,
-        entryDate: new Date(),
-        lastUpdated: new Date(),
-        type: signal.scenario.position,
-        stopLoss: signal.scenario.stopLoss,
-        takeProfit: signal.scenario.takeProfit,
-        unrealizedPnL: 0,
-        realizedPnL: 0,
-      };
+    try {
+      console.log('Executing trade signal:', signal);
+      if (mode === 'demo') {
+        // Simulate trade execution in demo mode
+        const newPosition: Position = {
+          symbol: signal.symbol,
+          quantity: calculatePositionSize(signal),
+          entryPrice: signal.scenario.entryPrice,
+          currentPrice: signal.scenario.entryPrice,
+          entryDate: new Date(),
+          lastUpdated: new Date(),
+          type: signal.scenario.position,
+          stopLoss: signal.scenario.stopLoss,
+          takeProfit: signal.scenario.takeProfit,
+          unrealizedPnL: 0,
+          realizedPnL: 0,
+        };
 
-      setPositions(prev => [...prev, newPosition]);
-      updatePerformance();
-    } else {
-      // Implement real trading logic here
-      console.log('Live trading not implemented yet');
+        setPositions(prev => [...prev, newPosition]);
+        updatePerformance();
+      } else {
+        console.log('Live trading not implemented yet');
+      }
+    } catch (error) {
+      console.error('Error executing trade signal:', error);
     }
   };
 
   const calculatePositionSize = (signal: TradingSignal): number => {
-    // Simple position sizing based on confidence
-    const baseSize = 100; // Base position size in shares
+    const baseSize = 100;
     return Math.round(baseSize * signal.scenario.confidence);
   };
 
@@ -102,7 +124,6 @@ export default function TradingInterface({ onSymbolChange }: TradingInterfacePro
     const closedPositions = positions.filter(p => p.realizedPnL !== 0);
     const winners = closedPositions.filter(p => p.realizedPnL > 0).length;
     const winRate = closedPositions.length > 0 ? (winners / closedPositions.length) * 100 : 0;
-    
     const totalPnL = positions.reduce((sum, pos) => sum + pos.realizedPnL + pos.unrealizedPnL, 0);
     
     setPerformance({
@@ -112,12 +133,15 @@ export default function TradingInterface({ onSymbolChange }: TradingInterfacePro
   };
 
   const handleModeToggle = () => {
-    setMode(mode === 'demo' ? 'live' : 'demo');
-    aiEngine.setMode(mode === 'demo' ? 'live' : 'demo');
+    const newMode = mode === 'demo' ? 'live' : 'demo';
+    console.log('Trading mode changed to:', newMode);
+    setMode(newMode);
   };
 
   const handleAIToggle = () => {
-    setAiEnabled(!aiEnabled);
+    const newState = !aiEnabled;
+    console.log('AI trading toggled:', newState);
+    setAiEnabled(newState);
   };
 
   return (
@@ -215,28 +239,18 @@ export default function TradingInterface({ onSymbolChange }: TradingInterfacePro
         <div className="space-y-4">
           <div className="bg-gray-800 p-4 rounded-lg">
             <h3 className="text-lg font-medium text-white mb-2">Active Positions</h3>
-            <div className="space-y-2">
-              {positions.length > 0 ? (
-                positions.map((position, index) => (
-                  <div key={index} className="border-b border-gray-700 pb-2">
-                    <div className="flex justify-between">
-                      <span className="text-gray-300">{position.symbol}</span>
-                      <span className={`${
-                        position.unrealizedPnL >= 0 ? 'text-green-500' : 'text-red-500'
-                      }`}>
-                        ${position.unrealizedPnL.toFixed(2)}
-                      </span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-400">{position.quantity} shares @ ${position.entryPrice.toFixed(2)}</span>
-                      <span className="text-gray-400">{position.type.toUpperCase()}</span>
-                    </div>
+            {positions.length > 0 ? (
+              <div className="space-y-2">
+                {positions.map((position, index) => (
+                  <div key={index} className="flex justify-between text-sm">
+                    <span className="text-gray-300">{position.symbol}</span>
+                    <span className="text-white">{position.quantity} shares</span>
                   </div>
-                ))
-              ) : (
-                <p className="text-gray-400">No active positions</p>
-              )}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-gray-400">No active positions</p>
+            )}
           </div>
 
           <div className="bg-gray-800 p-4 rounded-lg">
@@ -244,11 +258,13 @@ export default function TradingInterface({ onSymbolChange }: TradingInterfacePro
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <p className="text-gray-300">Win Rate</p>
-                <p className="text-2xl text-white">{performance.winRate.toFixed(1)}%</p>
+                <p className="text-2xl font-semibold text-white">
+                  {performance.winRate.toFixed(1)}%
+                </p>
               </div>
               <div>
                 <p className="text-gray-300">Profit/Loss</p>
-                <p className={`text-2xl ${
+                <p className={`text-2xl font-semibold ${
                   performance.profitLoss >= 0 ? 'text-green-500' : 'text-red-500'
                 }`}>
                   ${performance.profitLoss.toFixed(2)}
