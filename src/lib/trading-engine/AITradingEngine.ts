@@ -344,6 +344,9 @@ export class AITradingEngine {
         );
         const historyDays = historyNeeded + 40;
 
+        // ** ADDING UNIQUE LOG BEFORE DATE CALCULATION **
+        console.log("<<<<< CHECKING DATE LOGIC v7 >>>>>"); 
+        
         // ** FINAL DYNAMIC DATE CALCULATION - Using toLocaleDateString **
         const endDate = new Date();
         const startDate = new Date();
