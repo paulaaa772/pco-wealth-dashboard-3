@@ -3397,16 +3397,6 @@ export default function Portfolio() {
                 Holdings
               </button>
               <button
-                onClick={() => setActiveTab('funding')}
-                className={`pb-4 px-1 ${
-                  activeTab === 'funding'
-                    ? 'border-b-2 border-blue-500 text-blue-400 font-medium'
-                    : 'border-b-2 border-transparent text-gray-400 hover:text-gray-300'
-                }`}
-              >
-                Funding
-              </button>
-              <button
                 onClick={() => setActiveTab('tax')}
                 className={`pb-4 px-1 ${
                   activeTab === 'tax'
