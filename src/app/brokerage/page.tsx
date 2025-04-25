@@ -5,6 +5,7 @@ import dynamic from 'next/dynamic';
 import { PolygonService, PolygonCandle } from '../../lib/market-data/PolygonService';
 import TradingChart from '../../components/dashboard/TradingChart';
 import CongressTradingPanel from '../../components/brokerage/CongressTradingPanel';
+import BusinessInsiderTradingPanel from '../../components/brokerage/BusinessInsiderTradingPanel';
 
 // Create a simple AlertMessage component inline since it's missing
 const AlertMessage = ({ 
@@ -335,6 +336,31 @@ export interface CongressTrade {
   };
 }
 
+// Add handling for Business Insider trades
+export interface InsiderTrade {
+  id: number;
+  name: string;
+  title: string;
+  company: string;
+  symbol: string;
+  type: string;
+  shares: number;
+  price: number;
+  value: number;
+  date: string;
+  filing_date: string;
+  performance: number;
+  analysis?: {
+    sentiment: 'bullish' | 'bearish' | 'neutral';
+    confidence: number;
+    factors: {
+      business: string;
+      timing: string;
+      pattern: string;
+    };
+  };
+}
+
 export default function BrokeragePage() {
   // State for stock data
   const [symbol, setSymbol] = useState('AAPL');
@@ -352,10 +378,13 @@ export default function BrokeragePage() {
   const [isApiKeyValid, setIsApiKeyValid] = useState<boolean>(true);
   const [lastUpdateTime, setLastUpdateTime] = useState<Date>(new Date());
   const [refreshInterval, setRefreshInterval] = useState<number>(60); // seconds
-  const [activeTab, setActiveTab] = useState<'ai' | 'congress'>('ai'); // Tab navigation state
+  const [activeTab, setActiveTab] = useState<'ai' | 'congress' | 'insiders'>('ai'); // Tab navigation state
   
   // Add state for copied Congress trades
   const [copiedCongressTrades, setCopiedCongressTrades] = useState<CongressTrade[]>([]);
+  
+  // Add state for copied insider trades
+  const [copiedInsiderTrades, setCopiedInsiderTrades] = useState<InsiderTrade[]>([]);
 
   // Load initial data when page loads
   useEffect(() => {
@@ -767,6 +796,22 @@ export default function BrokeragePage() {
     return Math.max(1, Math.floor(estimatedAmount / price));
   };
 
+  // Handle copying a business insider trade
+  const handleCopyInsiderTrade = (trade: InsiderTrade) => {
+    // Add to copied trades list
+    setCopiedInsiderTrades(prev => [...prev, trade]);
+    
+    // Create a corresponding manual order
+    const newOrder: Omit<ManualOrder, 'id' | 'timestamp' | 'status' | 'price'> = {
+      symbol: trade.symbol,
+      type: trade.type.toLowerCase() as 'buy' | 'sell',
+      quantity: trade.shares,
+    };
+    
+    // Submit the order
+    handleManualOrder(newOrder);
+  };
+
   return (
     <div className="flex flex-col">
       {/* Header section */}
@@ -902,7 +947,7 @@ export default function BrokeragePage() {
             {/* Tab navigation */}
             <div className="flex border-b border-gray-200 dark:border-gray-700">
               <button
-                className={`px-4 py-2 text-sm font-medium ${
+                className={`px-3 py-2 text-sm font-medium ${
                   activeTab === 'ai' 
                     ? 'text-blue-600 border-b-2 border-blue-600 dark:text-blue-400 dark:border-blue-400' 
                     : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
@@ -912,14 +957,24 @@ export default function BrokeragePage() {
                 AI Trading
               </button>
               <button
-                className={`px-4 py-2 text-sm font-medium ${
+                className={`px-3 py-2 text-sm font-medium ${
                   activeTab === 'congress' 
                     ? 'text-blue-600 border-b-2 border-blue-600 dark:text-blue-400 dark:border-blue-400' 
                     : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
                 }`}
                 onClick={() => setActiveTab('congress')}
               >
-                Congress Trading
+                Congress
+              </button>
+              <button
+                className={`px-3 py-2 text-sm font-medium ${
+                  activeTab === 'insiders' 
+                    ? 'text-blue-600 border-b-2 border-blue-600 dark:text-blue-400 dark:border-blue-400' 
+                    : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+                }`}
+                onClick={() => setActiveTab('insiders')}
+              >
+                Insiders
               </button>
             </div>
             
@@ -927,10 +982,15 @@ export default function BrokeragePage() {
             <div className="p-4">
               {activeTab === 'ai' ? (
                 <AITradingPanel symbol={symbol} positions={aiPositions} />
-              ) : (
+              ) : activeTab === 'congress' ? (
                 <CongressTradingPanel 
                   symbol={symbol} 
                   onCopyTrade={handleCopyCongressTrade} 
+                />
+              ) : (
+                <BusinessInsiderTradingPanel 
+                  symbol={symbol} 
+                  onCopyTrade={handleCopyInsiderTrade} 
                 />
               )}
             </div>
