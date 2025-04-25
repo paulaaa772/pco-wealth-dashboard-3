@@ -2815,7 +2815,13 @@ export default function Portfolio() {
             
             {activeTab === 'holdings' && renderHoldingsTab()}
             
-            {/* ... keep other tab content ... */}
+            {activeTab === 'tax' && <TaxAndProfitContent />}
+            
+            {activeTab === 'transfers' && <InKindTransferContent />}
+            
+            {activeTab === 'goals' && <GoalSystemContent />}
+            
+            {activeTab === 'simulation' && <PortfolioSimulationContent />}
           </div>
         </div>
         
