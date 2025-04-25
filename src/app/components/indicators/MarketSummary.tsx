@@ -32,12 +32,12 @@ const MarketSummary: React.FC<MarketSummaryProps> = ({ symbol }) => {
         const priceData = await polygonService.getLatestPrice(symbol);
         
         if (priceData) {
-          setPrice(priceData.price);
+          setPrice(priceData);
           
           // Calculate change and change percent
           // For simplicity, we'll use a mock change value (ideally this would come from API)
-          const previousClose = priceData.price * (1 - (Math.random() * 0.05 - 0.025));
-          const dailyChange = priceData.price - previousClose;
+          const previousClose = priceData * (1 - (Math.random() * 0.05 - 0.025));
+          const dailyChange = priceData - previousClose;
           const dailyChangePercent = (dailyChange / previousClose) * 100;
           
           setChange(dailyChange);
@@ -97,7 +97,7 @@ const MarketSummary: React.FC<MarketSummaryProps> = ({ symbol }) => {
         />
         <BasicIndicator 
           label="Daily Change" 
-          value={price} 
+          value={change} 
           change={change} 
           format="currency" 
         />
