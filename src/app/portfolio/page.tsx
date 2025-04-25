@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
-import { ArrowUp, ArrowDown, RefreshCw, Edit2, Share2, Plus, Minus, UploadCloud, AlertTriangle, FileText, TrendingDown, ArrowLeftRight, DollarSign, Landmark, BarChart2, Target, Bell, Calendar, CheckSquare, Flag, PlusCircle, MessageSquare, X, Send, Maximize2, Minimize2 } from 'lucide-react'
+import { ArrowUp, ArrowDown, RefreshCw, Edit2, Share2, Plus, Minus, UploadCloud, AlertTriangle, FileText, TrendingDown, ArrowLeftRight, DollarSign, Landmark, BarChart2, Target, Bell, Calendar, CheckSquare, Flag, PlusCircle, MessageSquare, X, Send, Maximize2, Minimize2, Play, Settings, Layers, ChevronDown, BarChart, LineChart, Clock, Filter, Download } from 'lucide-react'
 
 // Mock data
 const portfolioData = {
@@ -1483,6 +1483,563 @@ const ErrorBoundary = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
+// Sample data for backtesting
+const backtestData = {
+  strategies: [
+    { id: 1, name: 'Buy and Hold', description: 'Simple buy and hold strategy' },
+    { id: 2, name: 'Dollar Cost Averaging', description: 'Invest a fixed amount at regular intervals' },
+    { id: 3, name: 'Value Investing', description: 'Focus on undervalued stocks with strong fundamentals' },
+    { id: 4, name: 'Momentum Trading', description: 'Buy stocks showing upward trends' },
+    { id: 5, name: 'Dividend Growth', description: 'Focus on stocks with growing dividend yields' },
+  ],
+  timeframes: [
+    { id: 1, name: '1 Year', value: '1y' },
+    { id: 2, name: '3 Years', value: '3y' },
+    { id: 3, name: '5 Years', value: '5y' },
+    { id: 4, name: '10 Years', value: '10y' },
+    { id: 5, name: 'Custom', value: 'custom' },
+  ],
+  indices: [
+    { id: 1, name: 'S&P 500', symbol: 'SPY' },
+    { id: 2, name: 'Nasdaq', symbol: 'QQQ' },
+    { id: 3, name: 'Dow Jones', symbol: 'DIA' },
+    { id: 4, name: 'Russell 2000', symbol: 'IWM' },
+  ],
+  sampleResults: {
+    initialInvestment: 10000,
+    endValue: 15750,
+    returnPercentage: 57.5,
+    annualizedReturn: 12.6,
+    maxDrawdown: 18.3,
+    sharpeRatio: 1.32,
+    volatility: 14.7,
+    winRate: 62,
+    monthlyPerformance: [
+      { month: 'Jan', value: 2.4 },
+      { month: 'Feb', value: -1.5 },
+      { month: 'Mar', value: 3.2 },
+      { month: 'Apr', value: 1.8 },
+      { month: 'May', value: -0.5 },
+      { month: 'Jun', value: 2.1 },
+      { month: 'Jul', value: 3.5 },
+      { month: 'Aug', value: -2.1 },
+      { month: 'Sep', value: -4.2 },
+      { month: 'Oct', value: 2.7 },
+      { month: 'Nov', value: 4.8 },
+      { month: 'Dec', value: 1.9 },
+    ],
+    comparisonPerformance: [
+      { year: 2020, strategy: 8.4, spy: 16.3 },
+      { year: 2021, strategy: 21.7, spy: 26.9 },
+      { year: 2022, strategy: -12.3, spy: -19.4 },
+      { year: 2023, strategy: 18.9, spy: 24.2 },
+      { year: 2024, strategy: 6.4, spy: 5.5 },
+    ]
+  }
+};
+
+interface SimulationParameters {
+  strategyId: number;
+  timeframeId: number;
+  initialAmount: number;
+  monthlyContribution: number;
+  rebalanceFrequency: string;
+  benchmark: string;
+  includeInflation: boolean;
+  includeFees: boolean;
+  feePercentage: number;
+  taxRate: number;
+}
+
+// Portfolio Simulation/Backtesting Component
+const PortfolioSimulationContent = () => {
+  const [isRunning, setIsRunning] = useState(false);
+  const [showResults, setShowResults] = useState(false);
+  const [showParameters, setShowParameters] = useState(true);
+  const [parameters, setParameters] = useState<SimulationParameters>({
+    strategyId: 1,
+    timeframeId: 2,
+    initialAmount: 10000,
+    monthlyContribution: 500,
+    rebalanceFrequency: 'quarterly',
+    benchmark: 'SPY',
+    includeInflation: true,
+    includeFees: true,
+    feePercentage: 0.25,
+    taxRate: 25
+  });
+
+  const handleParameterChange = (name: keyof SimulationParameters, value: any) => {
+    setParameters({
+      ...parameters,
+      [name]: value
+    });
+  };
+
+  const runSimulation = () => {
+    setIsRunning(true);
+    // Simulate API call delay
+    setTimeout(() => {
+      setIsRunning(false);
+      setShowResults(true);
+      setShowParameters(false);
+    }, 2000);
+  };
+
+  const reset = () => {
+    setShowResults(false);
+    setShowParameters(true);
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="bg-white rounded-lg shadow p-6">
+        <h2 className="text-xl font-semibold mb-4">Portfolio Simulation & Backtesting</h2>
+        <p className="text-gray-600 mb-6">
+          Test investment strategies against historical market data to evaluate performance and make informed decisions.
+        </p>
+        
+        {/* Simulation Parameters */}
+        {showParameters && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <div className="mb-6">
+                <h3 className="text-lg font-medium mb-3">Strategy & Timeframe</h3>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Investment Strategy</label>
+                    <select 
+                      className="w-full p-2 border rounded focus:ring-blue-500 focus:border-blue-500"
+                      value={parameters.strategyId}
+                      onChange={(e) => handleParameterChange('strategyId', parseInt(e.target.value))}
+                    >
+                      {backtestData.strategies.map(strategy => (
+                        <option key={strategy.id} value={strategy.id}>{strategy.name}</option>
+                      ))}
+                    </select>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {backtestData.strategies.find(s => s.id === parameters.strategyId)?.description}
+                    </p>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Time Period</label>
+                    <select 
+                      className="w-full p-2 border rounded focus:ring-blue-500 focus:border-blue-500"
+                      value={parameters.timeframeId}
+                      onChange={(e) => handleParameterChange('timeframeId', parseInt(e.target.value))}
+                    >
+                      {backtestData.timeframes.map(timeframe => (
+                        <option key={timeframe.id} value={timeframe.id}>{timeframe.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  
+                  {parameters.timeframeId === 5 && (
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
+                        <input 
+                          type="date" 
+                          className="w-full p-2 border rounded focus:ring-blue-500 focus:border-blue-500" 
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">End Date</label>
+                        <input 
+                          type="date" 
+                          className="w-full p-2 border rounded focus:ring-blue-500 focus:border-blue-500" 
+                        />
+                      </div>
+                    </div>
+                  )}
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Benchmark</label>
+                    <select 
+                      className="w-full p-2 border rounded focus:ring-blue-500 focus:border-blue-500"
+                      value={parameters.benchmark}
+                      onChange={(e) => handleParameterChange('benchmark', e.target.value)}
+                    >
+                      {backtestData.indices.map(index => (
+                        <option key={index.id} value={index.symbol}>{index.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+              
+              <div>
+                <h3 className="text-lg font-medium mb-3">Investment Parameters</h3>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Initial Investment</label>
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <span className="text-gray-500">$</span>
+                      </div>
+                      <input 
+                        type="number" 
+                        className="w-full pl-7 p-2 border rounded focus:ring-blue-500 focus:border-blue-500" 
+                        value={parameters.initialAmount}
+                        onChange={(e) => handleParameterChange('initialAmount', parseFloat(e.target.value))}
+                      />
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Monthly Contribution</label>
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <span className="text-gray-500">$</span>
+                      </div>
+                      <input 
+                        type="number" 
+                        className="w-full pl-7 p-2 border rounded focus:ring-blue-500 focus:border-blue-500" 
+                        value={parameters.monthlyContribution}
+                        onChange={(e) => handleParameterChange('monthlyContribution', parseFloat(e.target.value))}
+                      />
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Rebalance Frequency</label>
+                    <select 
+                      className="w-full p-2 border rounded focus:ring-blue-500 focus:border-blue-500"
+                      value={parameters.rebalanceFrequency}
+                      onChange={(e) => handleParameterChange('rebalanceFrequency', e.target.value)}
+                    >
+                      <option value="never">Never</option>
+                      <option value="annually">Annually</option>
+                      <option value="semiannually">Semi-Annually</option>
+                      <option value="quarterly">Quarterly</option>
+                      <option value="monthly">Monthly</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <div>
+              <div className="mb-6">
+                <h3 className="text-lg font-medium mb-3">Advanced Options</h3>
+                <div className="space-y-4">
+                  <div className="flex items-center">
+                    <input 
+                      type="checkbox" 
+                      id="includeInflation" 
+                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                      checked={parameters.includeInflation}
+                      onChange={(e) => handleParameterChange('includeInflation', e.target.checked)}
+                    />
+                    <label htmlFor="includeInflation" className="ml-2 block text-sm text-gray-700">Include Inflation Adjustment</label>
+                  </div>
+                  
+                  <div className="flex items-center">
+                    <input 
+                      type="checkbox" 
+                      id="includeFees" 
+                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                      checked={parameters.includeFees}
+                      onChange={(e) => handleParameterChange('includeFees', e.target.checked)}
+                    />
+                    <label htmlFor="includeFees" className="ml-2 block text-sm text-gray-700">Include Investment Fees</label>
+                  </div>
+                  
+                  {parameters.includeFees && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Annual Fee (%)</label>
+                      <input 
+                        type="number" 
+                        step="0.01" 
+                        className="w-32 p-2 border rounded focus:ring-blue-500 focus:border-blue-500" 
+                        value={parameters.feePercentage}
+                        onChange={(e) => handleParameterChange('feePercentage', parseFloat(e.target.value))}
+                      />
+                    </div>
+                  )}
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Tax Rate (%)</label>
+                    <input 
+                      type="number" 
+                      className="w-32 p-2 border rounded focus:ring-blue-500 focus:border-blue-500" 
+                      value={parameters.taxRate}
+                      onChange={(e) => handleParameterChange('taxRate', parseFloat(e.target.value))}
+                    />
+                  </div>
+                </div>
+              </div>
+              
+              <div className="bg-blue-50 p-4 rounded-lg border border-blue-100">
+                <h3 className="text-md font-medium text-blue-800 mb-2">Asset Allocation</h3>
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center">
+                    <div className="flex items-center">
+                      <div className="w-3 h-3 rounded-full bg-blue-500 mr-2"></div>
+                      <span className="text-sm">US Stocks</span>
+                    </div>
+                    <div className="relative w-32">
+                      <input 
+                        type="number" 
+                        className="w-full p-1 text-sm text-right border rounded" 
+                        value="60"
+                      />
+                      <div className="absolute inset-y-0 right-2 flex items-center pointer-events-none">
+                        <span className="text-gray-500 text-sm">%</span>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="flex justify-between items-center">
+                    <div className="flex items-center">
+                      <div className="w-3 h-3 rounded-full bg-green-500 mr-2"></div>
+                      <span className="text-sm">Intl Stocks</span>
+                    </div>
+                    <div className="relative w-32">
+                      <input 
+                        type="number" 
+                        className="w-full p-1 text-sm text-right border rounded" 
+                        value="20"
+                      />
+                      <div className="absolute inset-y-0 right-2 flex items-center pointer-events-none">
+                        <span className="text-gray-500 text-sm">%</span>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="flex justify-between items-center">
+                    <div className="flex items-center">
+                      <div className="w-3 h-3 rounded-full bg-purple-500 mr-2"></div>
+                      <span className="text-sm">Bonds</span>
+                    </div>
+                    <div className="relative w-32">
+                      <input 
+                        type="number" 
+                        className="w-full p-1 text-sm text-right border rounded" 
+                        value="15"
+                      />
+                      <div className="absolute inset-y-0 right-2 flex items-center pointer-events-none">
+                        <span className="text-gray-500 text-sm">%</span>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="flex justify-between items-center">
+                    <div className="flex items-center">
+                      <div className="w-3 h-3 rounded-full bg-yellow-500 mr-2"></div>
+                      <span className="text-sm">Cash</span>
+                    </div>
+                    <div className="relative w-32">
+                      <input 
+                        type="number" 
+                        className="w-full p-1 text-sm text-right border rounded" 
+                        value="5"
+                      />
+                      <div className="absolute inset-y-0 right-2 flex items-center pointer-events-none">
+                        <span className="text-gray-500 text-sm">%</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="mt-6 flex justify-end">
+                <button 
+                  className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+                  onClick={runSimulation}
+                  disabled={isRunning}
+                >
+                  {isRunning ? (
+                    <>
+                      <div className="animate-spin mr-2 h-4 w-4 border-t-2 border-b-2 border-white rounded-full"></div>
+                      Running Simulation...
+                    </>
+                  ) : (
+                    <>
+                      <Play className="h-4 w-4 mr-2" />
+                      Run Simulation
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+        
+        {/* Simulation Results */}
+        {showResults && (
+          <div>
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-lg font-medium">Simulation Results</h3>
+              <div className="flex space-x-3">
+                <button 
+                  className="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50 flex items-center"
+                  onClick={reset}
+                >
+                  <Settings className="h-4 w-4 mr-1" />
+                  Edit Parameters
+                </button>
+                <button className="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50 flex items-center">
+                  <Download className="h-4 w-4 mr-1" />
+                  Export
+                </button>
+              </div>
+            </div>
+            
+            {/* Key Metrics */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <div className="text-sm text-gray-500">Final Value</div>
+                <div className="text-xl font-bold">${backtestData.sampleResults.endValue.toLocaleString()}</div>
+                <div className="text-green-600 text-sm flex items-center">
+                  <ArrowUp className="h-3 w-3 mr-1" />
+                  {backtestData.sampleResults.returnPercentage}%
+                </div>
+              </div>
+              
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <div className="text-sm text-gray-500">Annualized Return</div>
+                <div className="text-xl font-bold">{backtestData.sampleResults.annualizedReturn}%</div>
+                <div className="text-sm text-gray-500">vs. {backtestData.sampleResults.comparisonPerformance[4].spy}% Benchmark</div>
+              </div>
+              
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <div className="text-sm text-gray-500">Max Drawdown</div>
+                <div className="text-xl font-bold">{backtestData.sampleResults.maxDrawdown}%</div>
+                <div className="text-sm text-gray-500">Worst peak-to-trough</div>
+              </div>
+              
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <div className="text-sm text-gray-500">Sharpe Ratio</div>
+                <div className="text-xl font-bold">{backtestData.sampleResults.sharpeRatio}</div>
+                <div className="text-sm text-gray-500">Risk-adjusted return</div>
+              </div>
+            </div>
+            
+            {/* Performance Chart */}
+            <div className="mb-6">
+              <div className="flex justify-between items-center mb-3">
+                <h4 className="font-medium">Portfolio Growth</h4>
+                <div className="flex space-x-2">
+                  <select className="text-sm border border-gray-300 rounded px-2 py-1">
+                    <option>Linear</option>
+                    <option>Logarithmic</option>
+                  </select>
+                  <select className="text-sm border border-gray-300 rounded px-2 py-1">
+                    <option>All Data</option>
+                    <option>YTD</option>
+                    <option>1 Year</option>
+                    <option>3 Years</option>
+                  </select>
+                </div>
+              </div>
+              
+              <div className="aspect-[16/9] bg-gray-50 w-full rounded-lg p-4 flex items-center justify-center">
+                <div className="text-gray-500 text-sm flex flex-col items-center">
+                  <LineChart className="h-10 w-10 mb-2 text-gray-400" />
+                  Growth chart would be rendered here
+                </div>
+              </div>
+            </div>
+            
+            {/* Monthly Breakdown */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+              <div className="col-span-2">
+                <h4 className="font-medium mb-3">Annual Performance</h4>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead>
+                      <tr>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Year</th>
+                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Strategy</th>
+                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Benchmark</th>
+                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Difference</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {backtestData.sampleResults.comparisonPerformance.map((year, i) => {
+                        const difference = year.strategy - year.spy;
+                        return (
+                          <tr key={i} className="hover:bg-gray-50">
+                            <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">{year.year}</td>
+                            <td className={`px-4 py-3 whitespace-nowrap text-sm text-right ${year.strategy >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                              {year.strategy >= 0 ? '+' : ''}{year.strategy}%
+                            </td>
+                            <td className={`px-4 py-3 whitespace-nowrap text-sm text-right ${year.spy >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                              {year.spy >= 0 ? '+' : ''}{year.spy}%
+                            </td>
+                            <td className={`px-4 py-3 whitespace-nowrap text-sm text-right ${difference >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                              {difference >= 0 ? '+' : ''}{difference.toFixed(1)}%
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              
+              <div>
+                <h4 className="font-medium mb-3">Monthly Performance</h4>
+                <div className="bg-white p-3 rounded-lg border border-gray-200">
+                  <div className="grid grid-cols-3 gap-2">
+                    {backtestData.sampleResults.monthlyPerformance.map((month, i) => (
+                      <div key={i} className="text-center">
+                        <div className="text-xs text-gray-500">{month.month}</div>
+                        <div className={`text-sm font-medium ${month.value >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          {month.value >= 0 ? '+' : ''}{month.value}%
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                
+                <div className="mt-4">
+                  <h4 className="font-medium mb-2">Statistics</h4>
+                  <div className="space-y-2">
+                    <div className="flex justify-between">
+                      <span className="text-sm text-gray-600">Win Rate:</span>
+                      <span className="text-sm font-medium">{backtestData.sampleResults.winRate}%</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-sm text-gray-600">Volatility:</span>
+                      <span className="text-sm font-medium">{backtestData.sampleResults.volatility}%</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-sm text-gray-600">Best Month:</span>
+                      <span className="text-sm font-medium text-green-600">+4.8%</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-sm text-gray-600">Worst Month:</span>
+                      <span className="text-sm font-medium text-red-600">-4.2%</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            {/* Strategy Analysis */}
+            <div className="bg-blue-50 p-4 rounded-lg border border-blue-100">
+              <h4 className="font-medium text-blue-800 mb-2">Strategy Analysis</h4>
+              <p className="text-sm text-blue-800 mb-3">
+                This strategy outperformed the benchmark by <span className="font-semibold">0.9%</span> annually while providing a better risk-adjusted return. 
+                Key strengths include lower drawdowns and consistent performance during market downturns.
+              </p>
+              <h5 className="font-medium text-blue-800 mb-1">Recommendations:</h5>
+              <ul className="text-sm text-blue-800 list-disc list-inside">
+                <li>Consider increasing allocation to value stocks for more stability</li>
+                <li>Rebalance more frequently during volatile periods</li>
+                <li>Additional diversification could further reduce drawdowns</li>
+              </ul>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
 // Wrap each section with ErrorBoundary
 export default function Portfolio() {
   const [activeTab, setActiveTab] = useState('portfolio');
@@ -1492,7 +2049,7 @@ export default function Portfolio() {
       {/* Tab Navigation */}
       <div className="border-b border-gray-200 mb-6">
         <div className="flex space-x-8 overflow-x-auto pb-1">
-          {['Portfolio', 'Activity', 'Holdings', 'Funding', 'Tax & Profit', 'Transfers', 'Goals'].map((tab) => (
+          {['Portfolio', 'Activity', 'Holdings', 'Funding', 'Tax & Profit', 'Transfers', 'Goals', 'Simulation'].map((tab) => (
             <button
               key={tab}
               className={`pb-4 px-1 whitespace-nowrap ${activeTab === tab.toLowerCase().replace(/[^a-z0-9]/g, '') 
@@ -1688,8 +2245,15 @@ export default function Portfolio() {
         </ErrorBoundary>
       )}
       
+      {/* Simulation Content */}
+      {activeTab === 'simulation' && (
+        <ErrorBoundary>
+          <PortfolioSimulationContent />
+        </ErrorBoundary>
+      )}
+      
       {/* Other tabs will be implemented later */}
-      {activeTab !== 'portfolio' && activeTab !== 'taxprofit' && activeTab !== 'transfers' && activeTab !== 'goals' && (
+      {activeTab !== 'portfolio' && activeTab !== 'taxprofit' && activeTab !== 'transfers' && activeTab !== 'goals' && activeTab !== 'simulation' && (
         <div className="py-8 text-center text-gray-500">
           <h2 className="text-xl font-semibold mb-2">Coming Soon</h2>
           <p>The {activeTab} tab is under development.</p>
