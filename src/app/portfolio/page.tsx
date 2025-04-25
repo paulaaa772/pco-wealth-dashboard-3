@@ -21,6 +21,7 @@ import NetWorthChart from '@/components/dashboard/NetWorthChart';
 import DonutChart from '@/components/dashboard/DonutChart';
 import LoadingSpinner from '@/components/dashboard/LoadingSpinner';
 import AiAssistantPanel from '@/components/dashboard/AiAssistantPanel';
+import ActivityContentComponent from '@/components/dashboard/ActivityContent';
 
 // Error boundary component for better error handling
 const ErrorBoundary = ({ children }: { children: React.ReactNode }) => {
@@ -2133,6 +2134,489 @@ const PortfolioSimulationContent = () => {
   );
 };
 
+// Data for AI trading signals and activity
+const getActivityData = () => {
+  return {
+    tradeSignals: [
+      {
+        id: 'signal-001',
+        symbol: 'NVDA',
+        action: 'BUY',
+        price: 1105.38,
+        timestamp: new Date().getTime() - 25 * 60 * 1000, // 25 min ago
+        confidence: 89,
+        reason: 'Strong momentum following AI chip demand surge',
+        status: 'new'
+      },
+      {
+        id: 'signal-002',
+        symbol: 'MSFT',
+        action: 'BUY',
+        price: 417.95,
+        timestamp: new Date().getTime() - 55 * 60 * 1000, // 55 min ago
+        confidence: 78,
+        reason: 'Positive market reaction to new cloud services pricing',
+        status: 'new'
+      },
+      {
+        id: 'signal-003',
+        symbol: 'AAPL',
+        action: 'SELL',
+        price: 213.07,
+        timestamp: new Date().getTime() - 2 * 60 * 60 * 1000, // 2 hours ago
+        confidence: 72,
+        reason: 'Technical resistance reached at 52-week high',
+        status: 'executed',
+        executionDetails: {
+          executionPrice: 212.95,
+          executionTime: new Date().getTime() - 1.8 * 60 * 60 * 1000,
+          profit: -0.06 // percentage
+        }
+      },
+      {
+        id: 'signal-004',
+        symbol: 'GOOGL',
+        action: 'BUY',
+        price: 175.24,
+        timestamp: new Date().getTime() - 3 * 60 * 60 * 1000, // 3 hours ago
+        confidence: 81,
+        reason: 'Oversold condition after market overreaction to earnings',
+        status: 'executed',
+        executionDetails: {
+          executionPrice: 175.38,
+          executionTime: new Date().getTime() - 2.9 * 60 * 60 * 1000,
+          profit: 1.24 // percentage
+        }
+      },
+      {
+        id: 'signal-005',
+        symbol: 'TSLA',
+        action: 'SELL',
+        price: 248.58,
+        timestamp: new Date().getTime() - 1 * 24 * 60 * 60 * 1000, // 1 day ago
+        confidence: 75,
+        reason: 'Increasing competition in EV market and declining margins',
+        status: 'executed',
+        executionDetails: {
+          executionPrice: 248.62,
+          executionTime: new Date().getTime() - 0.95 * 24 * 60 * 60 * 1000,
+          profit: 2.15 // percentage
+        }
+      }
+    ],
+    recentActivity: [
+      {
+        id: 'activity-001',
+        type: 'AI_TRADE',
+        symbol: 'GOOGL',
+        action: 'BUY',
+        quantity: 5,
+        price: 175.38,
+        timestamp: new Date().getTime() - 2.9 * 60 * 60 * 1000,
+        totalValue: 876.90,
+        status: 'completed'
+      },
+      {
+        id: 'activity-002',
+        type: 'AI_TRADE',
+        symbol: 'AAPL',
+        action: 'SELL',
+        quantity: 8,
+        price: 212.95,
+        timestamp: new Date().getTime() - 1.8 * 60 * 60 * 1000,
+        totalValue: 1703.60,
+        status: 'completed'
+      },
+      {
+        id: 'activity-003',
+        type: 'MANUAL_TRADE',
+        symbol: 'AMZN',
+        action: 'BUY',
+        quantity: 3,
+        price: 182.27,
+        timestamp: new Date().getTime() - 4.5 * 60 * 60 * 1000,
+        totalValue: 546.81,
+        status: 'completed'
+      },
+      {
+        id: 'activity-004',
+        type: 'DIVIDEND',
+        symbol: 'VIG',
+        action: 'DIVIDEND',
+        quantity: null,
+        price: null,
+        timestamp: new Date().getTime() - 2 * 24 * 60 * 60 * 1000,
+        totalValue: 12.48,
+        status: 'completed'
+      },
+      {
+        id: 'activity-005',
+        type: 'DEPOSIT',
+        symbol: null,
+        action: 'DEPOSIT',
+        quantity: null,
+        price: null,
+        timestamp: new Date().getTime() - 5 * 24 * 60 * 60 * 1000,
+        totalValue: 1000.00,
+        status: 'completed'
+      }
+    ],
+    aiPerformance: {
+      totalTrades: 27,
+      winRate: 74,
+      averageReturn: 2.3,
+      totalProfit: 1842.65,
+      lastMonth: {
+        trades: 12,
+        winRate: 83,
+        profit: 978.32
+      }
+    }
+  };
+};
+
+// Activity tab content component
+const ActivityContent = () => {
+  const activityData = getActivityData();
+  const [selectedFilter, setSelectedFilter] = useState('all');
+  const [signalAction, setSignalAction] = useState<{ [key: string]: string }>({});
+  
+  // Format timestamp to readable time
+  const formatTimestamp = (timestamp: number) => {
+    const now = new Date().getTime();
+    const diffMs = now - timestamp;
+    
+    if (diffMs < 60 * 1000) {
+      return 'Just now';
+    } else if (diffMs < 60 * 60 * 1000) {
+      const minutes = Math.floor(diffMs / (60 * 1000));
+      return `${minutes} ${minutes === 1 ? 'minute' : 'minutes'} ago`;
+    } else if (diffMs < 24 * 60 * 60 * 1000) {
+      const hours = Math.floor(diffMs / (60 * 60 * 1000));
+      return `${hours} ${hours === 1 ? 'hour' : 'hours'} ago`;
+    } else {
+      const days = Math.floor(diffMs / (24 * 60 * 60 * 1000));
+      return `${days} ${days === 1 ? 'day' : 'days'} ago`;
+    }
+  };
+  
+  // Handle execution of AI trade signal
+  const handleExecuteSignal = (signalId: string) => {
+    setSignalAction(prev => ({
+      ...prev,
+      [signalId]: 'executing'
+    }));
+    
+    // Simulate API call with timeout
+    setTimeout(() => {
+      setSignalAction(prev => ({
+        ...prev,
+        [signalId]: 'executed'
+      }));
+      
+      // In a real app, you would call the brokerage API here
+      // and update the activityData state with the real result
+    }, 1500);
+  };
+  
+  // Handle ignoring AI trade signal
+  const handleIgnoreSignal = (signalId: string) => {
+    setSignalAction(prev => ({
+      ...prev,
+      [signalId]: 'ignoring'
+    }));
+    
+    // Simulate API call with timeout
+    setTimeout(() => {
+      setSignalAction(prev => ({
+        ...prev,
+        [signalId]: 'ignored'
+      }));
+    }, 800);
+  };
+  
+  // Filter signals that haven't been acted upon
+  const pendingSignals = activityData.tradeSignals.filter(signal => 
+    signal.status === 'new' && 
+    !signalAction[signal.id]
+  );
+  
+  // Filter recent activity based on the selected filter
+  const filteredActivity = activityData.recentActivity.filter(activity => {
+    if (selectedFilter === 'all') return true;
+    if (selectedFilter === 'ai' && activity.type === 'AI_TRADE') return true;
+    if (selectedFilter === 'manual' && activity.type === 'MANUAL_TRADE') return true;
+    if (selectedFilter === 'dividends' && activity.type === 'DIVIDEND') return true;
+    if (selectedFilter === 'transfers' && 
+       (activity.type === 'DEPOSIT' || activity.type === 'WITHDRAWAL')) return true;
+    return false;
+  });
+  
+  return (
+    <div className="bg-[#172033] text-white p-6 space-y-8">
+      <div className="flex justify-between items-center">
+        <h2 className="text-2xl font-semibold">Trading Activity</h2>
+        <div className="flex space-x-3">
+          <button 
+            className={`px-3 py-1.5 rounded text-sm ${
+              selectedFilter === 'all' 
+                ? 'bg-blue-600 text-white' 
+                : 'bg-[#1D2939] text-gray-300 hover:bg-gray-700'
+            }`}
+            onClick={() => setSelectedFilter('all')}
+          >
+            All Activity
+          </button>
+          <button 
+            className={`px-3 py-1.5 rounded text-sm ${
+              selectedFilter === 'ai' 
+                ? 'bg-blue-600 text-white' 
+                : 'bg-[#1D2939] text-gray-300 hover:bg-gray-700'
+            }`}
+            onClick={() => setSelectedFilter('ai')}
+          >
+            AI Trades
+          </button>
+          <button 
+            className={`px-3 py-1.5 rounded text-sm ${
+              selectedFilter === 'manual' 
+                ? 'bg-blue-600 text-white' 
+                : 'bg-[#1D2939] text-gray-300 hover:bg-gray-700'
+            }`}
+            onClick={() => setSelectedFilter('manual')}
+          >
+            Manual Trades
+          </button>
+        </div>
+      </div>
+      
+      {/* AI Trade Signals Card */}
+      {pendingSignals.length > 0 && (
+        <div className="bg-[#1D2939] rounded-lg overflow-hidden">
+          <div className="border-b border-gray-700 p-4 bg-blue-900/20">
+            <h3 className="text-lg font-semibold flex items-center">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+              </svg>
+              AI Trade Signals
+            </h3>
+          </div>
+          <div className="p-6">
+            <p className="text-gray-300 mb-6">
+              Our AI has detected the following trading opportunities based on market analysis, news sentiment, and technical indicators.
+            </p>
+            
+            <div className="space-y-6">
+              {pendingSignals.map((signal) => (
+                <div key={signal.id} className="bg-[#2D3748] rounded-lg p-5">
+                  <div className="flex justify-between items-start mb-4">
+                    <div>
+                      <h4 className="text-xl font-medium text-white flex items-center">
+                        {signal.action === 'BUY' ? (
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 text-green-500" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M3.293 9.707a1 1 0 010-1.414l6-6a1 1 0 011.414 0l6 6a1 1 0 01-1.414 1.414L11 5.414V17a1 1 0 11-2 0V5.414L4.707 9.707a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                          </svg>
+                        ) : (
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 text-red-500" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M16.707 10.293a1 1 0 010 1.414l-6 6a1 1 0 01-1.414 0l-6-6a1 1 0 111.414-1.414L9 14.586V3a1 1 0 012 0v11.586l4.293-4.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                          </svg>
+                        )}
+                        {signal.action} {signal.symbol}
+                      </h4>
+                      <div className="text-sm text-gray-400 mt-1">
+                        AI confidence: 
+                        <span className={`ml-1 ${
+                          signal.confidence > 80 ? 'text-green-400' : 
+                          signal.confidence > 65 ? 'text-yellow-400' : 
+                          'text-red-400'
+                        }`}>
+                          {signal.confidence}%
+                        </span>
+                      </div>
+                      <div className="text-sm text-gray-400 mt-0.5">
+                        {formatTimestamp(signal.timestamp)}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-2xl font-semibold">
+                        ${signal.price.toFixed(2)}
+                      </div>
+                      <div className="text-sm text-gray-400">Current price</div>
+                    </div>
+                  </div>
+                  
+                  <div className="mt-2 mb-4">
+                    <div className="text-sm text-gray-300">
+                      <span className="font-medium">Analysis:</span> {signal.reason}
+                    </div>
+                  </div>
+                  
+                  <div className="flex justify-end space-x-3">
+                    {signalAction[signal.id] === 'executing' ? (
+                      <button 
+                        className="px-4 py-2 bg-green-600 text-white rounded-md flex items-center opacity-70 cursor-not-allowed"
+                        disabled
+                      >
+                        <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Executing...
+                      </button>
+                    ) : signalAction[signal.id] === 'executed' ? (
+                      <button 
+                        className="px-4 py-2 bg-green-600 text-white rounded-md flex items-center"
+                        disabled
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                        </svg>
+                        Executed
+                      </button>
+                    ) : signalAction[signal.id] === 'ignoring' ? (
+                      <button 
+                        className="px-4 py-2 bg-gray-600 text-white rounded-md opacity-70 cursor-not-allowed"
+                        disabled
+                      >
+                        Ignoring...
+                      </button>
+                    ) : signalAction[signal.id] === 'ignored' ? (
+                      <button 
+                        className="px-4 py-2 bg-gray-600 text-white rounded-md opacity-70 cursor-not-allowed"
+                        disabled
+                      >
+                        Ignored
+                      </button>
+                    ) : (
+                      <>
+                        <button 
+                          className="px-4 py-2 bg-transparent border border-gray-600 text-gray-300 hover:bg-gray-700 rounded-md"
+                          onClick={() => handleIgnoreSignal(signal.id)}
+                        >
+                          Ignore
+                        </button>
+                        <button 
+                          className={`px-4 py-2 ${signal.action === 'BUY' ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'} text-white rounded-md`}
+                          onClick={() => handleExecuteSignal(signal.id)}
+                        >
+                          Execute {signal.action}
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* AI Performance Metrics */}
+      <div className="bg-[#1D2939] rounded-lg overflow-hidden">
+        <div className="border-b border-gray-700 p-4">
+          <h3 className="text-lg font-semibold">AI Trading Performance</h3>
+        </div>
+        <div className="p-6">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <div className="bg-[#2D3748] rounded-lg p-4">
+              <div className="text-sm text-gray-400 mb-1">Win Rate</div>
+              <div className="text-2xl font-bold text-green-400">{activityData.aiPerformance.winRate}%</div>
+              <div className="text-xs text-gray-400 mt-1">Based on {activityData.aiPerformance.totalTrades} trades</div>
+            </div>
+            <div className="bg-[#2D3748] rounded-lg p-4">
+              <div className="text-sm text-gray-400 mb-1">Average Return</div>
+              <div className="text-2xl font-bold text-green-400">+{activityData.aiPerformance.averageReturn}%</div>
+              <div className="text-xs text-gray-400 mt-1">Per executed signal</div>
+            </div>
+            <div className="bg-[#2D3748] rounded-lg p-4">
+              <div className="text-sm text-gray-400 mb-1">Total Profit</div>
+              <div className="text-2xl font-bold text-green-400">${activityData.aiPerformance.totalProfit.toLocaleString()}</div>
+              <div className="text-xs text-gray-400 mt-1">Since activation</div>
+            </div>
+            <div className="bg-[#2D3748] rounded-lg p-4">
+              <div className="text-sm text-gray-400 mb-1">Last Month</div>
+              <div className="text-2xl font-bold text-green-400">+${activityData.aiPerformance.lastMonth.profit.toLocaleString()}</div>
+              <div className="text-xs text-gray-400 mt-1">{activityData.aiPerformance.lastMonth.winRate}% win rate ({activityData.aiPerformance.lastMonth.trades} trades)</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      {/* Recent Activity Table */}
+      <div className="bg-[#1D2939] rounded-lg overflow-hidden">
+        <div className="border-b border-gray-700 p-4">
+          <h3 className="text-lg font-semibold">Recent Activity</h3>
+        </div>
+        <div className="p-6">
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-700">
+              <thead className="bg-gray-800/50">
+                <tr>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Date & Time</th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Type</th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Details</th>
+                  <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">Amount</th>
+                  <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-300 uppercase tracking-wider">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-700">
+                {filteredActivity.map((activity) => (
+                  <tr key={activity.id} className="hover:bg-gray-800/30">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
+                      {formatTimestamp(activity.timestamp)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                        activity.type === 'AI_TRADE' ? 'bg-blue-900/30 text-blue-400' : 
+                        activity.type === 'MANUAL_TRADE' ? 'bg-purple-900/30 text-purple-400' : 
+                        activity.type === 'DIVIDEND' ? 'bg-green-900/30 text-green-400' : 
+                        'bg-yellow-900/30 text-yellow-400'
+                      }`}>
+                        {activity.type === 'AI_TRADE' ? 'AI Trade' : 
+                         activity.type === 'MANUAL_TRADE' ? 'Manual Trade' : 
+                         activity.type === 'DIVIDEND' ? 'Dividend' : 
+                         activity.type.charAt(0) + activity.type.slice(1).toLowerCase()}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
+                      {activity.type.includes('TRADE') ? (
+                        <div>
+                          <span className={activity.action === 'BUY' ? 'text-green-400' : 'text-red-400'}>
+                            {activity.action}
+                          </span>
+                          {' '}
+                          {activity.quantity} {activity.symbol} @ ${activity.price?.toFixed(2)}
+                        </div>
+                      ) : activity.type === 'DIVIDEND' ? (
+                        <div>Dividend payment from {activity.symbol}</div>
+                      ) : (
+                        <div>{activity.type}</div>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-medium">
+                      <span className={`
+                        ${activity.action === 'BUY' || activity.type === 'DEPOSIT' ? 'text-red-400' : 'text-green-400'}
+                      `}>
+                        {activity.action === 'BUY' || activity.type === 'DEPOSIT' ? '-' : '+'} 
+                        ${activity.totalValue.toFixed(2)}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-center">
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-900/30 text-green-400">
+                        Completed
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export default function Portfolio() {
   const [activeTab, setActiveTab] = useState('portfolio');
   const [selectedTimeframe, setSelectedTimeframe] = useState('1M');
@@ -2335,6 +2819,8 @@ export default function Portfolio() {
         return <GoalSystemContent />;
       case 'simulation':
         return <PortfolioSimulationContent />;
+      case 'activity':
+        return <ActivityContentComponent />;
       case 'portfolio':
       default:
         return (
@@ -2814,6 +3300,8 @@ export default function Portfolio() {
             )}
             
             {activeTab === 'holdings' && renderHoldingsTab()}
+            
+            {activeTab === 'activity' && <ActivityContentComponent />}
             
             {activeTab === 'tax' && <TaxAndProfitContent />}
             
