@@ -14,15 +14,17 @@ interface DonutChartProps {
   height?: number;
   innerRadius?: number;
   outerRadius?: number;
+  darkMode?: boolean;
 }
 
 const defaultData = [
-  { name: 'Technology', value: 35, color: '#4F46E5' },
-  { name: 'Healthcare', value: 20, color: '#7C3AED' },
-  { name: 'Financials', value: 15, color: '#10B981' },
-  { name: 'Consumer Discretionary', value: 12, color: '#F59E0B' },
-  { name: 'Communication Services', value: 10, color: '#EF4444' },
-  { name: 'Other', value: 8, color: '#9CA3AF' }
+  { name: 'Technology', value: 20, color: '#4169E1' }, // Royal Blue
+  { name: 'Healthcare', value: 15, color: '#9370DB' }, // Medium Purple
+  { name: 'Financial Services', value: 10, color: '#20B2AA' }, // Light Sea Green
+  { name: 'Consumer Discretionary', value: 12, color: '#3CB371' }, // Medium Sea Green
+  { name: 'Communication', value: 9, color: '#FF6347' }, // Tomato
+  { name: 'Industrials', value: 8, color: '#6495ED' }, // Cornflower Blue
+  { name: 'Other Sectors', value: 26, color: '#A9A9A9' } // Dark Gray
 ];
 
 const DonutChart: React.FC<DonutChartProps> = ({
@@ -30,7 +32,8 @@ const DonutChart: React.FC<DonutChartProps> = ({
   width = 300,
   height = 300,
   innerRadius = 75,
-  outerRadius = 130
+  outerRadius = 130,
+  darkMode = false
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const totalValue = data.reduce((sum, item) => sum + item.value, 0);
@@ -75,21 +78,29 @@ const DonutChart: React.FC<DonutChartProps> = ({
     // Draw inner circle to create donut effect
     ctx.beginPath();
     ctx.arc(centerX, centerY, innerRadius, 0, 2 * Math.PI);
-    ctx.fillStyle = '#FFFFFF';
+    ctx.fillStyle = darkMode ? '#1D2939' : '#FFFFFF';
     ctx.fill();
     
     // Draw center text
-    ctx.fillStyle = '#1F2937';
+    ctx.fillStyle = darkMode ? '#FFFFFF' : '#1F2937';
     ctx.font = 'bold 20px Inter, sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(`${totalValue}%`, centerX, centerY - 12);
     
-    ctx.fillStyle = '#6B7280';
+    ctx.fillStyle = darkMode ? '#A1A1AA' : '#6B7280';
     ctx.font = '14px Inter, sans-serif';
     ctx.fillText('Allocated', centerX, centerY + 12);
     
-  }, [data, width, height, innerRadius, outerRadius, totalValue]);
+  }, [data, width, height, innerRadius, outerRadius, totalValue, darkMode]);
+  
+  const legendItemClass = darkMode 
+    ? "text-gray-300" 
+    : "text-gray-700";
+  
+  const legendValueClass = darkMode 
+    ? "font-medium text-white" 
+    : "font-medium";
   
   return (
     <div className="relative">
@@ -108,8 +119,8 @@ const DonutChart: React.FC<DonutChartProps> = ({
               style={{ backgroundColor: sector.color }}
             />
             <div className="text-sm flex justify-between w-full">
-              <span className="text-gray-700">{sector.name}</span>
-              <span className="font-medium">{sector.value}%</span>
+              <span className={legendItemClass}>{sector.name}</span>
+              <span className={legendValueClass}>{sector.value}%</span>
             </div>
           </div>
         ))}
