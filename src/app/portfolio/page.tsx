@@ -1031,6 +1031,72 @@ const InKindTransferContent = () => {
   );
 };
 
+const MilestonesSection = () => (
+  <div className="bg-white rounded-lg shadow p-6">
+    <div className="flex justify-between items-center mb-4">
+      <h2 className="text-xl font-semibold">Milestones</h2>
+      <button className="flex items-center text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-2 rounded">
+        <PlusCircle className="h-4 w-4 mr-2" />
+        Add Milestone
+      </button>
+    </div>
+    
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      {goalData.milestones.map((milestone) => (
+        <div 
+          key={milestone.id}
+          className={`border rounded-lg p-4 ${
+            milestone.isComplete ? 'bg-green-50 border-green-200' : 'bg-white'
+          }`}
+        >
+          <div className="flex justify-between items-start mb-3">
+            <div>
+              <h3 className="font-medium">{milestone.title}</h3>
+              <div className="text-xs text-gray-500">{milestone.type}</div>
+            </div>
+            {milestone.isComplete ? (
+              <span className="flex items-center text-xs text-green-700 bg-green-100 px-2 py-1 rounded-full">
+                <CheckSquare className="h-3 w-3 mr-1" />
+                Complete
+              </span>
+            ) : (
+              <span className="flex items-center text-xs text-blue-700 bg-blue-100 px-2 py-1 rounded-full">
+                <Flag className="h-3 w-3 mr-1" />
+                In Progress
+              </span>
+            )}
+          </div>
+          
+          {!milestone.isComplete && (
+            <>
+              <div className="flex justify-between mb-1">
+                <span className="text-xs text-gray-500">
+                  {milestone.type === 'Portfolio' ? '$' : ''}{milestone.current.toLocaleString()}
+                  {milestone.type === 'Allocation' ? '%' : ''} of {milestone.type === 'Portfolio' ? '$' : ''}
+                  {milestone.target.toLocaleString()}{milestone.type === 'Allocation' ? '%' : ''}
+                </span>
+                <span className="text-xs font-medium">{milestone.progress}%</span>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-1.5 mb-3">
+                <div 
+                  className="bg-blue-600 h-1.5 rounded-full" 
+                  style={{ width: `${milestone.progress}%` }}
+                ></div>
+              </div>
+            </>
+          )}
+          
+          {milestone.isComplete && (
+            <div className="text-sm text-green-700 mt-2">
+              Completed on {milestone.completedDate}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  </div>
+);
+
 const GoalSystemContent = () => {
   const [showAddGoalForm, setShowAddGoalForm] = useState(false);
   
@@ -1169,69 +1235,7 @@ const GoalSystemContent = () => {
       </div>
       
       {/* Milestones */}
-      <div className="bg-white rounded-lg shadow p-6">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-semibold">Milestones</h2>
-          <button className="flex items-center text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-2 rounded">
-            <PlusCircle className="h-4 w-4 mr-2" />
-            Add Milestone
-          </button>
-        </div>
-        
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {goalData.milestones.map((milestone) => (
-            <div 
-              key={milestone.id}
-              className={`border rounded-lg p-4 ${
-                milestone.isComplete ? 'bg-green-50 border-green-200' : 'bg-white'
-              }`}
-            >
-              <div className="flex justify-between items-start mb-3">
-                <div>
-                  <h3 className="font-medium">{milestone.title}</h3>
-                  <div className="text-xs text-gray-500">{milestone.type}</div>
-                </div>
-                {milestone.isComplete ? (
-                  <span className="flex items-center text-xs text-green-700 bg-green-100 px-2 py-1 rounded-full">
-                    <CheckSquare className="h-3 w-3 mr-1" />
-                    Complete
-                  </span>
-                ) : (
-                  <span className="flex items-center text-xs text-blue-700 bg-blue-100 px-2 py-1 rounded-full">
-                    <Flag className="h-3 w-3 mr-1" />
-                    In Progress
-                  </span>
-                )}
-              </div>
-              
-              {!milestone.isComplete && (
-                <>
-                  <div className="flex justify-between mb-1">
-                    <span className="text-xs text-gray-500">
-                      {milestone.type === 'Portfolio' ? '$' : ''}{milestone.current.toLocaleString()}
-                      {milestone.type === 'Allocation' ? '%' : ''} of {milestone.type === 'Portfolio' ? '$' : ''}
-                      {milestone.target.toLocaleString()}{milestone.type === 'Allocation' ? '%' : ''}
-                    </span>
-                    <span className="text-xs font-medium">{milestone.progress}%</span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-1.5 mb-3">
-                    <div 
-                      className="bg-blue-600 h-1.5 rounded-full" 
-                      style={{ width: `${milestone.progress}%` }}
-                    ></div>
-                  </div>
-                </>
-              )}
-              
-              {milestone.isComplete && (
-                <div className="text-sm text-green-700 mt-2">
-                  Completed on {new Date(milestone.completedDate).toLocaleDateString()}
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      </div>
+      <MilestonesSection />
       
       {/* Performance Targets */}
       <div className="bg-white rounded-lg shadow p-6">
@@ -1447,6 +1451,39 @@ const AiAssistantPanel = () => {
   );
 };
 
+// Error boundary component to catch rendering errors
+const ErrorBoundary = ({ children }: { children: React.ReactNode }) => {
+  const [hasError, setHasError] = useState(false);
+  
+  useEffect(() => {
+    const handleError = (error: ErrorEvent) => {
+      console.error('Caught runtime error:', error);
+      setHasError(true);
+    };
+    
+    window.addEventListener('error', handleError);
+    return () => window.removeEventListener('error', handleError);
+  }, []);
+  
+  if (hasError) {
+    return (
+      <div className="p-6 bg-red-50 border border-red-200 rounded-lg text-center">
+        <h2 className="text-xl font-semibold text-red-700 mb-2">Something went wrong</h2>
+        <p className="text-red-600 mb-4">We encountered an error while rendering this section.</p>
+        <button 
+          onClick={() => setHasError(false)} 
+          className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+        >
+          Try Again
+        </button>
+      </div>
+    );
+  }
+  
+  return <>{children}</>;
+};
+
+// Wrap each section with ErrorBoundary
 export default function Portfolio() {
   const [activeTab, setActiveTab] = useState('portfolio');
 
@@ -1472,175 +1509,183 @@ export default function Portfolio() {
       
       {/* Main content */}
       {activeTab === 'portfolio' && (
-        <div>
-          <h1 className="text-2xl font-semibold mb-4">Stocks</h1>
-          
-          {/* Financial Summary */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8 border-b border-gray-200 pb-4">
-            <div>
-              <div className="text-sm text-gray-500 flex items-center">
-                Cash
-                <span className="ml-1 text-gray-400">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                </span>
-              </div>
-              <div className="font-semibold text-lg">${portfolioData.cash.toFixed(2)}</div>
-            </div>
+        <ErrorBoundary>
+          <div>
+            <h1 className="text-2xl font-semibold mb-4">Stocks</h1>
             
-            <div>
-              <div className="text-sm text-gray-500 flex items-center">
-                Margin
-                <span className="ml-1 text-gray-400">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                </span>
-              </div>
-              <div className="font-semibold text-lg text-blue-500">
-                ${portfolioData.margin.toLocaleString()}
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 inline ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
-              </div>
-            </div>
-            
-            <div>
-              <div className="text-sm text-gray-500">Total buying power</div>
-              <div className="font-semibold text-lg">${portfolioData.buyingPower.toLocaleString()}</div>
-            </div>
-            
-            <div className="flex items-center">
-              <button className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg font-medium">
-                Move money
-              </button>
-            </div>
-          </div>
-          
-          {/* Portfolio chart and details */}
-          <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 mb-8">
-            {/* Left column with pie chart */}
-            <div className="lg:col-span-2">
-              <DonutChart />
-            </div>
-            
-            {/* Right column with performance chart */}
-            <div className="lg:col-span-3">
-              <PerformanceChart />
-              
-              {/* Performance summary */}
-              <div className="grid grid-cols-3 gap-4 mt-8">
-                <div>
-                  <div className="text-sm text-gray-500">Starting value: {portfolioData.startDate}</div>
-                  <div className="font-semibold">${portfolioData.startValue.toFixed(2)}</div>
-                </div>
-                <div>
-                  <div className="text-sm text-gray-500">Ending value: {portfolioData.endDate}</div>
-                  <div className="font-semibold">${portfolioData.endValue.toFixed(2)}</div>
-                </div>
-                <div>
-                  <div className="text-sm text-gray-500">Net cash flow</div>
-                  <div className="font-semibold">${portfolioData.netCashFlow.toFixed(2)}</div>
-                </div>
-                <div>
-                  <div className="text-sm text-gray-500">Dividends earned</div>
-                  <div className="font-semibold">${portfolioData.dividendsEarned.toFixed(2)}</div>
-                </div>
-                <div>
-                  <div className="text-sm text-gray-500">Market gain</div>
-                  <div className="font-semibold text-red-500">${portfolioData.marketGain.toFixed(2)}</div>
-                </div>
-                <div>
-                  <div className="text-sm text-gray-500">Money weighted rate of return</div>
-                  <div className="font-semibold flex items-center text-red-500">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            {/* Financial Summary */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8 border-b border-gray-200 pb-4">
+              <div>
+                <div className="text-sm text-gray-500 flex items-center">
+                  Cash
+                  <span className="ml-1 text-gray-400">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
-                    {portfolioData.returnRate.toFixed(2)}%
+                  </span>
+                </div>
+                <div className="font-semibold text-lg">${portfolioData.cash.toFixed(2)}</div>
+              </div>
+              
+              <div>
+                <div className="text-sm text-gray-500 flex items-center">
+                  Margin
+                  <span className="ml-1 text-gray-400">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </span>
+                </div>
+                <div className="font-semibold text-lg text-blue-500">
+                  ${portfolioData.margin.toLocaleString()}
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 inline ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </div>
+              </div>
+              
+              <div>
+                <div className="text-sm text-gray-500">Total buying power</div>
+                <div className="font-semibold text-lg">${portfolioData.buyingPower.toLocaleString()}</div>
+              </div>
+              
+              <div className="flex items-center">
+                <button className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg font-medium">
+                  Move money
+                </button>
+              </div>
+            </div>
+            
+            {/* Portfolio chart and details */}
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 mb-8">
+              {/* Left column with pie chart */}
+              <div className="lg:col-span-2">
+                <DonutChart />
+              </div>
+              
+              {/* Right column with performance chart */}
+              <div className="lg:col-span-3">
+                <PerformanceChart />
+                
+                {/* Performance summary */}
+                <div className="grid grid-cols-3 gap-4 mt-8">
+                  <div>
+                    <div className="text-sm text-gray-500">Starting value: {portfolioData.startDate}</div>
+                    <div className="font-semibold">${portfolioData.startValue.toFixed(2)}</div>
+                  </div>
+                  <div>
+                    <div className="text-sm text-gray-500">Ending value: {portfolioData.endDate}</div>
+                    <div className="font-semibold">${portfolioData.endValue.toFixed(2)}</div>
+                  </div>
+                  <div>
+                    <div className="text-sm text-gray-500">Net cash flow</div>
+                    <div className="font-semibold">${portfolioData.netCashFlow.toFixed(2)}</div>
+                  </div>
+                  <div>
+                    <div className="text-sm text-gray-500">Dividends earned</div>
+                    <div className="font-semibold">${portfolioData.dividendsEarned.toFixed(2)}</div>
+                  </div>
+                  <div>
+                    <div className="text-sm text-gray-500">Market gain</div>
+                    <div className="font-semibold text-red-500">${portfolioData.marketGain.toFixed(2)}</div>
+                  </div>
+                  <div>
+                    <div className="text-sm text-gray-500">Money weighted rate of return</div>
+                    <div className="font-semibold flex items-center text-red-500">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                      {portfolioData.returnRate.toFixed(2)}%
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
-          </div>
-          
-          {/* Action buttons */}
-          <div className="flex space-x-4 mb-8">
-            <button className="flex flex-col items-center">
-              <div className="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center mb-1">
-                <Plus className="h-6 w-6 text-gray-600" />
-              </div>
-              <span className="text-sm">Buy</span>
-            </button>
             
-            <button className="flex flex-col items-center">
-              <div className="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center mb-1">
-                <Minus className="h-6 w-6 text-gray-600" />
-              </div>
-              <span className="text-sm">Sell</span>
-            </button>
+            {/* Action buttons */}
+            <div className="flex space-x-4 mb-8">
+              <button className="flex flex-col items-center">
+                <div className="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center mb-1">
+                  <Plus className="h-6 w-6 text-gray-600" />
+                </div>
+                <span className="text-sm">Buy</span>
+              </button>
+              
+              <button className="flex flex-col items-center">
+                <div className="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center mb-1">
+                  <Minus className="h-6 w-6 text-gray-600" />
+                </div>
+                <span className="text-sm">Sell</span>
+              </button>
+              
+              <button className="flex flex-col items-center">
+                <div className="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center mb-1">
+                  <RefreshCw className="h-6 w-6 text-gray-600" />
+                </div>
+                <span className="text-sm">Rebalance</span>
+              </button>
+              
+              <button className="flex flex-col items-center">
+                <div className="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center mb-1">
+                  <Edit2 className="h-6 w-6 text-gray-600" />
+                </div>
+                <span className="text-sm">Edit</span>
+              </button>
+              
+              <button className="flex flex-col items-center">
+                <div className="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center mb-1">
+                  <Share2 className="h-6 w-6 text-gray-600" />
+                </div>
+                <span className="text-sm">Share</span>
+              </button>
+            </div>
             
-            <button className="flex flex-col items-center">
-              <div className="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center mb-1">
-                <RefreshCw className="h-6 w-6 text-gray-600" />
+            {/* Activity Section */}
+            <div className="bg-white rounded-lg shadow p-6 mb-8">
+              <h2 className="text-lg font-semibold mb-4">Upcoming Activity</h2>
+              
+              <div className="border-b border-gray-200 py-4">
+                <div className="flex justify-between">
+                  <div>Trades</div>
+                  <div className="text-gray-500">None</div>
+                </div>
               </div>
-              <span className="text-sm">Rebalance</span>
-            </button>
-            
-            <button className="flex flex-col items-center">
-              <div className="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center mb-1">
-                <Edit2 className="h-6 w-6 text-gray-600" />
-              </div>
-              <span className="text-sm">Edit</span>
-            </button>
-            
-            <button className="flex flex-col items-center">
-              <div className="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center mb-1">
-                <Share2 className="h-6 w-6 text-gray-600" />
-              </div>
-              <span className="text-sm">Share</span>
-            </button>
-          </div>
-          
-          {/* Activity Section */}
-          <div className="bg-white rounded-lg shadow p-6 mb-8">
-            <h2 className="text-lg font-semibold mb-4">Upcoming Activity</h2>
-            
-            <div className="border-b border-gray-200 py-4">
-              <div className="flex justify-between">
-                <div>Trades</div>
-                <div className="text-gray-500">None</div>
+              
+              <div className="border-b border-gray-200 py-4">
+                <div className="flex justify-between">
+                  <div>Transfers To/From Stocks</div>
+                  <div className="text-gray-500">None</div>
+                </div>
               </div>
             </div>
             
-            <div className="border-b border-gray-200 py-4">
-              <div className="flex justify-between">
-                <div>Transfers To/From Stocks</div>
-                <div className="text-gray-500">None</div>
-              </div>
+            {/* Slices Section */}
+            <div className="mb-8">
+              <h2 className="text-lg font-semibold mb-4">Slices: {portfolioData.slices}</h2>
             </div>
           </div>
-          
-          {/* Slices Section */}
-          <div className="mb-8">
-            <h2 className="text-lg font-semibold mb-4">Slices: {portfolioData.slices}</h2>
-          </div>
-        </div>
+        </ErrorBoundary>
       )}
       
       {/* Tax & Profit Content */}
       {activeTab === 'taxprofit' && (
-        <TaxAndProfitContent />
+        <ErrorBoundary>
+          <TaxAndProfitContent />
+        </ErrorBoundary>
       )}
       
       {/* Transfers Content */}
       {activeTab === 'transfers' && (
-        <InKindTransferContent />
+        <ErrorBoundary>
+          <InKindTransferContent />
+        </ErrorBoundary>
       )}
       
       {/* Goals Content */}
       {activeTab === 'goals' && (
-        <GoalSystemContent />
+        <ErrorBoundary>
+          <GoalSystemContent />
+        </ErrorBoundary>
       )}
       
       {/* Other tabs will be implemented later */}
@@ -1652,7 +1697,9 @@ export default function Portfolio() {
       )}
       
       {/* AI Assistant Panel */}
-      <AiAssistantPanel />
+      <ErrorBoundary>
+        <AiAssistantPanel />
+      </ErrorBoundary>
     </div>
   )
 }
