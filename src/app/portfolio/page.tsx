@@ -286,7 +286,7 @@ const calculateTaxData = () => {
 // Content component for Tax & Profit tab
 const TaxAndProfitContent = () => {
   const taxData = calculateTaxData();
-  
+
   return (
     <div className="bg-[#172033] text-white p-6 space-y-8">
       <div className="flex justify-between items-center">
@@ -308,7 +308,7 @@ const TaxAndProfitContent = () => {
         <div className="border-b border-gray-700 p-4">
           <h3 className="text-lg font-semibold">Realized Gains & Losses</h3>
         </div>
-        <div className="p-6">
+    <div className="p-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="space-y-1">
               <div className="text-sm text-gray-400">Short-Term Gains</div>
@@ -601,10 +601,10 @@ const InKindTransferContent = () => {
                         <option key={account.id} value={account.id}>
                           {account.name} (${account.balance.toLocaleString()})
                         </option>
-                      ))}
-                    </select>
-                  </div>
-                  
+          ))}
+        </select>
+      </div>
+
                   <div className="space-y-2">
                     <label className="block text-sm text-gray-400">To</label>
                     <select className="w-full bg-[#2D3748] text-white border border-gray-700 rounded-md px-3 py-2">
@@ -1203,20 +1203,20 @@ const GoalSystemContent = () => {
       {activeGoalTab === 'goals' && (
         <div className="space-y-8">
           {/* Goals Summary */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="bg-[#1D2939] rounded-lg p-6">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold">Total Goals</h3>
                 <span className="bg-blue-900/30 text-blue-400 rounded-full px-3 py-1 text-sm font-medium">
                   {goalsData.investmentGoals.length}
                 </span>
-              </div>
+            </div>
               <div className="text-3xl font-bold mb-1">
                 ${goalsData.investmentGoals.reduce((sum, goal) => sum + goal.target, 0).toLocaleString()}
               </div>
               <div className="text-sm text-gray-400">Combined target amount</div>
-            </div>
-            
+          </div>
+
             <div className="bg-[#1D2939] rounded-lg p-6">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold">Current Progress</h3>
@@ -1267,10 +1267,10 @@ const GoalSystemContent = () => {
                       onClick={() => setSelectedGoal(selectedGoal === goal.id ? null : goal.id)}
                     >
                       <div className="flex justify-between items-start mb-3">
-                        <div>
+              <div>
                           <h4 className="text-lg font-medium text-white">{goal.name}</h4>
                           <div className="text-sm text-gray-400 mt-1">Target: ${goal.target.toLocaleString()} by {new Date(goal.targetDate).toLocaleDateString('en-US', { year: 'numeric', month: 'short' })}</div>
-                        </div>
+                </div>
                         <div className="text-right">
                           <div className="font-semibold text-lg">${goal.current.toLocaleString()}</div>
                           <div className="text-sm text-gray-400">Current value</div>
@@ -1402,13 +1402,13 @@ const GoalSystemContent = () => {
                           <div className="flex-grow">
                             <h5 className="font-medium text-white">{milestone.name}</h5>
                             <div className="text-sm text-gray-400">For goal: {relatedGoal?.name || 'Unknown'}</div>
-                          </div>
-                          <div className="text-right">
+              </div>
+              <div className="text-right">
                             <div className="font-medium">${milestone.target.toLocaleString()}</div>
                             <div className="text-xs text-green-400">
                               Completed {milestone.completedDate && new Date(milestone.completedDate).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
-                            </div>
-                          </div>
+                </div>
+              </div>
                         </div>
                       );
                     })}
@@ -1812,32 +1812,32 @@ const PortfolioSimulationContent = () => {
                         <span className="text-sm text-gray-300">{asset.name}</span>
                       </div>
                       <div className="text-sm font-medium">{asset.percentage}%</div>
-                    </div>
-                  ))}
+            </div>
+          ))}
                 </div>
-              </div>
-              
+        </div>
+
               <div>
                 <h4 className="text-white font-medium mb-3">Key Metrics</h4>
                 <div className="space-y-2">
                   <div className="flex justify-between">
                     <span className="text-sm text-gray-400">Monthly Savings Required:</span>
                     <span className="text-sm font-medium">${monthlyContribution.toLocaleString()}</span>
-                  </div>
+            </div>
                   <div className="flex justify-between">
                     <span className="text-sm text-gray-400">Success Probability:</span>
                     <span className="text-sm font-medium">
                       {simulationData.scenarioResults[selectedScenario].successRate}%
                     </span>
-                  </div>
+          </div>
                   <div className="flex justify-between">
                     <span className="text-sm text-gray-400">Potential Annual Income:</span>
                     <span className="text-sm font-medium">
                       {formatCurrency(simulationData.scenarioResults[selectedScenario].annualIncome)}
                     </span>
-                  </div>
-                </div>
-              </div>
+        </div>
+      </div>
+    </div>
               
               <div className="pt-4">
                 <button className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-md">
@@ -2617,6 +2617,307 @@ const ActivityContent = () => {
   );
 };
 
+const getFundingData = () => {
+  return {
+    accounts: [
+      {
+        id: 1,
+        name: 'Primary Checking',
+        bankName: 'Chase Bank',
+        accountNumber: '****1234',
+        status: 'Verified',
+        type: 'ACH'
+      },
+      {
+        id: 2,
+        name: 'Savings Account',
+        bankName: 'Bank of America',
+        accountNumber: '****5678',
+        status: 'Verified',
+        type: 'ACH'
+      }
+    ],
+    pendingDeposits: [
+      {
+        id: 101,
+        date: 'May 15, 2025',
+        amount: 500.00,
+        status: 'Pending',
+        estimatedCompletion: 'May 17, 2025',
+        source: 'Primary Checking'
+      }
+    ],
+    recentTransactions: [
+      {
+        id: 201,
+        date: 'May 1, 2025',
+        type: 'Deposit',
+        amount: 1000.00,
+        status: 'Completed',
+        source: 'Primary Checking'
+      },
+      {
+        id: 202,
+        date: 'Apr 15, 2025',
+        type: 'Withdrawal',
+        amount: 250.00,
+        status: 'Completed',
+        destination: 'Primary Checking'
+      },
+      {
+        id: 203,
+        date: 'Apr 1, 2025',
+        type: 'Deposit',
+        amount: 1000.00,
+        status: 'Completed',
+        source: 'Primary Checking'
+      }
+    ]
+  };
+};
+
+const FundingContent = () => {
+  const fundingData = getFundingData();
+  const portfolioData = getPortfolioData();
+  
+  return (
+    <div className="space-y-8">
+      {/* Header with Add Account Button */}
+      <div className="flex justify-between items-center">
+        <h1 className="text-2xl font-semibold">Funding Sources</h1>
+        <button className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded flex items-center">
+          <span className="mr-2">+</span>
+          Add Bank Account
+        </button>
+      </div>
+      
+      {/* Linked Accounts */}
+      <div className="bg-[#1D2939] rounded-lg p-6">
+        <h2 className="text-xl font-semibold mb-4">Linked Accounts</h2>
+        
+        <div className="overflow-x-auto">
+          <table className="min-w-full">
+            <thead>
+              <tr className="text-gray-400 text-left">
+                <th className="pb-3 font-medium">Account Name</th>
+                <th className="pb-3 font-medium">Bank</th>
+                <th className="pb-3 font-medium">Account Number</th>
+                <th className="pb-3 font-medium">Status</th>
+                <th className="pb-3 font-medium">Type</th>
+                <th className="pb-3 font-medium">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-700">
+              {fundingData.accounts.map(account => (
+                <tr key={account.id} className="text-gray-200">
+                  <td className="py-4">{account.name}</td>
+                  <td className="py-4">{account.bankName}</td>
+                  <td className="py-4">{account.accountNumber}</td>
+                  <td className="py-4">
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                      {account.status}
+                    </span>
+                  </td>
+                  <td className="py-4">{account.type}</td>
+                  <td className="py-4">
+                    <button className="text-blue-400 hover:text-blue-300 mr-3">Edit</button>
+                    <button className="text-red-400 hover:text-red-300">Remove</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      
+      {/* Deposit/Withdraw Card */}
+      <div className="bg-[#1D2939] rounded-lg p-6">
+        <h2 className="text-xl font-semibold mb-6">Move Money</h2>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          {/* Deposit Section */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-medium text-blue-400">Deposit Funds</h3>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-gray-400 mb-1 text-sm">From Account</label>
+                <select className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-white">
+                  {fundingData.accounts.map(account => (
+                    <option key={account.id} value={account.id}>{account.name} ({account.bankName})</option>
+                  ))}
+                </select>
+              </div>
+              
+              <div>
+                <label className="block text-gray-400 mb-1 text-sm">Amount</label>
+                <div className="relative">
+                  <span className="absolute left-3 top-2 text-gray-400">$</span>
+                  <input
+                    type="number"
+                    placeholder="0.00"
+                    className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 pl-7 text-white"
+                  />
+                </div>
+              </div>
+              
+              <div>
+                <label className="block text-gray-400 mb-1 text-sm">Frequency</label>
+                <select className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-white">
+                  <option>One-time</option>
+                  <option>Weekly</option>
+                  <option>Bi-weekly</option>
+                  <option>Monthly</option>
+                </select>
+              </div>
+              
+              <button className="w-full bg-blue-500 hover:bg-blue-600 text-white py-2 rounded">
+                Deposit Funds
+              </button>
+            </div>
+          </div>
+          
+          {/* Withdraw Section */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-medium text-orange-400">Withdraw Funds</h3>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-gray-400 mb-1 text-sm">To Account</label>
+                <select className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-white">
+                  {fundingData.accounts.map(account => (
+                    <option key={account.id} value={account.id}>{account.name} ({account.bankName})</option>
+                  ))}
+                </select>
+              </div>
+              
+              <div>
+                <label className="block text-gray-400 mb-1 text-sm">Amount</label>
+                <div className="relative">
+                  <span className="absolute left-3 top-2 text-gray-400">$</span>
+                  <input
+                    type="number"
+                    placeholder="0.00"
+                    className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 pl-7 text-white"
+                  />
+                </div>
+              </div>
+              
+              <div>
+                <p className="text-gray-400 text-sm mb-2">Available to withdraw: <span className="text-white font-medium">${portfolioData.cash.toLocaleString()}</span></p>
+                <p className="text-gray-400 text-sm">Funds will be available in 2-3 business days</p>
+              </div>
+              
+              <button className="w-full bg-orange-500 hover:bg-orange-600 text-white py-2 rounded">
+                Withdraw Funds
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      {/* Pending Transactions */}
+      {fundingData.pendingDeposits.length > 0 && (
+        <div className="bg-[#1D2939] rounded-lg p-6">
+          <h2 className="text-xl font-semibold mb-4">Pending Transactions</h2>
+          
+          <div className="overflow-x-auto">
+            <table className="min-w-full">
+              <thead>
+                <tr className="text-gray-400 text-left">
+                  <th className="pb-3 font-medium">Date</th>
+                  <th className="pb-3 font-medium">Type</th>
+                  <th className="pb-3 font-medium">Amount</th>
+                  <th className="pb-3 font-medium">Status</th>
+                  <th className="pb-3 font-medium">Estimated Completion</th>
+                  <th className="pb-3 font-medium">Source/Destination</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-700">
+                {fundingData.pendingDeposits.map(transaction => (
+                  <tr key={transaction.id} className="text-gray-200">
+                    <td className="py-4">{transaction.date}</td>
+                    <td className="py-4">Deposit</td>
+                    <td className="py-4 text-green-400">${transaction.amount.toLocaleString()}</td>
+                    <td className="py-4">
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                        {transaction.status}
+                      </span>
+                    </td>
+                    <td className="py-4">{transaction.estimatedCompletion}</td>
+                    <td className="py-4">{transaction.source}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+      
+      {/* Transaction History */}
+      <div className="bg-[#1D2939] rounded-lg p-6">
+        <h2 className="text-xl font-semibold mb-4">Transaction History</h2>
+        
+        <div className="mb-4 flex justify-between items-center">
+          <div className="flex space-x-2">
+            <button className="px-3 py-1 bg-gray-800 rounded text-gray-300 text-sm">All</button>
+            <button className="px-3 py-1 bg-gray-800 rounded text-gray-300 text-sm">Deposits</button>
+            <button className="px-3 py-1 bg-gray-800 rounded text-gray-300 text-sm">Withdrawals</button>
+          </div>
+          
+          <div className="flex items-center">
+            <span className="text-gray-400 text-sm mr-2">Date Range:</span>
+            <select className="bg-gray-800 border border-gray-700 rounded px-2 py-1 text-sm text-white">
+              <option>Last 30 days</option>
+              <option>Last 3 months</option>
+              <option>Last 6 months</option>
+              <option>Last year</option>
+              <option>All time</option>
+            </select>
+          </div>
+        </div>
+        
+        <div className="overflow-x-auto">
+          <table className="min-w-full">
+            <thead>
+              <tr className="text-gray-400 text-left">
+                <th className="pb-3 font-medium">Date</th>
+                <th className="pb-3 font-medium">Type</th>
+                <th className="pb-3 font-medium">Amount</th>
+                <th className="pb-3 font-medium">Status</th>
+                <th className="pb-3 font-medium">Source/Destination</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-700">
+              {fundingData.recentTransactions.map(transaction => (
+                <tr key={transaction.id} className="text-gray-200">
+                  <td className="py-4">{transaction.date}</td>
+                  <td className="py-4">{transaction.type}</td>
+                  <td className={`py-4 ${transaction.type === 'Deposit' ? 'text-green-400' : 'text-orange-400'}`}>
+                    {transaction.type === 'Deposit' ? '+' : '-'}${transaction.amount.toLocaleString()}
+                  </td>
+                  <td className="py-4">
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                      {transaction.status}
+                    </span>
+                  </td>
+                  <td className="py-4">{transaction.source || transaction.destination}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        
+        <div className="mt-4 flex justify-center">
+          <button className="text-blue-400 hover:text-blue-300 text-sm">
+            View More Transactions
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export default function Portfolio() {
   const [activeTab, setActiveTab] = useState('portfolio');
   const [selectedTimeframe, setSelectedTimeframe] = useState('1M');
@@ -2821,6 +3122,8 @@ export default function Portfolio() {
         return <PortfolioSimulationContent />;
       case 'activity':
         return <ActivityContentComponent />;
+      case 'funding':
+        return <FundingContent />;
       case 'portfolio':
       default:
         return (

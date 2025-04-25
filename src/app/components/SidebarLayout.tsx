@@ -8,6 +8,7 @@ const tabs = [
   { name: 'Portfolio', href: '/portfolio' },
   { name: 'Brokerage', href: '/brokerage' },
   { name: 'News', href: '/news' },
+  { name: 'Funding', href: '/funding' },
   { name: 'Settings', href: '/settings' },
 ]
 
