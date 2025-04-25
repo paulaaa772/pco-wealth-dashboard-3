@@ -25,6 +25,7 @@ interface Transaction {
   fromAccount?: string;
   toAccount?: string;
   description?: string;
+  method?: string;
 }
 
 // Recurring transfer interface
@@ -54,7 +55,7 @@ const FundingContent: React.FC = () => {
   
   // Form states
   const [amount, setAmount] = useState<string>('');
-  const [selectedMethod, setSelectedMethod] = useState<string | null>(null);
+  const [selectedMethod, setSelectedMethod] = useState<string>('');
   const [selectedDepositAccount, setSelectedDepositAccount] = useState<string>('');
   const [selectedWithdrawAccount, setSelectedWithdrawAccount] = useState<string>('');
   const [recurringAmount, setRecurringAmount] = useState<string>('');
@@ -106,7 +107,8 @@ const FundingContent: React.FC = () => {
       amount: 1000.00,
       fromAccount: 'Primary Checking',
       toAccount: 'Brokerage',
-      description: 'Monthly investment'
+      description: 'Monthly investment',
+      method: 'Chase Bank'
     },
     {
       id: 'tx2',
@@ -116,7 +118,8 @@ const FundingContent: React.FC = () => {
       amount: 500.00,
       fromAccount: 'Brokerage',
       toAccount: 'Primary Checking',
-      description: 'Emergency withdrawal'
+      description: 'Emergency withdrawal',
+      method: 'Chase Bank'
     },
     {
       id: 'tx3',
@@ -126,7 +129,8 @@ const FundingContent: React.FC = () => {
       amount: 250.00,
       fromAccount: 'Primary Checking',
       toAccount: 'Brokerage',
-      description: 'Weekly recurring investment'
+      description: 'Weekly recurring investment',
+      method: 'Chase Bank'
     },
     {
       id: 'tx4',
@@ -136,7 +140,8 @@ const FundingContent: React.FC = () => {
       amount: 2500.00,
       fromAccount: 'Savings Account',
       toAccount: 'Brokerage',
-      description: 'Investment deposit'
+      description: 'Investment deposit',
+      method: 'Visa'
     },
     {
       id: 'tx5',
@@ -145,7 +150,8 @@ const FundingContent: React.FC = () => {
       status: 'completed',
       amount: 32.15,
       toAccount: 'Brokerage',
-      description: 'Dividend payment'
+      description: 'Dividend payment',
+      method: 'Bitcoin Wallet'
     }
   ]);
   
@@ -506,6 +512,7 @@ const FundingContent: React.FC = () => {
                         onChange={(e) => setSelectedMethod(e.target.value)}
                         className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
                       >
+                        <option value="">Select a funding method</option>
                         <option value="bank">Bank Transfer (ACH)</option>
                         <option value="wire">Wire Transfer</option>
                         <option value="card">Debit Card</option>
