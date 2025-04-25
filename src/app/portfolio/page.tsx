@@ -122,7 +122,24 @@ const holdingsData: Holding[] = [
   { name: "MicroStrategy", symbol: "MSTR", quantity: 0, value: 0.00 },
   { name: "Fundrise Portfolio", symbol: "Fundrise", quantity: 1, value: 1117.70 },
   { name: "Bitcoin", symbol: "BTC", quantity: 0.05, value: 3000.00 },
-  { name: "High-Yield Savings", symbol: "HYSA", quantity: 1, value: 12000.00 }
+  { name: "High-Yield Savings", symbol: "HYSA", quantity: 1, value: 12000.00 },
+  
+  // New investments from retirement accounts
+  { name: "BlackRock Equity Index Fund GG", symbol: "BEIFGG", quantity: 1, value: 16962.49 },
+  { name: "Large Cap Growth III Fund (AmerCentury)", symbol: "LCGFAC", quantity: 1, value: 16011.20 },
+  { name: "American Funds Growth Fund of Amer R6", symbol: "RGAGX", quantity: 1, value: 10972.12 },
+  { name: "Great-West Life Stock", symbol: "GWO", quantity: 1, value: 5478.62 },
+  { name: "BlackRock US Debt Index Fund L", symbol: "BRDIX", quantity: 1, value: 3137.62 },
+  { name: "American Funds Capital World G/I R6", symbol: "RWIGX", quantity: 1, value: 3000.52 },
+  { name: "BlackRock Mid Capitalization Eqy Index J", symbol: "BMCIX", quantity: 1, value: 2681.10 },
+  { name: "BlackRock Russell 2000 Index J", symbol: "BR2KX", quantity: 1, value: 2626.73 },
+  { name: "BlackRock MSCI EAFE Equity Index Fund M", symbol: "BEIFM", quantity: 1, value: 113.19 },
+  { name: "Mid Cap Growth / Artisan Partners Fund", symbol: "ARTMX", quantity: 1, value: 81.43 },
+  { name: "Allspring Small Company Growth Inst", symbol: "WSCGX", quantity: 1, value: 40.15 },
+  { name: "American Beacon Small Cap Value Cl I CIT", symbol: "ABSCI", quantity: 1, value: 39.45 },
+  { name: "Allspring Special Mid Cap Value CIT E2", symbol: "ASMCE", quantity: 1, value: 39.10 },
+  { name: "Capital Group EuroPacific Growth SA", symbol: "CEUSX", quantity: 1, value: 32.18 },
+  { name: "Empower Multi-Sector Bond Inst", symbol: "EMPBX", quantity: 1, value: 29.97 }
 ];
 
 // Content components for different tabs
