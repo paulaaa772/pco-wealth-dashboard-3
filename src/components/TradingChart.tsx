@@ -3,9 +3,8 @@
 import React, { useRef, useEffect, useState } from 'react'
 import { createChart, IChartApi, ISeriesApi, ChartOptions, DeepPartial, ColorType, LineStyle, CrosshairMode, Time } from 'lightweight-charts'
 import IndicatorSelector from './IndicatorSelector'
-import { indicatorDefinitions } from '@/app/components/indicators/IndicatorComponents'
-// Remove conflicting import and use our own interface definition
-// import { ManualOrder } from './brokerage/OrderEntryPanel'
+import TradingTools, { DrawingTool } from './TradingTools' 
+import DrawingCanvas from './DrawingCanvas'
 
 // Define interfaces for the data
 export interface CandleData {
@@ -42,6 +41,8 @@ const TradingChart: React.FC<TradingChartProps> = ({ symbol, data, manualTrades 
   const [indicators, setIndicators] = useState<string[]>(selectedIndicators);
   const [error, setError] = useState<string | null>(null);
   const [lastPrice, setLastPrice] = useState<number | null>(null);
+  const [activeTool, setActiveTool] = useState<DrawingTool>('none');
+  const [chartDimensions, setChartDimensions] = useState({ width: 0, height: 0 });
   
   // Format data for lightweight-charts
   const formatChartData = (data: CandleData[]) => {
@@ -182,11 +183,20 @@ const TradingChart: React.FC<TradingChartProps> = ({ symbol, data, manualTrades 
       }
     }
     
+    // Store chart dimensions for drawing canvas
+    setChartDimensions({
+      width: chartContainerRef.current.clientWidth,
+      height: 500
+    });
+    
     // Handle window resize
     const handleResize = () => {
       if (chart.current && chartContainerRef.current) {
-        chart.current.applyOptions({ 
-          width: chartContainerRef.current.clientWidth 
+        const newWidth = chartContainerRef.current.clientWidth;
+        chart.current.applyOptions({ width: newWidth });
+        setChartDimensions({
+          width: newWidth,
+          height: 500
         });
       }
     };
@@ -241,6 +251,22 @@ const TradingChart: React.FC<TradingChartProps> = ({ symbol, data, manualTrades 
     
     return result;
   };
+  
+  // Handle drawing tool selection
+  const handleSelectTool = (tool: DrawingTool) => {
+    setActiveTool(tool);
+  };
+  
+  // Handle clearing all drawings
+  const handleClearDrawings = () => {
+    // This will be passed to the DrawingCanvas component
+    console.log('Clearing all drawings');
+  };
+  
+  // Handle when a drawing is completed
+  const handleDrawingComplete = (drawing: any) => {
+    console.log('Drawing completed:', drawing);
+  };
 
   return (
     <div className="w-full h-full flex flex-col">
@@ -250,20 +276,45 @@ const TradingChart: React.FC<TradingChartProps> = ({ symbol, data, manualTrades 
         </div>
       )}
       
-      {(!data || data.length === 0) ? (
-        <div className="flex-grow flex items-center justify-center text-gray-500">
-          No data available for {symbol}
-        </div>
-      ) : (
-        <div className="flex-grow min-h-[500px] relative" ref={chartContainerRef} />
-      )}
-      
-      <div className="flex justify-between items-center mt-2">
+      {/* Tools Bar */}
+      <div className="mb-2 flex justify-between">
+        <TradingTools
+          onSelectTool={handleSelectTool}
+          activeTool={activeTool}
+          onClearDrawings={handleClearDrawings}
+        />
+        
         <div className="text-sm text-gray-400">
           {lastPrice && (
             <span>Last: <span className="text-white font-medium">${lastPrice.toFixed(2)}</span></span>
           )}
         </div>
+      </div>
+      
+      {(!data || data.length === 0) ? (
+        <div className="flex-grow flex items-center justify-center text-gray-500">
+          No data available for {symbol}
+        </div>
+      ) : (
+        <div className="flex-grow min-h-[500px] relative">
+          {/* Chart Container */}
+          <div ref={chartContainerRef} className="w-full h-full" />
+          
+          {/* Drawing Canvas */}
+          {chartDimensions.width > 0 && (
+            <DrawingCanvas
+              activeTool={activeTool}
+              width={chartDimensions.width}
+              height={chartDimensions.height}
+              chartInstance={chart.current}
+              onDrawingComplete={handleDrawingComplete}
+              onClearDrawings={handleClearDrawings}
+            />
+          )}
+        </div>
+      )}
+      
+      <div className="mt-2">
         <IndicatorSelector
           onSelect={(name) => setIndicators((prev) => [...prev, name])}
         />
