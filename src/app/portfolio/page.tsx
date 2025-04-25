@@ -84,6 +84,47 @@ const portfolioData = {
   endDate: 'Apr 24, 2025'
 };
 
+// Define a type for holdings
+interface Holding {
+  name: string;
+  symbol: string;
+  quantity: number;
+  value: number;
+  sector?: string;
+}
+
+// Add the holdings data
+const holdingsData: Holding[] = [
+  { name: "Tencent", symbol: "TCEHY", quantity: 2, value: 111.84 },
+  { name: "Taiwan Semiconductor", symbol: "TSM", quantity: 2.17, value: 323.89 },
+  { name: "ASML Holding NV", symbol: "ASML", quantity: 1.04, value: 667.48 },
+  { name: "Morgan Stanley CD (4.2%)", symbol: "CD", quantity: 1, value: 2000.00 },
+  { name: "BlackRock Technology Opportuni", symbol: "BGSAX", quantity: 1, value: 57.38 },
+  { name: "Berkshire Hathaway B", symbol: "BRK.B", quantity: 2, value: 584.65 },
+  { name: "Caterpillar", symbol: "CAT", quantity: 2, value: 378.74 },
+  { name: "iShares Gold Trust", symbol: "IAU", quantity: 1, value: 59.66 },
+  { name: "Northrop Grumman", symbol: "NOC", quantity: 1, value: 507.62 },
+  { name: "Novo Nordisk ADR", symbol: "NVO", quantity: 1, value: 252.87 },
+  { name: "SPDR S&P 500 ETF", symbol: "SPY", quantity: 2, value: 310.10 },
+  { name: "Vanguard Dividend Appreciation", symbol: "VIG", quantity: 1, value: 192.36 },
+  { name: "Vanguard Total Stock Market ET", symbol: "VTI", quantity: 3, value: 465.21 },
+  { name: "Vanguard Growth ETF", symbol: "VUG", quantity: 2, value: 313.00 },
+  { name: "Consumer Discretionary SPDR", symbol: "XLY", quantity: 1, value: 155.05 },
+  { name: "Vistra Corp", symbol: "VST", quantity: 1, value: 50.00 },
+  { name: "Vanguard Real Estate ETF", symbol: "VNQ", quantity: 2, value: 180.00 },
+  { name: "Health Care Select Sector SPDR", symbol: "XLV", quantity: 1, value: 100.00 },
+  { name: "Pacer Data & Infra REIT ETF", symbol: "SRVR", quantity: 5, value: 120.00 },
+  { name: "NVIDIA", symbol: "NVDA", quantity: 14, value: 1260.00 },
+  { name: "Lam Research", symbol: "LRCX", quantity: 1, value: 900.00 },
+  { name: "Kratos Defense", symbol: "KTOS", quantity: 8, value: 120.00 },
+  { name: "Intel Corp", symbol: "INTC", quantity: 5, value: 185.00 },
+  { name: "Agrify Corp", symbol: "AGFY", quantity: 3, value: 5.00 },
+  { name: "MicroStrategy", symbol: "MSTR", quantity: 0, value: 0.00 },
+  { name: "Fundrise Portfolio", symbol: "Fundrise", quantity: 1, value: 1117.70 },
+  { name: "Bitcoin", symbol: "BTC", quantity: 0.05, value: 3000.00 },
+  { name: "High-Yield Savings", symbol: "HYSA", quantity: 1, value: 12000.00 }
+];
+
 // Content components for different tabs
 const TaxAndProfitContent = () => <div className="p-4">Tax and Profit content placeholder</div>;
 const InKindTransferContent = () => <div className="p-4">In-Kind Transfer content placeholder</div>;
@@ -95,6 +136,11 @@ export default function Portfolio() {
   const [selectedTimeframe, setSelectedTimeframe] = useState('1M');
   const [isLoading, setIsLoading] = useState(true);
   const [netWorthData, setNetWorthData] = useState<DataPoint[]>([]);
+  
+  // Add state for holdings filtering and sorting
+  const [holdingsFilter, setHoldingsFilter] = useState('');
+  const [holdingsSortField, setHoldingsSortField] = useState<'name' | 'value'>('value');
+  const [holdingsSortDirection, setHoldingsSortDirection] = useState<'asc' | 'desc'>('desc');
   
   const timeframes = [
     { id: '1D', label: '1D' },
@@ -132,6 +178,146 @@ export default function Portfolio() {
       </div>
     );
   }
+  
+  // Add a function to render the Holdings tab content
+  const renderHoldingsTab = () => {
+    // Filter the holdings based on search
+    const filteredHoldings = holdingsData.filter(holding => 
+      holding.name.toLowerCase().includes(holdingsFilter.toLowerCase()) || 
+      holding.symbol.toLowerCase().includes(holdingsFilter.toLowerCase())
+    );
+    
+    // Sort the holdings
+    const sortedHoldings = [...filteredHoldings].sort((a, b) => {
+      if (holdingsSortField === 'name') {
+        return holdingsSortDirection === 'asc' 
+          ? a.name.localeCompare(b.name) 
+          : b.name.localeCompare(a.name);
+      } else {
+        return holdingsSortDirection === 'asc' 
+          ? a.value - b.value 
+          : b.value - a.value;
+      }
+    });
+    
+    // Calculate total portfolio value
+    const totalValue = holdingsData.reduce((sum, holding) => sum + holding.value, 0);
+    
+    return (
+      <div className="bg-[#172033] text-white p-6">
+        <div className="mb-6">
+          <h2 className="text-2xl font-semibold mb-2">Holdings</h2>
+          <p className="text-gray-400">Total Portfolio Value: ${totalValue.toLocaleString()}</p>
+        </div>
+        
+        {/* Search and Sort Controls */}
+        <div className="flex flex-col md:flex-row justify-between mb-6 gap-4">
+          <div className="relative">
+            <input
+              type="text"
+              placeholder="Search holdings..."
+              value={holdingsFilter}
+              onChange={(e) => setHoldingsFilter(e.target.value)}
+              className="bg-[#1D2939] text-white border border-gray-700 rounded-md p-2 pl-8 w-full md:w-64"
+            />
+            <svg className="absolute left-2 top-3 h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+          </div>
+          <div className="flex items-center space-x-4">
+            <span className="text-gray-400">Sort by:</span>
+            <button
+              onClick={() => {
+                setHoldingsSortField('name');
+                if (holdingsSortField === 'name') {
+                  setHoldingsSortDirection(holdingsSortDirection === 'asc' ? 'desc' : 'asc');
+                } else {
+                  setHoldingsSortDirection('asc');
+                }
+              }}
+              className={`px-3 py-1 rounded ${
+                holdingsSortField === 'name' ? 'bg-blue-600 text-white' : 'bg-[#1D2939] text-gray-300'
+              }`}
+            >
+              Name {holdingsSortField === 'name' && (holdingsSortDirection === 'asc' ? '↑' : '↓')}
+            </button>
+            <button
+              onClick={() => {
+                setHoldingsSortField('value');
+                if (holdingsSortField === 'value') {
+                  setHoldingsSortDirection(holdingsSortDirection === 'asc' ? 'desc' : 'asc');
+                } else {
+                  setHoldingsSortDirection('desc');
+                }
+              }}
+              className={`px-3 py-1 rounded ${
+                holdingsSortField === 'value' ? 'bg-blue-600 text-white' : 'bg-[#1D2939] text-gray-300'
+              }`}
+            >
+              Value {holdingsSortField === 'value' && (holdingsSortDirection === 'asc' ? '↑' : '↓')}
+            </button>
+          </div>
+        </div>
+        
+        {/* Holdings Table */}
+        <div className="bg-[#1D2939] rounded-lg overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-700">
+              <thead className="bg-[#1A202C]">
+                <tr>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                    Name
+                  </th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                    Symbol
+                  </th>
+                  <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">
+                    Quantity
+                  </th>
+                  <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">
+                    Value
+                  </th>
+                  <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">
+                    % of Portfolio
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-700">
+                {sortedHoldings.map((holding, index) => {
+                  const percentage = (holding.value / totalValue) * 100;
+                  return (
+                    <tr key={index} className="hover:bg-[#2D3748]">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-white">
+                        {holding.name}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
+                        {holding.symbol}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-gray-300">
+                        {holding.quantity}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-white">
+                        ${holding.value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-gray-300">
+                        {percentage.toFixed(2)}%
+                        <div className="w-full bg-gray-700 h-1 mt-1 rounded-full overflow-hidden">
+                          <div 
+                            className="bg-blue-500 h-1 rounded-full" 
+                            style={{ width: `${percentage}%` }}
+                          ></div>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    );
+  };
   
   const renderContent = () => {
     switch(activeTab) {
@@ -468,153 +654,161 @@ export default function Portfolio() {
           
           {/* Main Content */}
           <div>
-            <h2 className="text-2xl font-semibold mb-6">Stocks</h2>
+            {activeTab === 'portfolio' && (
+              <>
+                <h2 className="text-2xl font-semibold mb-6">Stocks</h2>
+                
+                {/* Cash, Margin, Buying Power Metrics */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
+                  <div>
+                    <div className="flex items-center">
+                      <span className="text-gray-400 mr-2">Cash</span>
+                      <div className="bg-gray-700 rounded-full w-4 h-4 flex items-center justify-center text-xs">?</div>
+                    </div>
+                    <div className="text-xl font-bold">${portfolioData.cash.toLocaleString()}</div>
+                  </div>
+                  
+                  <div>
+                    <div className="flex items-center">
+                      <span className="text-gray-400 mr-2">Margin</span>
+                      <div className="bg-gray-700 rounded-full w-4 h-4 flex items-center justify-center text-xs">?</div>
+                    </div>
+                    <div className="text-xl font-bold text-blue-400">${portfolioData.margin.toLocaleString()} ›</div>
+                  </div>
+                  
+                  <div>
+                    <span className="text-gray-400">Total buying power</span>
+                    <div className="text-xl font-bold">${portfolioData.buyingPower.toLocaleString()}</div>
+                  </div>
+                  
+                  <div className="md:col-span-3 flex justify-end">
+                    <button className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded">
+                      Move money
+                    </button>
+                  </div>
+                </div>
+                
+                <div className="flex flex-col lg:flex-row gap-8">
+                  {/* Left side - Donut Chart */}
+                  <div className="w-full lg:w-1/3">
+                    <div className="bg-[#1D2939] rounded-lg p-6 h-full">
+                      <div className="text-center">
+                        <div className="text-4xl font-bold mb-1">${portfolioData.totalValue.toLocaleString()}</div>
+                        <div className="text-sm text-gray-400">as of {portfolioData.date}</div>
+                      </div>
+                      
+                      <div className="mt-4">
+                        <DonutChart 
+                          data={allocationData} 
+                          width={250} 
+                          height={250} 
+                          innerRadius={70} 
+                          outerRadius={110} 
+                        />
+                      </div>
+                      
+                      {/* Action Buttons */}
+                      <div className="mt-6 grid grid-cols-5 gap-2">
+                        <div className="flex flex-col items-center">
+                          <button className="w-12 h-12 rounded-full bg-gray-700 hover:bg-gray-600 flex items-center justify-center mb-1">
+                            <Plus className="h-6 w-6" />
+                          </button>
+                          <span className="text-xs text-gray-300">Buy</span>
+                        </div>
+                        
+                        <div className="flex flex-col items-center">
+                          <button className="w-12 h-12 rounded-full bg-gray-700 hover:bg-gray-600 flex items-center justify-center mb-1">
+                            <MinusCircle className="h-6 w-6" />
+                          </button>
+                          <span className="text-xs text-gray-300">Sell</span>
+                        </div>
+                        
+                        <div className="flex flex-col items-center">
+                          <button className="w-12 h-12 rounded-full bg-gray-700 hover:bg-gray-600 flex items-center justify-center mb-1">
+                            <RefreshCw className="h-6 w-6" />
+                          </button>
+                          <span className="text-xs text-gray-300">Rebalance</span>
+                        </div>
+                        
+                        <div className="flex flex-col items-center">
+                          <button className="w-12 h-12 rounded-full bg-gray-700 hover:bg-gray-600 flex items-center justify-center mb-1">
+                            <Edit className="h-6 w-6" />
+                          </button>
+                          <span className="text-xs text-gray-300">Edit</span>
+                        </div>
+                        
+                        <div className="flex flex-col items-center">
+                          <button className="w-12 h-12 rounded-full bg-gray-700 hover:bg-gray-600 flex items-center justify-center mb-1">
+                            <Share2 className="h-6 w-6" />
+                          </button>
+                          <span className="text-xs text-gray-300">Share</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Right side - Line Chart */}
+                  <div className="w-full lg:w-2/3">
+                    <div className="bg-[#1D2939] rounded-lg p-6">
+                      {/* Time Frame Buttons */}
+                      <div className="flex justify-end mb-4">
+                        {timeframes.map((tf) => (
+                          <button
+                            key={tf.id}
+                            onClick={() => setSelectedTimeframe(tf.id)}
+                            className={`px-2 py-1 text-xs rounded mx-1 ${
+                              selectedTimeframe === tf.id
+                                ? 'bg-blue-500 text-white'
+                                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                            }`}
+                          >
+                            {tf.label}
+                          </button>
+                        ))}
+                      </div>
+                      
+                      {/* Net Worth Chart */}
+                      <div className="h-64">
+                        <NetWorthChart 
+                          data={netWorthData}
+                          title=""
+                          height={256}
+                          timeframes={['1D', '1W', '1M', '3M', '6M', 'YTD', '1Y']}
+                          darkMode={true}
+                        />
+                      </div>
+                      
+                      {/* Portfolio Performance Metrics */}
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-8">
+                        <div>
+                          <div className="text-gray-400 text-sm">Starting value: {portfolioData.startDate}</div>
+                          <div className="font-medium">${portfolioData.startValue.toLocaleString()}</div>
+                        </div>
+                        
+                        <div>
+                          <div className="text-gray-400 text-sm">Ending value: {portfolioData.endDate}</div>
+                          <div className="font-medium">${portfolioData.endValue.toLocaleString()}</div>
+                        </div>
+                        
+                        <div>
+                          <div className="text-gray-400 text-sm">Net cash flow</div>
+                          <div className="font-medium">${portfolioData.netCashFlow.toLocaleString()}</div>
+                        </div>
+                        
+                        <div>
+                          <div className="text-gray-400 text-sm">Money weighted rate of return</div>
+                          <div className="font-medium text-red-500">↓ {portfolioData.returnRate}%</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
             
-            {/* Cash, Margin, Buying Power Metrics */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
-              <div>
-                <div className="flex items-center">
-                  <span className="text-gray-400 mr-2">Cash</span>
-                  <div className="bg-gray-700 rounded-full w-4 h-4 flex items-center justify-center text-xs">?</div>
-                </div>
-                <div className="text-xl font-bold">${portfolioData.cash.toLocaleString()}</div>
-              </div>
-              
-              <div>
-                <div className="flex items-center">
-                  <span className="text-gray-400 mr-2">Margin</span>
-                  <div className="bg-gray-700 rounded-full w-4 h-4 flex items-center justify-center text-xs">?</div>
-                </div>
-                <div className="text-xl font-bold text-blue-400">${portfolioData.margin.toLocaleString()} ›</div>
-              </div>
-              
-              <div>
-                <span className="text-gray-400">Total buying power</span>
-                <div className="text-xl font-bold">${portfolioData.buyingPower.toLocaleString()}</div>
-              </div>
-              
-              <div className="md:col-span-3 flex justify-end">
-                <button className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded">
-                  Move money
-                </button>
-              </div>
-            </div>
+            {activeTab === 'holdings' && renderHoldingsTab()}
             
-            <div className="flex flex-col lg:flex-row gap-8">
-              {/* Left side - Donut Chart */}
-              <div className="w-full lg:w-1/3">
-                <div className="bg-[#1D2939] rounded-lg p-6 h-full">
-                  <div className="text-center">
-                    <div className="text-4xl font-bold mb-1">${portfolioData.totalValue.toLocaleString()}</div>
-                    <div className="text-sm text-gray-400">as of {portfolioData.date}</div>
-                  </div>
-                  
-                  <div className="mt-4">
-                    <DonutChart 
-                      data={allocationData} 
-                      width={250} 
-                      height={250} 
-                      innerRadius={70} 
-                      outerRadius={110} 
-                    />
-                  </div>
-                  
-                  {/* Action Buttons */}
-                  <div className="mt-6 grid grid-cols-5 gap-2">
-                    <div className="flex flex-col items-center">
-                      <button className="w-12 h-12 rounded-full bg-gray-700 hover:bg-gray-600 flex items-center justify-center mb-1">
-                        <Plus className="h-6 w-6" />
-                      </button>
-                      <span className="text-xs text-gray-300">Buy</span>
-                    </div>
-                    
-                    <div className="flex flex-col items-center">
-                      <button className="w-12 h-12 rounded-full bg-gray-700 hover:bg-gray-600 flex items-center justify-center mb-1">
-                        <MinusCircle className="h-6 w-6" />
-                      </button>
-                      <span className="text-xs text-gray-300">Sell</span>
-                    </div>
-                    
-                    <div className="flex flex-col items-center">
-                      <button className="w-12 h-12 rounded-full bg-gray-700 hover:bg-gray-600 flex items-center justify-center mb-1">
-                        <RefreshCw className="h-6 w-6" />
-                      </button>
-                      <span className="text-xs text-gray-300">Rebalance</span>
-                    </div>
-                    
-                    <div className="flex flex-col items-center">
-                      <button className="w-12 h-12 rounded-full bg-gray-700 hover:bg-gray-600 flex items-center justify-center mb-1">
-                        <Edit className="h-6 w-6" />
-                      </button>
-                      <span className="text-xs text-gray-300">Edit</span>
-                    </div>
-                    
-                    <div className="flex flex-col items-center">
-                      <button className="w-12 h-12 rounded-full bg-gray-700 hover:bg-gray-600 flex items-center justify-center mb-1">
-                        <Share2 className="h-6 w-6" />
-                      </button>
-                      <span className="text-xs text-gray-300">Share</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              
-              {/* Right side - Line Chart */}
-              <div className="w-full lg:w-2/3">
-                <div className="bg-[#1D2939] rounded-lg p-6">
-                  {/* Time Frame Buttons */}
-                  <div className="flex justify-end mb-4">
-                    {timeframes.map((tf) => (
-                      <button
-                        key={tf.id}
-                        onClick={() => setSelectedTimeframe(tf.id)}
-                        className={`px-2 py-1 text-xs rounded mx-1 ${
-                          selectedTimeframe === tf.id
-                            ? 'bg-blue-500 text-white'
-                            : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                        }`}
-                      >
-                        {tf.label}
-                      </button>
-                    ))}
-                  </div>
-                  
-                  {/* Net Worth Chart */}
-                  <div className="h-64">
-                    <NetWorthChart 
-                      data={netWorthData}
-                      title=""
-                      height={256}
-                      timeframes={['1D', '1W', '1M', '3M', '6M', 'YTD', '1Y']}
-                      darkMode={true}
-                    />
-                  </div>
-                  
-                  {/* Portfolio Performance Metrics */}
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-8">
-                    <div>
-                      <div className="text-gray-400 text-sm">Starting value: {portfolioData.startDate}</div>
-                      <div className="font-medium">${portfolioData.startValue.toLocaleString()}</div>
-                    </div>
-                    
-                    <div>
-                      <div className="text-gray-400 text-sm">Ending value: {portfolioData.endDate}</div>
-                      <div className="font-medium">${portfolioData.endValue.toLocaleString()}</div>
-                    </div>
-                    
-                    <div>
-                      <div className="text-gray-400 text-sm">Net cash flow</div>
-                      <div className="font-medium">${portfolioData.netCashFlow.toLocaleString()}</div>
-                    </div>
-                    
-                    <div>
-                      <div className="text-gray-400 text-sm">Money weighted rate of return</div>
-                      <div className="font-medium text-red-500">↓ {portfolioData.returnRate}%</div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
+            {/* ... keep other tab content ... */}
           </div>
         </div>
         
