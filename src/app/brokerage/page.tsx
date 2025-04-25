@@ -70,6 +70,18 @@ export default function BrokeragePage() {
       
       // Load initial market data
       loadMarketData(service, symbol);
+      
+      // Set up interval for live data updates (every 30 seconds)
+      const dataRefreshInterval = setInterval(() => {
+        if (polygonService) {
+          console.log('Refreshing market data...');
+          loadMarketData(polygonService, symbol);
+        }
+      }, 30000); // 30 seconds
+      
+      return () => {
+        clearInterval(dataRefreshInterval);
+      };
     } catch (err: any) {
       console.error('Failed to initialize brokerage page:', err);
       setError(`Failed to initialize: ${err.message}`);
@@ -94,7 +106,7 @@ export default function BrokeragePage() {
     }
 
     try {
-      setIsLoading(true);
+      if (!isLoading) setIsLoading(true);
       setError(null);
       
       console.log(`Loading market data for ${sym}`);
@@ -116,7 +128,7 @@ export default function BrokeragePage() {
         'day'
       );
       
-      console.log('API Response:', response);
+      console.log('API Response length:', response?.length);
       
       if (response && response.length > 0) {
         // Store raw data

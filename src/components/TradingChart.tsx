@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useRef, useEffect, useState } from 'react'
-import { createChart, LineStyle, CrosshairMode } from 'lightweight-charts'
+import { createChart, IChartApi, ISeriesApi, ChartOptions, DeepPartial, ColorType, LineStyle, CrosshairMode, Time } from 'lightweight-charts'
 import IndicatorSelector from './IndicatorSelector'
 import { indicatorDefinitions } from '@/app/components/indicators/IndicatorComponents'
 // Remove conflicting import and use our own interface definition
@@ -36,240 +36,241 @@ interface TradingChartProps {
 }
 
 const TradingChart: React.FC<TradingChartProps> = ({ symbol, data, manualTrades = [], selectedIndicators = [] }) => {
-  const canvasRef = useRef<HTMLCanvasElement>(null)
-  const chart = useRef<any>(null)
-  const candleSeries = useRef<any>(null)
-  const [indicators, setIndicators] = useState<string[]>(selectedIndicators)
-  const [error, setError] = useState<string | null>(null)
-  const [canvasDims, setCanvasDims] = useState({ width: 0, height: 0 })
+  const chartContainerRef = useRef<HTMLDivElement>(null);
+  const chart = useRef<IChartApi | null>(null);
+  const candleSeries = useRef<ISeriesApi<"Candlestick"> | null>(null);
+  const [indicators, setIndicators] = useState<string[]>(selectedIndicators);
+  const [error, setError] = useState<string | null>(null);
+  const [lastPrice, setLastPrice] = useState<number | null>(null);
+  
+  // Format data for lightweight-charts
+  const formatChartData = (data: CandleData[]) => {
+    return data.map(candle => ({
+      time: candle.time as Time,
+      open: candle.open,
+      high: candle.high,
+      low: candle.low,
+      close: candle.close,
+    }));
+  };
 
-  // Handle canvas resize
+  // Initialize chart on mount
   useEffect(() => {
-    const updateDimensions = () => {
-      if (canvasRef.current) {
-        const canvas = canvasRef.current
-        const parent = canvas.parentElement
-        if (!parent) return
+    if (!chartContainerRef.current || !data || data.length === 0) return;
+    
+    // Log first data point for debugging
+    console.log(`Initializing chart for ${symbol} with ${data.length} data points`);
+    console.log('First data point:', data[0]);
+    
+    if (chartContainerRef.current.children.length > 0) {
+      chartContainerRef.current.innerHTML = '';
+    }
+    
+    // Chart options
+    const chartOptions: DeepPartial<ChartOptions> = {
+      width: chartContainerRef.current.clientWidth,
+      height: 500,
+      layout: {
+        background: { 
+          type: ColorType.Solid, 
+          color: '#151924' 
+        },
+        textColor: '#d1d4dc',
+        fontSize: 12,
+        fontFamily: 'Roboto, sans-serif',
+      },
+      grid: {
+        vertLines: {
+          color: '#1c2030',
+          style: LineStyle.Dotted,
+        },
+        horzLines: {
+          color: '#1c2030',
+          style: LineStyle.Dotted,
+        },
+      },
+      crosshair: {
+        mode: CrosshairMode.Normal,
+        vertLine: {
+          width: 1,
+          color: '#3c4158',
+          style: LineStyle.Solid,
+        },
+        horzLine: {
+          width: 1,
+          color: '#3c4158',
+          style: LineStyle.Solid,
+        },
+      },
+      rightPriceScale: {
+        borderColor: '#1c2030',
+        visible: true,
+        scaleMargins: {
+          top: 0.1,
+          bottom: 0.1,
+        },
+      },
+      timeScale: {
+        borderColor: '#1c2030',
+        timeVisible: true,
+        secondsVisible: false,
+      },
+      watermark: {
+        visible: true,
+        fontSize: 48,
+        horzAlign: 'center',
+        vertAlign: 'center',
+        color: 'rgba(25, 32, 45, 0.15)',
+        text: symbol,
+      },
+    };
+    
+    // Create chart instance
+    chart.current = createChart(chartContainerRef.current, chartOptions);
+    
+    // Add candlestick series
+    candleSeries.current = chart.current.addCandlestickSeries({
+      upColor: '#26a69a',
+      downColor: '#ef5350',
+      borderVisible: false,
+      wickUpColor: '#26a69a',
+      wickDownColor: '#ef5350',
+    });
+    
+    const formattedData = formatChartData(data);
+    
+    if (formattedData.length > 0) {
+      candleSeries.current.setData(formattedData);
+      
+      // Get last price for price line
+      const lastCandle = formattedData[formattedData.length - 1];
+      if (lastCandle) {
+        setLastPrice(lastCandle.close);
         
-        // Get parent dimensions, subtract padding
-        const parentStyle = window.getComputedStyle(parent)
-        const paddingLeft = parseFloat(parentStyle.paddingLeft || '0')
-        const paddingRight = parseFloat(parentStyle.paddingRight || '0')
-        const paddingTop = parseFloat(parentStyle.paddingTop || '0')
-        const paddingBottom = parseFloat(parentStyle.paddingBottom || '0')
-        
-        const width = parent.clientWidth - paddingLeft - paddingRight
-        const height = parent.clientHeight - paddingTop - paddingBottom
-        
-        // Set canvas dimensions
-        canvas.width = width
-        canvas.height = height
-        setCanvasDims({ width, height })
+        // Add price line for last price
+        candleSeries.current.createPriceLine({
+          price: lastCandle.close,
+          color: '#f5d142',
+          lineWidth: 2,
+          lineStyle: LineStyle.Dashed,
+          axisLabelVisible: true,
+          title: 'Last Price',
+        });
       }
     }
     
-    // Initial update and add resize listener
-    updateDimensions()
-    window.addEventListener('resize', updateDimensions)
+    // Add markers for manual trades
+    if (manualTrades && manualTrades.length > 0 && candleSeries.current) {
+      const markers = manualTrades.map(trade => {
+        if (!trade.timestamp) return null;
+        
+        // Find the closest candle time to the trade timestamp
+        const tradeDate = new Date(trade.timestamp);
+        const tradeTime = tradeDate.toISOString().split('T')[0];
+        
+        return {
+          time: tradeTime as Time,
+          position: trade.side === 'buy' ? 'belowBar' : 'aboveBar',
+          color: trade.side === 'buy' ? '#26a69a' : '#ef5350',
+          shape: trade.side === 'buy' ? 'arrowUp' : 'arrowDown',
+          text: `${trade.side.toUpperCase()} ${trade.amount} @ $${trade.entryPrice?.toFixed(2) || '0.00'}`
+        };
+      }).filter(Boolean);
+      
+      if (markers.length > 0) {
+        candleSeries.current.setMarkers(markers as any);
+      }
+    }
+    
+    // Handle window resize
+    const handleResize = () => {
+      if (chart.current && chartContainerRef.current) {
+        chart.current.applyOptions({ 
+          width: chartContainerRef.current.clientWidth 
+        });
+      }
+    };
+    
+    window.addEventListener('resize', handleResize);
     
     return () => {
-      window.removeEventListener('resize', updateDimensions)
-    }
-  }, [])
-
-  // Draw the chart when data or dimensions change
-  useEffect(() => {
-    const drawChart = () => {
-      if (!canvasRef.current || !data || data.length === 0) return
-      
-      console.log(`Drawing chart for ${symbol} with ${data.length} data points`);
-      console.log('First data point:', data[0]);
-      
-      const canvas = canvasRef.current
-      const ctx = canvas.getContext('2d')
-      if (!ctx) return
-      
-      // Clear canvas
-      ctx.clearRect(0, 0, canvas.width, canvas.height)
-      
-      // Set up chart dimensions
-      const margin = { top: 20, right: 60, bottom: 30, left: 60 }
-      const chartWidth = canvas.width - margin.left - margin.right
-      const chartHeight = canvas.height - margin.top - margin.bottom
-      
-      // Find min and max values
-      let minPrice = Number.MAX_VALUE
-      let maxPrice = Number.MIN_VALUE
-      
-      data.forEach(candle => {
-        // Skip any invalid data points
-        if (typeof candle.low !== 'number' || typeof candle.high !== 'number') {
-          console.warn('Invalid candle data point:', candle);
-          return;
-        }
-        minPrice = Math.min(minPrice, candle.low)
-        maxPrice = Math.max(maxPrice, candle.high)
-      })
-      
-      // Check if we have valid min/max values
-      if (minPrice === Number.MAX_VALUE || maxPrice === Number.MIN_VALUE) {
-        console.error('Could not determine price range from data');
-        return;
-      }
-      
-      // Add some padding to the min/max
-      const pricePadding = (maxPrice - minPrice) * 0.1
-      minPrice -= pricePadding
-      maxPrice += pricePadding
-      
-      // Calculate scale factors
-      const candleWidth = chartWidth / data.length
-      const priceScale = chartHeight / (maxPrice - minPrice)
-      
-      // Helper function to convert price to Y coordinate
-      const priceToY = (price: number) => 
-        margin.top + chartHeight - (price - minPrice) * priceScale
-      
-      // Draw grid lines and price labels
-      ctx.strokeStyle = '#444'
-      ctx.fillStyle = '#aaa'
-      ctx.font = '10px Arial'
-      ctx.textAlign = 'right'
-      
-      // Draw price grid lines (horizontal)
-      const priceStep = (maxPrice - minPrice) / 5
-      for (let i = 0; i <= 5; i++) {
-        const price = minPrice + priceStep * i
-        const y = priceToY(price)
-        
-        ctx.beginPath()
-        ctx.moveTo(margin.left, y)
-        ctx.lineTo(margin.left + chartWidth, y)
-        ctx.stroke()
-        
-        // Price label
-        ctx.fillText(price.toFixed(2), margin.left - 5, y + 4)
-      }
-      
-      // Draw time grid lines (vertical) - every 5th candle
-      ctx.textAlign = 'center'
-      for (let i = 0; i < data.length; i += 5) {
-        const x = margin.left + i * candleWidth + candleWidth / 2
-        
-        ctx.beginPath()
-        ctx.moveTo(x, margin.top)
-        ctx.lineTo(x, margin.top + chartHeight)
-        ctx.stroke()
-        
-        // Only show date for every 5th candle
-        if (i % 5 === 0 && data[i]) {
-          const dateStr = data[i].time.split('T')[0]
-          ctx.fillText(dateStr, x, margin.top + chartHeight + 15)
-        }
-      }
-      
-      // Draw each candle
-      data.forEach((candle, i) => {
-        if (!candle || typeof candle.open !== 'number' || typeof candle.high !== 'number' ||
-            typeof candle.low !== 'number' || typeof candle.close !== 'number') {
-          console.warn(`Invalid candle data at index ${i}:`, candle)
-          return
-        }
-        
-        const x = margin.left + i * candleWidth
-        const candleBodyWidth = Math.max(1, candleWidth * 0.8)
-        const bodyX = x + (candleWidth - candleBodyWidth) / 2
-        
-        // Calculate y coordinates
-        const openY = priceToY(candle.open)
-        const closeY = priceToY(candle.close)
-        const highY = priceToY(candle.high)
-        const lowY = priceToY(candle.low)
-        
-        // Determine if bullish (green) or bearish (red)
-        const isBullish = candle.close > candle.open
-        ctx.fillStyle = isBullish ? '#4caf50' : '#f44336'
-        ctx.strokeStyle = isBullish ? '#4caf50' : '#f44336'
-        
-        // Draw candle wick (high to low)
-        ctx.beginPath()
-        ctx.moveTo(x + candleWidth / 2, highY)
-        ctx.lineTo(x + candleWidth / 2, lowY)
-        ctx.stroke()
-        
-        // Draw candle body (open to close)
-        const bodyHeight = Math.max(1, Math.abs(closeY - openY))
-        const bodyY = isBullish ? closeY : openY
-        
-        ctx.fillRect(bodyX, bodyY, candleBodyWidth, bodyHeight)
-      })
-      
-      // Draw current price line and label
-      if (data.length > 0) {
-        const currentPrice = data[data.length - 1].close
-        const y = priceToY(currentPrice)
-        
-        // Draw line
-        ctx.beginPath()
-        ctx.strokeStyle = '#ffeb3b'
-        ctx.setLineDash([5, 3])
-        ctx.moveTo(margin.left, y)
-        ctx.lineTo(margin.left + chartWidth, y)
-        ctx.stroke()
-        ctx.setLineDash([])
-        
-        // Draw price label
-        ctx.fillStyle = '#ffeb3b'
-        ctx.textAlign = 'left'
-        ctx.fillText(`$${currentPrice.toFixed(2)}`, margin.left + chartWidth + 5, y + 4)
-      }
-      
-      // Draw symbol and a timestamp to identify the chart
-      ctx.fillStyle = '#aaa'
-      ctx.font = '14px Arial'
-      ctx.textAlign = 'left'
-      ctx.fillText(symbol, margin.left, margin.top - 5)
-      
-      // Draw timestamp
-      const now = new Date()
-      ctx.font = '10px Arial'
-      ctx.textAlign = 'right'
-      ctx.fillText(`Last updated: ${now.toLocaleTimeString()}`, margin.left + chartWidth, margin.top - 5)
-    }
-    
-    drawChart()
-  }, [symbol, data, canvasDims])
-
-  // Cleanup chart on component unmount
-  useEffect(() => {
-    return () => {
+      window.removeEventListener('resize', handleResize);
       if (chart.current) {
-        try { chart.current.remove(); } catch (e) {}
-        chart.current = null
+        chart.current.remove();
+        chart.current = null;
       }
-    }
-  }, [])
+    };
+  }, [symbol, data]);
 
-  // --- Rendering --- 
+  // Add selected indicators
+  useEffect(() => {
+    if (!chart.current || !candleSeries.current) return;
+    
+    // Reset for now - in a full implementation, we would track each indicator
+    // and only add/remove as needed
+    indicators.forEach(indicator => {
+      // Example of adding SMA
+      if (indicator === 'SMA') {
+        const smaData = calculateSMA(data, 20);
+        const smaLine = chart.current!.addLineSeries({
+          color: '#2196F3',
+          lineWidth: 2,
+          priceLineVisible: false,
+        });
+        smaLine.setData(smaData);
+      }
+      
+      // In a real implementation, add logic for other indicators here
+    });
+  }, [indicators, data]);
+
+  // Simple SMA calculation example for demonstration
+  const calculateSMA = (data: CandleData[], period: number) => {
+    const result = [];
+    
+    for (let i = period - 1; i < data.length; i++) {
+      let sum = 0;
+      for (let j = 0; j < period; j++) {
+        sum += data[i - j].close;
+      }
+      result.push({
+        time: data[i].time as Time,
+        value: sum / period
+      });
+    }
+    
+    return result;
+  };
+
   return (
-    <div className="w-full h-full relative">
-      {(!data || data.length === 0) && (
-        <div className="absolute inset-0 flex items-center justify-center text-gray-500">
-          No data available for {symbol}
+    <div className="w-full h-full flex flex-col">
+      {error && (
+        <div className="text-red-500 text-sm mb-2 p-2 bg-red-500/10 border border-red-500/30 rounded">
+          {error}
         </div>
       )}
-      <canvas
-        ref={canvasRef}
-        className="w-full h-full"
-        style={{ display: (!data || data.length === 0) ? 'none' : 'block' }}
-      />
-      <div className="mt-2 flex-shrink-0">
+      
+      {(!data || data.length === 0) ? (
+        <div className="flex-grow flex items-center justify-center text-gray-500">
+          No data available for {symbol}
+        </div>
+      ) : (
+        <div className="flex-grow min-h-[500px] relative" ref={chartContainerRef} />
+      )}
+      
+      <div className="flex justify-between items-center mt-2">
+        <div className="text-sm text-gray-400">
+          {lastPrice && (
+            <span>Last: <span className="text-white font-medium">${lastPrice.toFixed(2)}</span></span>
+          )}
+        </div>
         <IndicatorSelector
           onSelect={(name) => setIndicators((prev) => [...prev, name])}
         />
       </div>
     </div>
-  )
-}
+  );
+};
 
-export default TradingChart
+export default TradingChart;
+
