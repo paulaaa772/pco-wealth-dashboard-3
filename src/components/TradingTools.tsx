@@ -9,7 +9,7 @@ import {
   CornerRightDown, 
   Minus, 
   ArrowRight as HorizontalRay, 
-  LineVertical,
+  BarChart2 as VerticalLine,
   Plus,
   LayoutGrid,
   LineChart,
@@ -134,7 +134,7 @@ const TradingTools: React.FC<TradingToolsProps> = ({
                 className={`flex items-center p-2 rounded text-xs ${activeTool === 'verticalLine' ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-700'}`}
                 onClick={() => handleSelectTool('verticalLine')}
               >
-                <LineVertical size={14} className="mr-2" />
+                <VerticalLine size={14} className="mr-2" />
                 <span>Vertical Line</span>
               </button>
               <button 
