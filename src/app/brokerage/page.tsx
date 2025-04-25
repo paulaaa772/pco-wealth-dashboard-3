@@ -1,289 +1,241 @@
 'use client'
 
-import React, { useState, useEffect } from 'react';
-import { PolygonService } from '../../lib/market-data/PolygonService';
+import { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
-import TradingInterface from '../../components/dashboard/TradingInterface';
-import OrderBook from '@/components/brokerage/OrderBook';
-import TradeHistory from '@/components/brokerage/TradeHistory';
-import OrderEntryPanel from '@/components/brokerage/OrderEntryPanel';
-import { Maximize2 } from 'lucide-react';
-import { ManualOrder } from '@/components/brokerage/OrderEntryPanel';
-import { Position } from '@/lib/trading-engine/AITradingEngine';
+import { PolygonService } from '../../lib/market-data/PolygonService';
 import MarketSummary from '../components/indicators/MarketSummary';
+import SymbolSearch from '../../components/brokerage/SymbolSearch';
+import OrderBook from '../../components/brokerage/OrderBook';
+import TradeHistory from '../../components/brokerage/TradeHistory';
+import OrderEntryPanel from '../../components/brokerage/OrderEntryPanel';
+import AITradingPanel from '../../components/brokerage/AITradingPanel';
+import AlertMessage from '../../components/dashboard/AlertMessage';
 
-// Import the TradingChart component with dynamic import to avoid SSR issues
-const TradingChart = dynamic(
-  () => import('@/components/TradingChart'),
-  { ssr: false }
-);
+// Dynamically load the TradingChart with SSR disabled to avoid hydration issues
+const TradingChart = dynamic(() => import('../../components/dashboard/TradingChart'), { ssr: false });
 
-// Define a spinner component for loading states
-const Spinner = () => (
-  <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto my-4"></div>
-);
-
-// Define the data interfaces
-interface CandleData {
-  o: number; // open
-  h: number; // high
-  l: number; // low
-  c: number; // close
-  t: number; // timestamp
-  v: number; // volume
-}
-
-// Interface for the chart component
-interface ChartDataPoint {
-  time: string;
+// Define interface for candle data
+export interface CandleData {
+  timestamp: number;
   open: number;
   high: number;
-  low: number;
   close: number;
+  low: number;
+  volume: number;
+}
+
+// Define interface for manual orders
+export interface ManualOrder {
+  id: string;
+  symbol: string;
+  type: 'buy' | 'sell';
+  quantity: number;
+  price: number;
+  status: 'open' | 'filled' | 'canceled';
+  timestamp: number;
+}
+
+// Define interface for AI positions
+export interface AIPosition {
+  id: string;
+  symbol: string;
+  type: 'buy' | 'sell';
+  quantity: number;
+  entryPrice: number;
+  exitPrice?: number;
+  entryTimestamp: number;
+  exitTimestamp?: number;
+  profit?: number;
+  status: 'open' | 'closed';
+  reason: string;
 }
 
 export default function BrokeragePage() {
-  const [symbol, setSymbol] = useState('AAPL');
+  const [symbol, setSymbol] = useState<string>('AAPL');
   const [candleData, setCandleData] = useState<CandleData[]>([]);
-  const [chartData, setChartData] = useState<ChartDataPoint[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [polygonService, setPolygonService] = useState<PolygonService | null>(null);
-  const [isChartFullScreen, setIsChartFullScreen] = useState(false);
-  const [manualTrades, setManualTrades] = useState<ManualOrder[]>([]);
-  const [aiPositions, setAiPositions] = useState<Position[]>([]);
-
-  // Initialize the page
+  const [timeframe, setTimeframe] = useState<string>('1D');
+  const [manualOrders, setManualOrders] = useState<ManualOrder[]>([]);
+  const [aiPositions, setAiPositions] = useState<AIPosition[]>([]);
+  const [currentPrice, setCurrentPrice] = useState<number>(0);
+  
+  // Initialize page and load market data
   useEffect(() => {
-    console.log('Initializing brokerage page');
+    console.log('Brokerage page initialized');
+    loadMarketData();
+    
+    // Load market data every minute
+    const interval = setInterval(loadMarketData, 60000);
+    return () => clearInterval(interval);
+  }, [symbol, timeframe]);
+  
+  // Load market data for the selected symbol and timeframe
+  const loadMarketData = async () => {
+    if (!symbol) return;
+    
+    setLoading(true);
+    setError(null);
+    
     try {
-      // Check if API key is defined
-      const apiKey = process.env.NEXT_PUBLIC_POLYGON_API_KEY;
-      if (!apiKey) {
-        console.warn('No Polygon API key found in environment variables');
-        setError('Polygon API key is missing. Please add it to your environment variables.');
-      } else {
-        console.log('Polygon API key is available:', apiKey.substring(0, 4) + '...');
+      console.log(`Loading market data for ${symbol} with timeframe ${timeframe}`);
+      const polygonService = new PolygonService();
+      
+      // Get latest price
+      const priceData = await polygonService.getLatestPrice(symbol);
+      if (priceData !== null) {
+        setCurrentPrice(priceData.price);
       }
       
-      const service = PolygonService.getInstance();
-      setPolygonService(service);
-      
-      // Load initial market data
-      loadMarketData(service, symbol);
-      
-      // Set up interval for live data updates (every 30 seconds)
-      const dataRefreshInterval = setInterval(() => {
-        if (polygonService) {
-          console.log('Refreshing market data...');
-          loadMarketData(polygonService, symbol);
-        }
-      }, 30000); // 30 seconds
-      
-      return () => {
-        clearInterval(dataRefreshInterval);
-      };
-    } catch (err: any) {
-      console.error('Failed to initialize brokerage page:', err);
-      setError(`Failed to initialize: ${err.message}`);
-      setIsLoading(false);
-    }
-  }, []);
-
-  // Load market data when symbol changes
-  useEffect(() => {
-    if (polygonService && symbol) {
-      loadMarketData(polygonService, symbol);
-    }
-  }, [symbol, polygonService]);
-
-  // Function to load market data
-  const loadMarketData = async (service: PolygonService, sym: string) => {
-    if (!service) {
-      console.error('Polygon service is not initialized');
-      setError('Service not initialized. Please refresh the page.');
-      setIsLoading(false);
-      return;
-    }
-
-    try {
-      if (!isLoading) setIsLoading(true);
-      setError(null);
-      
-      console.log(`Loading market data for ${sym}`);
-      
-      // Get the current date and date 30 days ago
-      const endDate = new Date();
-      const startDate = new Date();
-      startDate.setDate(startDate.getDate() - 30);
-      
-      // Format dates as YYYY-MM-DD
-      const startDateStr = startDate.toISOString().split('T')[0];
-      const endDateStr = endDate.toISOString().split('T')[0];
-      
-      // Fetch candle data
-      const response = await service.getStockCandles(
-        sym,
-        startDateStr,
-        endDateStr,
-        'day'
-      );
-      
-      console.log('API Response length:', response?.length);
-      
-      if (response && response.length > 0) {
-        // Store raw data
-        setCandleData(response);
-        
-        // Map API response to the format needed by the chart
-        const formattedData = response.map((candle: CandleData) => ({
-          time: new Date(candle.t).toISOString().split('T')[0],
-          open: candle.o,
-          high: candle.h,
-          low: candle.l,
-          close: candle.c
-        }));
-        
-        setChartData(formattedData);
-        console.log('Chart data formatted successfully:', formattedData.length, 'data points');
-        
-        // Log the first data point to verify format
-        if (formattedData.length > 0) {
-          console.log('Sample data point:', formattedData[0]);
-        }
+      // Get candle data
+      const candles = await polygonService.getStockCandles(symbol, timeframe);
+      if (candles && candles.length > 0) {
+        setCandleData(candles);
+        console.log(`Loaded ${candles.length} candles for ${symbol}`);
       } else {
-        console.error('Invalid response format or empty response:', response);
-        setError('No data received for this symbol. Check API key or try another symbol.');
-        setChartData([]);
+        console.warn('No candle data returned');
+        setError('No data available for this symbol and timeframe');
       }
     } catch (err: any) {
       console.error('Error loading market data:', err);
       setError(`Failed to load market data: ${err.message || 'Unknown error'}`);
-      setChartData([]);
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
-
-  // Handle symbol change initiated from the TradingInterface component
+  
+  // Handle symbol change
   const handleSymbolChange = (newSymbol: string) => {
-    if (!newSymbol || newSymbol.trim() === '') {
-      console.error('Invalid symbol provided');
-      return;
-    }
-    
-    console.log('BrokeragePage: Symbol changed to', newSymbol);
-    setSymbol(newSymbol.toUpperCase().trim());
-    
-    if (polygonService) {
-      loadMarketData(polygonService, newSymbol.toUpperCase().trim());
-    }
+    setSymbol(newSymbol);
+    setError(null);
   };
-
-  const toggleFullScreen = () => {
-    setIsChartFullScreen(!isChartFullScreen);
-    console.log("Toggle fullscreen:", isChartFullScreen);
+  
+  // Handle timeframe change
+  const handleTimeframeChange = (newTimeframe: string) => {
+    setTimeframe(newTimeframe);
+    setError(null);
   };
-
-  // Get the latest closing price from chart data
-  const latestClosePrice = chartData.length > 0 ? chartData[chartData.length - 1].close : null;
-
-  // Handler for manual order simulation from OrderEntryPanel
-  const handleManualOrder = (order: ManualOrder) => {
-    console.log('[BrokeragePage] Received manual order simulation:', order);
-    // Add timestamp and current price
-    setManualTrades(prev => [...prev, { 
-      ...order, 
+  
+  // Handle manual order submission
+  const handleManualOrder = (order: Omit<ManualOrder, 'id' | 'timestamp' | 'status' | 'price'>) => {
+    const newOrder: ManualOrder = {
+      ...order,
+      id: `order-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       timestamp: Date.now(),
-      entryPrice: latestClosePrice || 0
-    }]);
+      status: 'open',
+      price: currentPrice, // Use current price for the order
+    };
+    
+    setManualOrders([newOrder, ...manualOrders]);
+    return newOrder;
   };
-
-  // Handler for AI opening a new position
-  const handleNewAIPosition = (newPosition: Position) => {
-    console.log('[BrokeragePage] Adding new AI position:', newPosition);
-    setAiPositions(prev => [...prev, newPosition]);
+  
+  // Handle AI position
+  const handleAIPosition = (position: Omit<AIPosition, 'id' | 'entryTimestamp' | 'entryPrice'>) => {
+    const newPosition: AIPosition = {
+      ...position,
+      id: `position-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      entryTimestamp: Date.now(),
+      entryPrice: currentPrice,
+      status: 'open',
+    };
+    
+    setAiPositions([newPosition, ...aiPositions]);
+    return newPosition;
   };
-
-  // Handler for closing AI positions
-  const handleCloseAIPosition = (positionId: string) => {
-    console.log('[BrokeragePage] Closing position:', positionId);
-    setAiPositions(prev => 
-      prev.map(pos => 
-        pos.id === positionId 
-          ? { 
-              ...pos, 
-              status: 'closed', 
-              closeDate: new Date(),
-              exitPrice: latestClosePrice || pos.entryPrice,
-              profit: latestClosePrice 
-                ? (pos.type === 'buy' 
-                  ? (latestClosePrice - pos.entryPrice) * pos.quantity 
-                  : (pos.entryPrice - latestClosePrice) * pos.quantity)
-                : 0
-            } 
+  
+  // Close AI position
+  const closeAIPosition = (positionId: string, reason: string) => {
+    setAiPositions(
+      aiPositions.map(pos => 
+        pos.id === positionId
+          ? {
+              ...pos,
+              exitPrice: currentPrice,
+              exitTimestamp: Date.now(),
+              status: 'closed',
+              profit: pos.type === 'buy'
+                ? (currentPrice - pos.entryPrice) * pos.quantity
+                : (pos.entryPrice - currentPrice) * pos.quantity,
+              reason: reason
+            }
           : pos
       )
     );
   };
-
+  
   return (
-    <div className="container mx-auto px-4 py-6 text-white">
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
-        <div className="lg:col-span-2 flex flex-col gap-4">
-          <MarketSummary symbol={symbol} />
-          
-          <div className={`bg-gray-900 rounded-lg p-1 flex flex-col ${isChartFullScreen ? 'h-[80vh]' : 'h-[60vh]'} relative`}>
-            <button 
-              onClick={toggleFullScreen}
-              className="absolute top-2 right-2 z-10 p-1 bg-gray-700/50 hover:bg-gray-600/80 rounded text-gray-300"
-              title={isChartFullScreen ? "Minimize Chart" : "Maximize Chart"}
-            >
-              <Maximize2 size={18} />
-            </button>
-
-            {error && !isLoading && (
-              <div className="bg-red-900/30 border border-red-700 text-red-400 px-3 py-1 rounded mb-2 text-sm">
-                {error}
+    <div className="p-4 md:p-6">
+      <div className="mb-4">
+        <SymbolSearch currentSymbol={symbol} onSymbolChange={handleSymbolChange} />
+      </div>
+      
+      <MarketSummary symbol={symbol} />
+      
+      {error && (
+        <AlertMessage 
+          type="error"
+          title="Data Loading Error"
+          message={error}
+          className="mb-6"
+        />
+      )}
+      
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        <div className="xl:col-span-2">
+          <div className="bg-gray-900 border border-gray-800 rounded-lg p-4 mb-6">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-bold text-white">{symbol} Chart</h2>
+              <div className="flex space-x-2">
+                {['1D', '1W', '1M', '3M', '1Y'].map(tf => (
+                  <button
+                    key={tf}
+                    className={`px-3 py-1 rounded-md ${timeframe === tf ? 'bg-blue-600' : 'bg-gray-800'}`}
+                    onClick={() => handleTimeframeChange(tf)}
+                  >
+                    {tf}
+                  </button>
+                ))}
               </div>
-            )}
-            {isLoading ? (
-              <div className="flex-grow flex items-center justify-center">
-                <Spinner />
-                <p className="ml-2 text-gray-400">Loading chart data...</p>
-              </div>
-            ) : chartData.length > 0 ? (
-              <div className="flex-grow h-full w-full min-h-0">
+            </div>
+            
+            <div className="h-[400px] w-full">
+              {loading ? (
+                <div className="h-full w-full flex items-center justify-center">
+                  <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+                </div>
+              ) : (
                 <TradingChart 
+                  data={candleData} 
                   symbol={symbol} 
-                  data={chartData} 
-                  manualTrades={manualTrades}
+                  currentPrice={currentPrice}
                 />
-              </div>
-            ) : (
-              <div className="flex-grow flex items-center justify-center">
-                <p className="text-gray-500">{error || `No data available for ${symbol}`}</p>
-              </div>
-            )}
+              )}
+            </div>
           </div>
-
-          <div className="">
-            <TradingInterface 
-              currentSymbol={symbol} 
-              onSymbolChange={handleSymbolChange}
-              positions={aiPositions}
-              onClosePosition={handleCloseAIPosition}
-              onNewAIPosition={handleNewAIPosition}
-            />
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+            <OrderBook symbol={symbol} />
+            <TradeHistory symbol={symbol} />
           </div>
         </div>
-        <div className="lg:col-span-1 flex flex-col gap-4 h-full">
-          <div className="flex-1 min-h-0"><OrderBook symbol={symbol} latestPrice={latestClosePrice} /></div>
-          <div className="flex-1 min-h-0"><TradeHistory symbol={symbol} positions={aiPositions} /></div>
-          <div className="flex-1 min-h-0">
+        
+        <div>
+          <div className="mb-6">
             <OrderEntryPanel 
               symbol={symbol} 
-              onPlaceOrder={handleManualOrder}
+              currentPrice={currentPrice} 
+              onOrderSubmit={handleManualOrder}
+            />
+          </div>
+          
+          <div>
+            <AITradingPanel 
+              symbol={symbol}
+              currentPrice={currentPrice}
+              onPositionOpen={handleAIPosition}
+              onPositionClose={closeAIPosition}
+              activePositions={aiPositions.filter(p => p.status === 'open')}
             />
           </div>
         </div>

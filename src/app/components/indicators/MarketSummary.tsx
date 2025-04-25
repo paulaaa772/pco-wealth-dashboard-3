@@ -1,119 +1,123 @@
 'use client'
 
 import React, { useState, useEffect } from 'react';
-import BasicIndicator from './BasicIndicator';
 import { PolygonService } from '../../../lib/market-data/PolygonService';
+import BasicIndicator from './BasicIndicator';
 
 interface MarketSummaryProps {
   symbol: string;
 }
 
+interface PriceData {
+  price: number;
+  previousClose: number;
+  volume: number;
+}
+
 const MarketSummary: React.FC<MarketSummaryProps> = ({ symbol }) => {
-  const [loading, setLoading] = useState<boolean>(true);
-  const [price, setPrice] = useState<number>(0);
+  const [price, setPrice] = useState<number | null>(null);
+  const [previousClose, setPreviousClose] = useState<number | null>(null);
   const [change, setChange] = useState<number>(0);
   const [changePercent, setChangePercent] = useState<number>(0);
   const [volume, setVolume] = useState<number>(0);
-  const [companyName, setCompanyName] = useState<string>('');
+  const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const polygonService = new PolygonService();
 
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchMarketData = async () => {
       if (!symbol) return;
       
       setLoading(true);
       setError(null);
       
       try {
-        // Get an instance of the PolygonService using the static method
-        const polygonService = PolygonService.getInstance();
-        
-        // Fetch the latest price
-        const priceData = await polygonService.getLatestPrice(symbol);
-        
-        if (priceData) {
-          setPrice(priceData);
+        // Get latest price
+        const latestPrice = await polygonService.getLatestPrice(symbol);
+        if (latestPrice !== null) {
+          // Set price directly from the returned price value
+          setPrice(latestPrice);
           
-          // Calculate change and change percent
-          // For simplicity, we'll use a mock change value (ideally this would come from API)
-          const previousClose = priceData * (1 - (Math.random() * 0.05 - 0.025));
-          const dailyChange = priceData - previousClose;
-          const dailyChangePercent = (dailyChange / previousClose) * 100;
+          // For demonstration purposes, we'll set the previous close to 95% of current price
+          // In a real app, you would fetch this from a separate API endpoint
+          const estimatedPreviousClose = latestPrice * 0.95;
+          setPreviousClose(estimatedPreviousClose);
           
-          setChange(dailyChange);
-          setChangePercent(dailyChangePercent);
+          // Calculate change
+          const priceChange = latestPrice - estimatedPreviousClose;
+          setChange(priceChange);
           
-          // Set volume (mock data for now)
-          setVolume(Math.floor(Math.random() * 10000000));
+          // Calculate percent change
+          const percentChange = (priceChange / estimatedPreviousClose) * 100;
+          setChangePercent(percentChange);
+          
+          // Set a random volume for demonstration purposes
+          // In a real app, you would fetch this from the API
+          setVolume(Math.floor(1000000 + Math.random() * 5000000));
+        } else {
+          setError('No price data available');
         }
-        
-        // Fetch company details
-        const companyData = await polygonService.getCompanyDetails(symbol);
-        if (companyData) {
-          setCompanyName(companyData.name);
-        }
-      } catch (err: any) {
+      } catch (err) {
         console.error('Error fetching market data:', err);
-        setError(err?.message || 'Failed to load market data');
+        setError('Failed to load market data');
       } finally {
         setLoading(false);
       }
     };
+
+    fetchMarketData();
     
-    fetchData();
+    // Refresh data every minute
+    const interval = setInterval(fetchMarketData, 60000);
     
-    // Set up polling to refresh data every minute
-    const intervalId = setInterval(fetchData, 60000);
-    
-    return () => clearInterval(intervalId);
+    return () => clearInterval(interval);
   }, [symbol]);
-  
+
   if (loading) {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 animate-pulse">
+      <div className="w-full grid grid-cols-1 md:grid-cols-4 gap-4 mb-6 animate-pulse">
         {[...Array(4)].map((_, i) => (
           <div key={i} className="h-24 bg-gray-800 rounded-lg"></div>
         ))}
       </div>
     );
   }
-  
+
   if (error) {
     return (
-      <div className="bg-red-900/20 border border-red-500 p-4 rounded-lg">
-        <p className="text-red-500">Error: {error}</p>
+      <div className="w-full p-4 bg-red-900/20 border border-red-600/30 rounded-lg mb-6">
+        <p className="text-red-400">{error}</p>
       </div>
     );
   }
-  
+
   return (
-    <div className="mb-4">
-      <h2 className="text-xl font-bold text-white mb-3">{companyName || symbol}</h2>
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <BasicIndicator 
-          label="Current Price" 
-          value={price} 
-          format="currency" 
-        />
-        <BasicIndicator 
-          label="Daily Change" 
-          value={change} 
-          change={change} 
-          format="currency" 
-        />
-        <BasicIndicator 
-          label="Change %" 
-          value={changePercent} 
-          change={changePercent} 
-          format="percentage" 
-        />
-        <BasicIndicator 
-          label="Volume" 
-          value={volume} 
-          format="number" 
-          showIcon={false}
-        />
-      </div>
+    <div className="w-full grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+      <BasicIndicator 
+        label="Current Price" 
+        value={price || 0} 
+        format="currency" 
+        showIcon={false}
+        tooltipContent="The most recent trading price for this stock"
+      />
+      <BasicIndicator 
+        label="Daily Change" 
+        value={change} 
+        format="currency" 
+        tooltipContent="The price change since the previous market close"
+      />
+      <BasicIndicator 
+        label="Change %" 
+        value={changePercent} 
+        format="percentage"
+        tooltipContent="The percentage change since the previous market close"
+      />
+      <BasicIndicator 
+        label="Volume" 
+        value={volume} 
+        showIcon={false}
+        tooltipContent="The total number of shares traded today"
+      />
     </div>
   );
 };

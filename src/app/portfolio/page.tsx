@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
-import { ArrowUp, ArrowDown, RefreshCw, Edit2, Share2, Plus, Minus, UploadCloud, AlertTriangle, FileText, TrendingDown, ArrowLeftRight, DollarSign, Landmark, BarChart2, Target, Bell, Calendar, CheckSquare, Flag, PlusCircle, MessageSquare, X, Send, Maximize2, Minimize2, Play, Settings, Layers, ChevronDown, BarChart, LineChart, Clock, Filter, Download } from 'lucide-react'
+import { ArrowUp, ArrowDown, RefreshCw, Edit2, Share2, Plus, Minus, UploadCloud, AlertTriangle, FileText, TrendingDown, ArrowLeftRight, DollarSign, Landmark, BarChart2, Target, Bell, Calendar, CheckSquare, Flag, PlusCircle, MessageSquare, X, Send, Maximize2, Minimize2, Play, Settings, Layers, ChevronDown, BarChart, LineChart, Clock, Filter, Download, ArrowDownCircle, ArrowUpCircle, Info, CheckIcon, CreditCard, CalendarClock } from 'lucide-react'
 
 // Mock data
 const portfolioData = {
@@ -440,11 +440,13 @@ const PerformanceChart = () => {
 };
 
 const TaxAndProfitContent = () => {
+  const [selectedYear, setSelectedYear] = useState('All Time');
+  
   return (
     <div className="space-y-8">
       {/* Summary Card */}
       <div className="bg-white rounded-lg shadow p-6">
-        <h2 className="text-xl font-semibold mb-4">Year-to-Date Tax Summary ({taxData.currentYear})</h2>
+        <h2 className="text-xl font-semibold mb-4 text-gray-900">Year-to-Date Tax Summary ({taxData.currentYear})</h2>
         
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="bg-gray-50 p-4 rounded-lg">
@@ -479,7 +481,7 @@ const TaxAndProfitContent = () => {
       {/* Tax-Loss Harvesting Opportunities */}
       <div className="bg-white rounded-lg shadow p-6">
         <div className="flex justify-between items-center mb-4">
-          <h2 className="text-lg font-semibold">Tax-Loss Harvesting Opportunities</h2>
+          <h2 className="text-lg font-semibold text-gray-900">Tax-Loss Harvesting Opportunities</h2>
           <button className="text-sm bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded">
             Analyze Portfolio
           </button>
@@ -520,7 +522,7 @@ const TaxAndProfitContent = () => {
       
       {/* Wash Sale Detection */}
       <div className="bg-white rounded-lg shadow p-6">
-        <h2 className="text-lg font-semibold mb-4">Wash Sale Detection</h2>
+        <h2 className="text-lg font-semibold mb-4 text-gray-900">Wash Sale Detection</h2>
         
         {taxData.washSales.length > 0 ? (
           <div>
@@ -570,9 +572,13 @@ const TaxAndProfitContent = () => {
       {/* Gain/Loss Breakdown */}
       <div className="bg-white rounded-lg shadow p-6">
         <div className="flex justify-between items-center mb-4">
-          <h2 className="text-lg font-semibold">Realized Gain/Loss Breakdown</h2>
+          <h2 className="text-lg font-semibold text-gray-900">Realized Gain/Loss Breakdown</h2>
           <div className="flex space-x-2">
-            <select className="text-sm border border-gray-300 rounded px-2 py-1 bg-white">
+            <select 
+              className="text-sm border border-gray-300 rounded px-2 py-1 text-gray-900 bg-white"
+              value={selectedYear}
+              onChange={(e) => setSelectedYear(e.target.value)}
+            >
               <option>All Time</option>
               <option>2025</option>
               <option>2024</option>
@@ -638,7 +644,7 @@ const TaxAndProfitContent = () => {
       
       {/* Tax Documents */}
       <div className="bg-white rounded-lg shadow p-6">
-        <h2 className="text-lg font-semibold mb-4">Tax Documents</h2>
+        <h2 className="text-lg font-semibold mb-4 text-gray-900">Tax Documents</h2>
         
         <div className="mb-4">
           <button className="flex items-center text-sm bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded">
@@ -1099,6 +1105,19 @@ const MilestonesSection = () => (
 
 const GoalSystemContent = () => {
   const [showAddGoalForm, setShowAddGoalForm] = useState(false);
+  const [newGoal, setNewGoal] = useState({
+    title: '',
+    targetAmount: 0,
+    contribution: 0,
+    deadline: ''
+  });
+
+  const handleNewGoalChange = (field: string, value: any) => {
+    setNewGoal({
+      ...newGoal,
+      [field]: value
+    });
+  };
   
   // Render the goals
   return (
@@ -1125,8 +1144,10 @@ const GoalSystemContent = () => {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Goal Name</label>
                 <input 
                   type="text" 
-                  className="w-full p-2 border rounded focus:ring-blue-500 focus:border-blue-500" 
+                  className="w-full p-2 border border-gray-300 rounded text-gray-900 focus:ring-blue-500 focus:border-blue-500" 
                   placeholder="e.g., Retirement Fund"
+                  value={newGoal.title}
+                  onChange={(e) => handleNewGoalChange('title', e.target.value)}
                 />
               </div>
               <div>
@@ -1136,9 +1157,11 @@ const GoalSystemContent = () => {
                     <span className="text-gray-500">$</span>
                   </div>
                   <input 
-                    type="text" 
-                    className="w-full pl-7 p-2 border rounded focus:ring-blue-500 focus:border-blue-500" 
+                    type="number" 
+                    className="w-full pl-7 p-2 border border-gray-300 rounded text-gray-900 focus:ring-blue-500 focus:border-blue-500" 
                     placeholder="0.00"
+                    value={newGoal.targetAmount || ''}
+                    onChange={(e) => handleNewGoalChange('targetAmount', parseFloat(e.target.value) || 0)}
                   />
                 </div>
               </div>
@@ -1149,9 +1172,11 @@ const GoalSystemContent = () => {
                     <span className="text-gray-500">$</span>
                   </div>
                   <input 
-                    type="text" 
-                    className="w-full pl-7 p-2 border rounded focus:ring-blue-500 focus:border-blue-500" 
+                    type="number" 
+                    className="w-full pl-7 p-2 border border-gray-300 rounded text-gray-900 focus:ring-blue-500 focus:border-blue-500" 
                     placeholder="0.00"
+                    value={newGoal.contribution || ''}
+                    onChange={(e) => handleNewGoalChange('contribution', parseFloat(e.target.value) || 0)}
                   />
                 </div>
               </div>
@@ -1159,7 +1184,9 @@ const GoalSystemContent = () => {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Target Date</label>
                 <input 
                   type="date" 
-                  className="w-full p-2 border rounded focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full p-2 border border-gray-300 rounded text-gray-900 focus:ring-blue-500 focus:border-blue-500"
+                  value={newGoal.deadline}
+                  onChange={(e) => handleNewGoalChange('deadline', e.target.value)}
                 />
               </div>
               
@@ -1186,7 +1213,7 @@ const GoalSystemContent = () => {
           {goalData.investmentGoals.map((goal) => (
             <div key={goal.id} className="border rounded-lg overflow-hidden">
               <div className="bg-gray-50 px-4 py-3 border-b flex justify-between items-center">
-                <div className="font-medium">{goal.title}</div>
+                <div className="font-medium text-gray-900">{goal.title}</div>
                 <div className="flex space-x-2">
                   <span className="text-sm text-gray-500">Target: ${goal.targetAmount.toLocaleString()}</span>
                   <span className="text-sm text-gray-500">|</span>
@@ -1209,15 +1236,15 @@ const GoalSystemContent = () => {
                 <div className="mt-4 grid grid-cols-2 md:grid-cols-3 gap-4">
                   <div>
                     <div className="text-xs text-gray-500">Contribution</div>
-                    <div className="font-medium">${goal.contribution}/mo</div>
+                    <div className="font-medium text-gray-900">${goal.contribution}/mo</div>
                   </div>
                   <div>
                     <div className="text-xs text-gray-500">Remaining</div>
-                    <div className="font-medium">${(goal.targetAmount - goal.currentAmount).toLocaleString()}</div>
+                    <div className="font-medium text-gray-900">${(goal.targetAmount - goal.currentAmount).toLocaleString()}</div>
                   </div>
                   <div>
                     <div className="text-xs text-gray-500">Time Left</div>
-                    <div className="font-medium">
+                    <div className="font-medium text-gray-900">
                       {/* Hardcoded for now due to TypeScript date calculation errors */}
                       {goal.id === 1 ? '180' : goal.id === 2 ? '14' : '64'} months
                     </div>
@@ -1242,7 +1269,7 @@ const GoalSystemContent = () => {
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-semibold">Performance Targets</h2>
           <div className="flex space-x-2">
-            <select className="text-sm border border-gray-300 rounded px-2 py-1">
+            <select className="text-sm border border-gray-300 rounded px-2 py-1 text-gray-900 bg-white">
               <option>Daily</option>
               <option>Weekly</option>
               <option selected>Monthly</option>
@@ -1256,13 +1283,13 @@ const GoalSystemContent = () => {
         
         <div className="space-y-6">
           {goalData.performanceTargets.map((target) => (
-            <div key={target.id} className="border rounded-lg p-4">
+            <div key={target.id} className="border border-gray-300 rounded-lg p-4">
               <div className="flex justify-between mb-2">
                 <div>
-                  <h3 className="font-medium">{target.title}</h3>
+                  <h3 className="font-medium text-gray-900">{target.title}</h3>
                   <div className="text-xs text-gray-500">{target.period}</div>
                 </div>
-                <div className="text-lg font-semibold">
+                <div className="text-lg font-semibold text-gray-900">
                   {target.current}{target.title === 'Annual Return' || target.title === 'Dividend Yield' ? '%' : ''} 
                   <span className="text-gray-400 text-base"> / {target.target}{target.title === 'Annual Return' || target.title === 'Dividend Yield' ? '%' : ''}</span>
                 </div>
