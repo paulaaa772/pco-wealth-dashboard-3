@@ -1,40 +1,78 @@
 'use client'
 
 import React from 'react';
-import { Position } from '@/lib/trading-engine/AITradingEngine';
 
-interface TradeHistoryProps {
-    symbol?: string;
-    positions: Position[];
+export interface Order {
+  id: string;
+  symbol: string;
+  type: 'buy' | 'sell';
+  quantity: number;
+  price: number;
+  timestamp: number;
+  status: 'open' | 'filled' | 'canceled';
 }
 
-const TradeHistory: React.FC<TradeHistoryProps> = ({ symbol = 'BTC', positions }) => {
-  const sortedTrades = [...positions]
-      .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+interface TradeHistoryProps {
+  orders: Order[];
+}
+
+const TradeHistory: React.FC<TradeHistoryProps> = ({ orders }) => {
+  const sortedOrders = [...orders].sort((a, b) => b.timestamp - a.timestamp);
 
   return (
-    <div className="bg-gray-800 rounded-lg p-4 h-full text-gray-300 flex flex-col">
-      <h3 className="text-lg font-semibold text-white mb-3 flex-shrink-0">Trade History (AI)</h3>
-      <div className="flex justify-between text-xs mb-1 text-gray-500 flex-shrink-0">
-        <span>Amount ({symbol})</span>
-        <span>Price (USD)</span>
-        <span>Time</span>
-      </div>
-      <div className="flex-grow overflow-y-auto pr-1"> 
-        {sortedTrades.length > 0 ? sortedTrades.map((trade) => {
-          const isBuy = trade.type === 'buy';
-          const tradeTime = trade.timestamp ? new Date(trade.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second: '2-digit'}) : '--:--:--';
-          return (
-            <div key={trade.id} className={`flex justify-between text-sm mb-0.5 ${isBuy ? 'text-green-400' : 'text-red-400'}`}>
-              <span>{trade.quantity.toFixed(6)}</span>
-              <span>{trade.entryPrice.toFixed(2)}</span>
-              <span className="text-gray-500">{tradeTime}</span>
-            </div>
-          )
-        }) : (
-            <div className="text-center text-sm text-gray-500 pt-4">No AI trade history yet.</div>
-        )}
-      </div>
+    <div>
+      <h3 className="text-lg font-semibold mb-3 text-gray-900 dark:text-white">Trade History</h3>
+      
+      {sortedOrders.length === 0 ? (
+        <div className="text-center py-6 text-gray-500 dark:text-gray-400">
+          No trade history
+        </div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+            <thead>
+              <tr>
+                <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Symbol</th>
+                <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Type</th>
+                <th scope="col" className="px-3 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Quantity</th>
+                <th scope="col" className="px-3 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Price</th>
+                <th scope="col" className="px-3 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Total</th>
+                <th scope="col" className="px-3 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Date</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+              {sortedOrders.map(order => (
+                <tr key={order.id}>
+                  <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                    {order.symbol}
+                  </td>
+                  <td className="px-3 py-4 whitespace-nowrap text-sm">
+                    <span className={`inline-flex px-2 py-1 text-xs rounded-md font-medium ${
+                      order.type === 'buy' 
+                        ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400' 
+                        : 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400'
+                    }`}>
+                      {order.type === 'buy' ? 'Buy' : 'Sell'}
+                    </span>
+                  </td>
+                  <td className="px-3 py-4 whitespace-nowrap text-sm text-right text-gray-900 dark:text-white">
+                    {order.quantity}
+                  </td>
+                  <td className="px-3 py-4 whitespace-nowrap text-sm text-right text-gray-900 dark:text-white">
+                    ${order.price.toFixed(2)}
+                  </td>
+                  <td className="px-3 py-4 whitespace-nowrap text-sm text-right text-gray-900 dark:text-white">
+                    ${(order.quantity * order.price).toFixed(2)}
+                  </td>
+                  <td className="px-3 py-4 whitespace-nowrap text-sm text-right text-gray-500 dark:text-gray-400">
+                    {new Date(order.timestamp).toLocaleString()}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 };

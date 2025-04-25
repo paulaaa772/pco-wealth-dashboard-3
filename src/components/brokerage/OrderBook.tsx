@@ -1,65 +1,78 @@
 'use client'
 
-import React from 'react'; // Removed useState, useEffect
+import React from 'react';
 
-interface OrderBookProps {
-    symbol?: string; 
-    latestPrice?: number | null; // Pass latest known price from parent
+export interface Order {
+  id: string;
+  symbol: string;
+  type: 'buy' | 'sell';
+  quantity: number;
+  price: number;
+  timestamp: number;
+  status: 'open' | 'filled' | 'canceled';
 }
 
-const OrderBook: React.FC<OrderBookProps> = ({ symbol = 'BTC', latestPrice }) => {
+interface OrderBookProps {
+  orders: Order[];
+}
 
-  // Remove internal state and useEffect for fetching quote
-  // const [latestQuote, setLatestQuote] = useState<{ bid: number, ask: number } | null>(null);
-  // const [isLoading, setIsLoading] = useState(false);
-  // const [error, setError] = useState<string | null>(null);
-  // useEffect(() => { ... fetchQuote logic removed ... }, [symbol]);
-
-  // Calculate mid-price based on passed prop
-  let midPrice = '--.--';
-  let simulatedBid = 92900; // Default mock bids/asks
-  let simulatedAsk = 93100;
-  
-  if (latestPrice && typeof latestPrice === 'number') {
-      const spread = latestPrice * 0.0005; 
-      simulatedAsk = latestPrice + spread / 2;
-      simulatedBid = latestPrice - spread / 2;
-      midPrice = ((simulatedBid + simulatedAsk) / 2).toFixed(2);
-  }
+const OrderBook: React.FC<OrderBookProps> = ({ orders }) => {
+  const openOrders = orders.filter(order => order.status === 'open');
 
   return (
-    <div className="bg-gray-800 rounded-lg p-4 h-full text-gray-300 flex flex-col">
-      <h3 className="text-lg font-semibold text-white mb-3 flex-shrink-0">Order Book</h3>
-      <div className="flex justify-between text-xs mb-1 text-gray-500 flex-shrink-0">
-        <span>Amount ({symbol})</span>
-        <span>Price (USD)</span>
-      </div>
+    <div>
+      <h3 className="text-lg font-semibold mb-3 text-gray-900 dark:text-white">Open Orders</h3>
       
-      {/* Asks (Sell Orders) - Static Mock Data (uses simulatedAsk) */}
-      <div className="text-red-400 flex-grow overflow-y-auto order-1"> 
-        {[...Array(15)].map((_, i) => (
-          <div key={`ask-${i}`} className="flex justify-between text-sm mb-0.5">
-            <span>{(Math.random() * 0.5).toFixed(6)}</span>
-            <span>{( simulatedAsk + (Math.random() * 100) ).toFixed(2)}</span>
-          </div>
-        ))}
-      </div>
-
-      {/* Mid Price Display (no loading/error state needed here now) */}
-      <div className={`text-center text-lg font-bold my-1 py-1 border-y border-gray-700 flex-shrink-0 order-2 text-white`}>
-         { midPrice }
-      </div>
-
-      {/* Bids (Buy Orders) - Static Mock Data (uses simulatedBid) */}
-      <div className="text-green-400 flex-grow overflow-y-auto order-3"> 
-        {[...Array(15)].map((_, i) => (
-          <div key={`bid-${i}`} className="flex justify-between text-sm mb-0.5">
-            <span>{(Math.random() * 0.5).toFixed(6)}</span>
-            <span>{( simulatedBid - (Math.random() * 100) ).toFixed(2)}</span>
-          </div>
-        ))}
-      </div>
-      
+      {openOrders.length === 0 ? (
+        <div className="text-center py-6 text-gray-500 dark:text-gray-400">
+          No open orders
+        </div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+            <thead>
+              <tr>
+                <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Symbol</th>
+                <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Type</th>
+                <th scope="col" className="px-3 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Quantity</th>
+                <th scope="col" className="px-3 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Price</th>
+                <th scope="col" className="px-3 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Total</th>
+                <th scope="col" className="px-3 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Date</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+              {openOrders.map(order => (
+                <tr key={order.id}>
+                  <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                    {order.symbol}
+                  </td>
+                  <td className="px-3 py-4 whitespace-nowrap text-sm">
+                    <span className={`inline-flex px-2 py-1 text-xs rounded-md font-medium ${
+                      order.type === 'buy' 
+                        ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400' 
+                        : 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400'
+                    }`}>
+                      {order.type === 'buy' ? 'Buy' : 'Sell'}
+                    </span>
+                  </td>
+                  <td className="px-3 py-4 whitespace-nowrap text-sm text-right text-gray-900 dark:text-white">
+                    {order.quantity}
+                  </td>
+                  <td className="px-3 py-4 whitespace-nowrap text-sm text-right text-gray-900 dark:text-white">
+                    ${order.price.toFixed(2)}
+                  </td>
+                  <td className="px-3 py-4 whitespace-nowrap text-sm text-right text-gray-900 dark:text-white">
+                    ${(order.quantity * order.price).toFixed(2)}
+                  </td>
+                  <td className="px-3 py-4 whitespace-nowrap text-sm text-right text-gray-500 dark:text-gray-400">
+                    {new Date(order.timestamp).toLocaleString()}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 };

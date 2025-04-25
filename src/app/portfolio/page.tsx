@@ -575,16 +575,21 @@ const TaxAndProfitContent = () => {
           <h2 className="text-lg font-semibold text-gray-900">Realized Gain/Loss Breakdown</h2>
           <div className="flex space-x-2">
             <select 
+              id="selectedYear"
               className="text-sm border border-gray-300 rounded px-2 py-1 text-gray-900 bg-white"
               value={selectedYear}
               onChange={(e) => setSelectedYear(e.target.value)}
+              aria-label="Select tax year"
             >
               <option>All Time</option>
               <option>2025</option>
               <option>2024</option>
               <option>2023</option>
             </select>
-            <button className="text-sm bg-gray-200 hover:bg-gray-300 px-3 py-1 rounded">
+            <button 
+              className="text-sm bg-gray-200 hover:bg-gray-300 px-3 py-1 rounded"
+              aria-label="Export tax data"
+            >
               Export
             </button>
           </div>
@@ -1141,24 +1146,26 @@ const GoalSystemContent = () => {
             <h3 className="text-lg font-medium mb-3">New Investment Goal</h3>
             <form className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Goal Name</label>
+                <label htmlFor="goal-title" className="block text-sm font-medium text-gray-700 mb-1">Goal Name</label>
                 <input 
+                  id="goal-title"
                   type="text" 
-                  className="w-full p-2 border border-gray-300 rounded text-gray-900 focus:ring-blue-500 focus:border-blue-500" 
+                  className="w-full p-2 border border-gray-300 rounded text-gray-900 focus:ring-blue-500 focus:border-blue-500 bg-white" 
                   placeholder="e.g., Retirement Fund"
                   value={newGoal.title}
                   onChange={(e) => handleNewGoalChange('title', e.target.value)}
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Target Amount</label>
+                <label htmlFor="goal-target-amount" className="block text-sm font-medium text-gray-700 mb-1">Target Amount</label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                     <span className="text-gray-500">$</span>
                   </div>
                   <input 
+                    id="goal-target-amount"
                     type="number" 
-                    className="w-full pl-7 p-2 border border-gray-300 rounded text-gray-900 focus:ring-blue-500 focus:border-blue-500" 
+                    className="w-full pl-7 p-2 border border-gray-300 rounded text-gray-900 focus:ring-blue-500 focus:border-blue-500 bg-white" 
                     placeholder="0.00"
                     value={newGoal.targetAmount || ''}
                     onChange={(e) => handleNewGoalChange('targetAmount', parseFloat(e.target.value) || 0)}
@@ -1166,14 +1173,15 @@ const GoalSystemContent = () => {
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Monthly Contribution</label>
+                <label htmlFor="goal-contribution" className="block text-sm font-medium text-gray-700 mb-1">Monthly Contribution</label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                     <span className="text-gray-500">$</span>
                   </div>
                   <input 
+                    id="goal-contribution"
                     type="number" 
-                    className="w-full pl-7 p-2 border border-gray-300 rounded text-gray-900 focus:ring-blue-500 focus:border-blue-500" 
+                    className="w-full pl-7 p-2 border border-gray-300 rounded text-gray-900 focus:ring-blue-500 focus:border-blue-500 bg-white" 
                     placeholder="0.00"
                     value={newGoal.contribution || ''}
                     onChange={(e) => handleNewGoalChange('contribution', parseFloat(e.target.value) || 0)}
@@ -1181,10 +1189,11 @@ const GoalSystemContent = () => {
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Target Date</label>
+                <label htmlFor="goal-target-date" className="block text-sm font-medium text-gray-700 mb-1">Target Date</label>
                 <input 
+                  id="goal-target-date"
                   type="date" 
-                  className="w-full p-2 border border-gray-300 rounded text-gray-900 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full p-2 border border-gray-300 rounded text-gray-900 focus:ring-blue-500 focus:border-blue-500 bg-white"
                   value={newGoal.deadline}
                   onChange={(e) => handleNewGoalChange('deadline', e.target.value)}
                 />
@@ -1648,8 +1657,9 @@ const PortfolioSimulationContent = () => {
                 <h3 className="text-lg font-medium mb-3">Strategy & Timeframe</h3>
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Investment Strategy</label>
+                    <label htmlFor="investmentStrategy" className="block text-sm font-medium text-gray-700 mb-1">Investment Strategy</label>
                     <select 
+                      id="investmentStrategy"
                       className="w-full p-2 border border-gray-300 rounded text-gray-900 focus:ring-blue-500 focus:border-blue-500 bg-white"
                       value={parameters.strategyId}
                       onChange={(e) => handleParameterChange('strategyId', parseInt(e.target.value))}
@@ -1664,8 +1674,9 @@ const PortfolioSimulationContent = () => {
                   </div>
                   
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Time Period</label>
+                    <label htmlFor="timePeriod" className="block text-sm font-medium text-gray-700 mb-1">Time Period</label>
                     <select 
+                      id="timePeriod"
                       className="w-full p-2 border border-gray-300 rounded text-gray-900 focus:ring-blue-500 focus:border-blue-500 bg-white"
                       value={parameters.timeframeId}
                       onChange={(e) => handleParameterChange('timeframeId', parseInt(e.target.value))}
@@ -1679,15 +1690,17 @@ const PortfolioSimulationContent = () => {
                   {parameters.timeframeId === 5 && (
                     <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
+                        <label htmlFor="startDate" className="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
                         <input 
+                          id="startDate"
                           type="date" 
                           className="w-full p-2 border border-gray-300 rounded text-gray-900 focus:ring-blue-500 focus:border-blue-500" 
                         />
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">End Date</label>
+                        <label htmlFor="endDate" className="block text-sm font-medium text-gray-700 mb-1">End Date</label>
                         <input 
+                          id="endDate"
                           type="date" 
                           className="w-full p-2 border border-gray-300 rounded text-gray-900 focus:ring-blue-500 focus:border-blue-500" 
                         />
@@ -1696,8 +1709,9 @@ const PortfolioSimulationContent = () => {
                   )}
                   
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Benchmark</label>
+                    <label htmlFor="benchmark" className="block text-sm font-medium text-gray-700 mb-1">Benchmark</label>
                     <select 
+                      id="benchmark"
                       className="w-full p-2 border border-gray-300 rounded text-gray-900 focus:ring-blue-500 focus:border-blue-500 bg-white"
                       value={parameters.benchmark}
                       onChange={(e) => handleParameterChange('benchmark', e.target.value)}
@@ -1714,12 +1728,13 @@ const PortfolioSimulationContent = () => {
                 <h3 className="text-lg font-medium mb-3">Investment Parameters</h3>
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Initial Investment</label>
+                    <label htmlFor="initialInvestment" className="block text-sm font-medium text-gray-700 mb-1">Initial Investment</label>
                     <div className="relative">
                       <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                         <span className="text-gray-500">$</span>
                       </div>
                       <input 
+                        id="initialInvestment"
                         type="number" 
                         className="w-full pl-7 p-2 border border-gray-300 rounded text-gray-900 focus:ring-blue-500 focus:border-blue-500" 
                         value={parameters.initialAmount}
@@ -1729,12 +1744,13 @@ const PortfolioSimulationContent = () => {
                   </div>
                   
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Monthly Contribution</label>
+                    <label htmlFor="monthlyContribution" className="block text-sm font-medium text-gray-700 mb-1">Monthly Contribution</label>
                     <div className="relative">
                       <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                         <span className="text-gray-500">$</span>
                       </div>
                       <input 
+                        id="monthlyContribution"
                         type="number" 
                         className="w-full pl-7 p-2 border border-gray-300 rounded text-gray-900 focus:ring-blue-500 focus:border-blue-500" 
                         value={parameters.monthlyContribution}
@@ -1744,8 +1760,9 @@ const PortfolioSimulationContent = () => {
                   </div>
                   
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Rebalance Frequency</label>
+                    <label htmlFor="rebalanceFrequency" className="block text-sm font-medium text-gray-700 mb-1">Rebalance Frequency</label>
                     <select 
+                      id="rebalanceFrequency"
                       className="w-full p-2 border border-gray-300 rounded text-gray-900 focus:ring-blue-500 focus:border-blue-500 bg-white"
                       value={parameters.rebalanceFrequency}
                       onChange={(e) => handleParameterChange('rebalanceFrequency', e.target.value)}
@@ -1789,8 +1806,9 @@ const PortfolioSimulationContent = () => {
                   
                   {parameters.includeFees && (
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Annual Fee (%)</label>
+                      <label htmlFor="annualFee" className="block text-sm font-medium text-gray-700 mb-1">Annual Fee (%)</label>
                       <input 
+                        id="annualFee"
                         type="number" 
                         step="0.01" 
                         className="w-32 p-2 border border-gray-300 rounded text-gray-900 focus:ring-blue-500 focus:border-blue-500" 
@@ -1801,8 +1819,9 @@ const PortfolioSimulationContent = () => {
                   )}
                   
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Tax Rate (%)</label>
+                    <label htmlFor="taxRate" className="block text-sm font-medium text-gray-700 mb-1">Tax Rate (%)</label>
                     <input 
+                      id="taxRate"
                       type="number" 
                       className="w-32 p-2 border border-gray-300 rounded text-gray-900 focus:ring-blue-500 focus:border-blue-500" 
                       value={parameters.taxRate}
@@ -1818,10 +1837,11 @@ const PortfolioSimulationContent = () => {
                   <div className="flex justify-between items-center">
                     <div className="flex items-center">
                       <div className="w-3 h-3 rounded-full bg-blue-500 mr-2"></div>
-                      <span className="text-sm">US Stocks</span>
+                      <label htmlFor="usStocks" className="text-sm">US Stocks</label>
                     </div>
                     <div className="relative w-32">
                       <input 
+                        id="usStocks"
                         type="number" 
                         className="w-full p-1 text-sm text-gray-900 text-right border border-gray-300 rounded" 
                         value={allocation.usStocks}
@@ -1836,10 +1856,11 @@ const PortfolioSimulationContent = () => {
                   <div className="flex justify-between items-center">
                     <div className="flex items-center">
                       <div className="w-3 h-3 rounded-full bg-green-500 mr-2"></div>
-                      <span className="text-sm">Intl Stocks</span>
+                      <label htmlFor="intlStocks" className="text-sm">Intl Stocks</label>
                     </div>
                     <div className="relative w-32">
                       <input 
+                        id="intlStocks"
                         type="number" 
                         className="w-full p-1 text-sm text-gray-900 text-right border border-gray-300 rounded" 
                         value={allocation.intlStocks}
@@ -1854,10 +1875,11 @@ const PortfolioSimulationContent = () => {
                   <div className="flex justify-between items-center">
                     <div className="flex items-center">
                       <div className="w-3 h-3 rounded-full bg-purple-500 mr-2"></div>
-                      <span className="text-sm">Bonds</span>
+                      <label htmlFor="bonds" className="text-sm">Bonds</label>
                     </div>
                     <div className="relative w-32">
                       <input 
+                        id="bonds"
                         type="number" 
                         className="w-full p-1 text-sm text-gray-900 text-right border border-gray-300 rounded" 
                         value={allocation.bonds}
@@ -1872,10 +1894,11 @@ const PortfolioSimulationContent = () => {
                   <div className="flex justify-between items-center">
                     <div className="flex items-center">
                       <div className="w-3 h-3 rounded-full bg-yellow-500 mr-2"></div>
-                      <span className="text-sm">Cash</span>
+                      <label htmlFor="cash" className="text-sm">Cash</label>
                     </div>
                     <div className="relative w-32">
                       <input 
+                        id="cash"
                         type="number" 
                         className="w-full p-1 text-sm text-gray-900 text-right border border-gray-300 rounded" 
                         value={allocation.cash}
@@ -1967,11 +1990,11 @@ const PortfolioSimulationContent = () => {
               <div className="flex justify-between items-center mb-3">
                 <h4 className="font-medium">Portfolio Growth</h4>
                 <div className="flex space-x-2">
-                  <select className="text-sm border border-gray-300 rounded px-2 py-1">
+                  <select className="text-sm border border-gray-300 rounded px-2 py-1 text-gray-900 bg-white">
                     <option>Linear</option>
                     <option>Logarithmic</option>
                   </select>
-                  <select className="text-sm border border-gray-300 rounded px-2 py-1">
+                  <select className="text-sm border border-gray-300 rounded px-2 py-1 text-gray-900 bg-white">
                     <option>All Data</option>
                     <option>YTD</option>
                     <option>1 Year</option>

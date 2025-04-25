@@ -22,7 +22,7 @@ const MarketSummary: React.FC<MarketSummaryProps> = ({ symbol }) => {
   const [volume, setVolume] = useState<number>(0);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const polygonService = new PolygonService();
+  const polygonService = PolygonService.getInstance();
 
   useEffect(() => {
     const fetchMarketData = async () => {

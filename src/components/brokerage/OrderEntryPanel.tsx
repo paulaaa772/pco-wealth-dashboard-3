@@ -3,210 +3,174 @@
 import React, { useState } from 'react';
 
 // Define props if we need to pass data or functions down later
-interface OrderEntryPanelProps {
-    symbol?: string; // e.g., BTC, AAPL
-    baseCurrency?: string; // e.g., USD
-    // Add callback for when an order is simulated
-    onPlaceOrder?: (order: ManualOrder) => void;
+export interface OrderEntryPanelProps {
+    symbol: string;
+    currentPrice: number;
+    onOrderSubmit: (order: Omit<ManualOrder, 'id' | 'timestamp' | 'status' | 'price'>) => any;
 }
 
 // Simple structure for the simulated order - EXPORT this interface
 export interface ManualOrder {
+    id: string;
     symbol: string;
-    side: 'buy' | 'sell';
-    type: 'limit' | 'market' | 'stop';
-    amount: number;
-    limitPrice?: number;
-    stopPrice?: number;
-    timestamp?: number; // Add timestamp (when order was placed/simulated)
-    entryPrice?: number; // Add simulated entry price (for chart plotting)
+    type: 'buy' | 'sell';
+    quantity: number;
+    price: number;
+    timestamp: number;
+    status: 'open' | 'filled' | 'canceled';
 }
 
-const OrderEntryPanel: React.FC<OrderEntryPanelProps> = ({ 
-    symbol = 'BTC', // Default symbol for placeholders
-    baseCurrency = 'USD', 
-    onPlaceOrder // Destructure the new prop
+const OrderEntryPanel: React.FC<OrderEntryPanelProps> = ({
+    symbol,
+    currentPrice,
+    onOrderSubmit,
 }) => {
-  const [orderType, setOrderType] = useState<'limit' | 'market' | 'stop'>('limit'); // limit, market, stop
-  const [side, setSide] = useState<'buy' | 'sell'>('buy'); // buy, sell
-  const [limitPrice, setLimitPrice] = useState('');
-  const [stopPrice, setStopPrice] = useState('');
-  const [amount, setAmount] = useState('');
-  const [statusMessage, setStatusMessage] = useState<string | null>(null);
-  const [statusType, setStatusType] = useState<'success' | 'error' | null>(null);
+    const [orderType, setOrderType] = useState<'buy' | 'sell'>('buy');
+    const [quantity, setQuantity] = useState<number>(10);
+    const [error, setError] = useState<string | null>(null);
+    const [isSuccess, setIsSuccess] = useState<boolean>(false);
 
-  const handlePlaceOrder = () => {
-      console.log("[OrderEntry] handlePlaceOrder called."); // Log entry
-      setStatusMessage(null); 
-      setStatusType(null);
-      
-      const amountStr = amount.trim();
-      const limitPriceStr = limitPrice.trim();
-      const stopPriceStr = stopPrice.trim();
-      
-      console.log(`[OrderEntry] Raw inputs: amount=${amountStr}, limit=${limitPriceStr}, stop=${stopPriceStr}`);
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        setError(null);
+        
+        if (!symbol) {
+            setError('No symbol selected');
+            return;
+        }
+        
+        if (quantity <= 0) {
+            setError('Quantity must be greater than 0');
+            return;
+        }
+        
+        if (!currentPrice || currentPrice <= 0) {
+            setError('Invalid current price');
+            return;
+        }
+        
+        try {
+            const order = {
+                symbol,
+                type: orderType,
+                quantity,
+            };
+            
+            onOrderSubmit(order);
+            
+            // Show success message briefly
+            setIsSuccess(true);
+            setTimeout(() => setIsSuccess(false), 3000);
+            
+            // Reset form if it's a buy order
+            if (orderType === 'buy') {
+                setQuantity(10);
+            }
+        } catch (err: any) {
+            setError(`Error submitting order: ${err.message || 'Unknown error'}`);
+        }
+    };
 
-      const orderAmount = parseFloat(amountStr);
-      const orderLimitPrice = parseFloat(limitPriceStr);
-      const orderStopPrice = parseFloat(stopPriceStr);
+    const totalValue = quantity * currentPrice;
 
-      if (isNaN(orderAmount) || orderAmount <= 0) {
-          console.error("[OrderEntry] Validation Error: Invalid amount.");
-          setStatusMessage('Error: Invalid amount.');
-          setStatusType('error');
-          return;
-      }
-      
-      let simulatedOrder: ManualOrder = {
-        symbol: symbol,
-        side: side,
-        type: orderType,
-        amount: orderAmount,
-      };
-
-      if (orderType === 'limit') {
-          if (isNaN(orderLimitPrice) || orderLimitPrice <= 0) {
-             console.error("[OrderEntry] Validation Error: Invalid limit price.");
-             setStatusMessage('Error: Invalid limit price.');
-             setStatusType('error');
-             return;
-          }
-          simulatedOrder.limitPrice = orderLimitPrice;
-      } else if (orderType === 'stop') {
-           if (isNaN(orderStopPrice) || orderStopPrice <= 0) {
-             console.error("[OrderEntry] Validation Error: Invalid stop price.");
-             setStatusMessage('Error: Invalid stop price.');
-             setStatusType('error');
-             return;
-          } 
-          simulatedOrder.stopPrice = orderStopPrice;
-          if (!isNaN(orderLimitPrice) && orderLimitPrice > 0) {
-              simulatedOrder.limitPrice = orderLimitPrice;
-          } else {
-              simulatedOrder.limitPrice = orderStopPrice; 
-          }
-      }
-
-      console.log('--- Manual Order Simulation ---', simulatedOrder);
-      setStatusMessage(`Simulated ${side.toUpperCase()} ${orderType.toUpperCase()} order placed for ${orderAmount} ${symbol}.`);
-      setStatusType('success');
-      
-      // Call the callback function if provided
-      if (onPlaceOrder) {
-          onPlaceOrder(simulatedOrder);
-      }
-      
-      // Clear inputs after simulation
-      setLimitPrice('');
-      setStopPrice('');
-      setAmount('');
-
-      // Message will persist until next action or clear
-      // setTimeout(() => setStatusMessage(null), 4000); // Remove timeout
-  };
-
-  return (
-    <div className="bg-gray-800 rounded-lg p-4 h-full text-gray-300 flex flex-col">
-      {/* Buy/Sell Tabs */}
-      <div className="flex mb-4 border-b border-gray-700 flex-shrink-0">
-        <button 
-          onClick={() => setSide('buy')} 
-          className={`flex-1 pb-2 text-center font-semibold ${side === 'buy' ? 'text-green-400 border-b-2 border-green-400' : 'text-gray-500'}`}
-        >
-          Buy
-        </button>
-        <button 
-          onClick={() => setSide('sell')} 
-          className={`flex-1 pb-2 text-center font-semibold ${side === 'sell' ? 'text-red-400 border-b-2 border-red-400' : 'text-gray-500'}`}
-        >
-          Sell
-        </button>
-      </div>
-
-      {/* Order Type Selector */}
-      <div className="flex justify-around mb-4 text-sm flex-shrink-0">
-        <button onClick={() => setOrderType('limit')} className={`px-2 py-1 rounded ${orderType === 'limit' ? 'bg-gray-600 text-white font-semibold' : 'text-gray-500 hover:text-gray-300'}`}>Limit</button>
-        <button onClick={() => setOrderType('market')} className={`px-2 py-1 rounded ${orderType === 'market' ? 'bg-gray-600 text-white font-semibold' : 'text-gray-500 hover:text-gray-300'}`}>Market</button>
-        <button onClick={() => setOrderType('stop')} className={`px-2 py-1 rounded ${orderType === 'stop' ? 'bg-gray-600 text-white font-semibold' : 'text-gray-500 hover:text-gray-300'}`}>Stop Limit</button>
-      </div>
-
-      {/* Input Fields Area - Allows scrolling if content overflows */}
-      <div className="flex-grow overflow-y-auto pr-1"> {/* Added padding-right for scrollbar */} 
-          {orderType === 'limit' && (
-            <div className="mb-3">
-              <label className="block text-xs text-gray-400 mb-1">Limit Price ({baseCurrency})</label>
-              <input 
-                type="number" 
-                placeholder="Enter price" 
-                value={limitPrice}
-                onChange={(e) => setLimitPrice(e.target.value)}
-                className="w-full p-2 rounded bg-gray-700 border border-gray-600 text-white text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
-              />
-            </div>
-          )}
-          {orderType === 'stop' && (
-            <div className="mb-3">
-              <label className="block text-xs text-gray-400 mb-1">Stop Price ({baseCurrency})</label>
-              <input 
-                type="number" 
-                placeholder="Enter stop price" 
-                value={stopPrice}
-                onChange={(e) => setStopPrice(e.target.value)}
-                className="w-full p-2 rounded bg-gray-700 border border-gray-600 text-white text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
-               />
-               {/* Optional Limit for Stop Limit */}
-               <label className="block text-xs text-gray-400 mt-2 mb-1">Limit Price (Optional for Stop Limit)</label>
-               <input 
-                 type="number" 
-                 placeholder="Defaults to stop price" 
-                 value={limitPrice} // Reuse limitPrice state for stop-limit's limit
-                 onChange={(e) => setLimitPrice(e.target.value)}
-                 className="w-full p-2 rounded bg-gray-700 border border-gray-600 text-white text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
-               />
-            </div>
-          )}
-          <div className="mb-3">
-            <label className="block text-xs text-gray-400 mb-1">Amount ({symbol})</label>
-            <input 
-              type="number" 
-              placeholder="Enter amount" 
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              className="w-full p-2 rounded bg-gray-700 border border-gray-600 text-white text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
-            />
-          </div>
-          {/* Placeholder for % amount buttons */}
-          <div className="flex justify-between text-xs text-gray-400 mb-4">
-              <span>Amount %:</span>
-              <button className="hover:text-white">25%</button>
-              <button className="hover:text-white">50%</button>
-              <button className="hover:text-white">75%</button>
-              <button className="hover:text-white">Max</button>
-          </div>
-
-          {/* Add other relevant inputs like TP/SL later */}
-      </div>
-      
-      {/* Status Message */}
-      <div className="h-8 mt-2 flex-shrink-0 text-center"> 
-        {statusMessage && (
-            <p className={`text-sm font-medium ${statusType === 'error' ? 'text-red-400' : 'text-green-400'}`}>
-              {statusMessage}
-            </p>
-        )}
-       </div>
-
-      {/* Submit Button */}
-      <div className="mt-auto pt-2 flex-shrink-0"> {/* Pushes button to bottom */} 
-          <button 
-            onClick={handlePlaceOrder}
-            className={`w-full p-3 rounded font-bold ${side === 'buy' ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'} text-white text-sm uppercase`}
-          >
-            {side === 'buy' ? `Buy ${symbol}` : `Sell ${symbol}`}
-          </button>
-      </div>
-    </div>
-  );
+    return (
+        <div>
+            <h3 className="text-lg font-semibold mb-3 text-gray-900 dark:text-white">Place Order</h3>
+            
+            {error && (
+                <div className="mb-4 p-2 bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-400 rounded text-sm">
+                    {error}
+                </div>
+            )}
+            
+            {isSuccess && (
+                <div className="mb-4 p-2 bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-400 rounded text-sm">
+                    Order submitted successfully!
+                </div>
+            )}
+            
+            <form onSubmit={handleSubmit}>
+                <div className="mb-4">
+                    <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">Symbol</label>
+                    <div className="bg-gray-100 dark:bg-gray-700 px-3 py-2 rounded border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white">
+                        {symbol}
+                    </div>
+                </div>
+                
+                <div className="mb-4">
+                    <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">Order Type</label>
+                    <div className="flex">
+                        <button
+                            type="button"
+                            className={`flex-1 py-2 px-4 text-sm font-medium rounded-l-md focus:outline-none ${
+                                orderType === 'buy'
+                                    ? 'bg-green-600 text-white'
+                                    : 'bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
+                            }`}
+                            onClick={() => setOrderType('buy')}
+                        >
+                            Buy
+                        </button>
+                        <button
+                            type="button"
+                            className={`flex-1 py-2 px-4 text-sm font-medium rounded-r-md focus:outline-none ${
+                                orderType === 'sell'
+                                    ? 'bg-red-600 text-white'
+                                    : 'bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
+                            }`}
+                            onClick={() => setOrderType('sell')}
+                        >
+                            Sell
+                        </button>
+                    </div>
+                </div>
+                
+                <div className="mb-4">
+                    <label htmlFor="quantity" className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">
+                        Quantity
+                    </label>
+                    <input
+                        id="quantity"
+                        type="number"
+                        min="1"
+                        value={quantity}
+                        onChange={(e) => setQuantity(parseInt(e.target.value) || 0)}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    />
+                </div>
+                
+                <div className="mb-4">
+                    <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">Price</label>
+                    <div className="flex items-center space-x-2">
+                        <div className="flex-1 bg-gray-100 dark:bg-gray-700 px-3 py-2 rounded border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white">
+                            ${currentPrice.toFixed(2)}
+                        </div>
+                        <div className="text-sm text-gray-500 dark:text-gray-400">
+                            Market Price
+                        </div>
+                    </div>
+                </div>
+                
+                <div className="mb-5 p-3 bg-gray-100 dark:bg-gray-700 rounded">
+                    <div className="flex justify-between">
+                        <span className="text-sm text-gray-600 dark:text-gray-400">Total</span>
+                        <span className="font-bold text-gray-900 dark:text-white">${totalValue.toFixed(2)}</span>
+                    </div>
+                </div>
+                
+                <button
+                    type="submit"
+                    className={`w-full py-2 px-4 rounded font-medium ${
+                        orderType === 'buy'
+                            ? 'bg-green-600 hover:bg-green-700 text-white'
+                            : 'bg-red-600 hover:bg-red-700 text-white'
+                    }`}
+                >
+                    {orderType === 'buy' ? 'Buy' : 'Sell'} {symbol}
+                </button>
+            </form>
+        </div>
+    );
 };
 
 export default OrderEntryPanel; 
