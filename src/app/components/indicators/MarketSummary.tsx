@@ -91,30 +91,36 @@ const MarketSummary: React.FC<MarketSummaryProps> = ({ symbol }) => {
     );
   }
 
+  // Ensure we have safe values for all the indicators
+  const safePrice = price !== null ? price : 0;
+  const safeChange = change !== null ? change : 0;
+  const safeChangePercent = changePercent !== null ? changePercent : 0;
+  const safeVolume = volume !== null ? volume : 0;
+
   return (
     <div className="w-full grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
       <BasicIndicator 
         label="Current Price" 
-        value={price || 0} 
+        value={safePrice} 
         format="currency" 
         showIcon={false}
         tooltipContent="The most recent trading price for this stock"
       />
       <BasicIndicator 
         label="Daily Change" 
-        value={change} 
+        value={safeChange} 
         format="currency" 
         tooltipContent="The price change since the previous market close"
       />
       <BasicIndicator 
         label="Change %" 
-        value={changePercent} 
+        value={safeChangePercent} 
         format="percentage"
         tooltipContent="The percentage change since the previous market close"
       />
       <BasicIndicator 
         label="Volume" 
-        value={volume} 
+        value={safeVolume} 
         showIcon={false}
         tooltipContent="The total number of shares traded today"
       />
