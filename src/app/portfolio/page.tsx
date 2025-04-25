@@ -13,7 +13,14 @@ import {
   LineChart,
   Share2,
   Edit,
-  MinusCircle
+  MinusCircle,
+  Calendar,
+  DollarSign,
+  ArrowDown,
+  ArrowUp,
+  BarChart2,
+  FileText,
+  AlertTriangle
 } from 'lucide-react'
 
 // Import our custom components
@@ -207,8 +214,312 @@ const getAllocationData = () => {
   return getSectorColors();
 };
 
+// Calculate tax implications from the portfolio
+const calculateTaxData = () => {
+  // Calculate dividends based on typical yield for different sectors
+  const dividendYields: { [key: string]: number } = {
+    'Technology': 0.005, // 0.5%
+    'Healthcare': 0.015, // 1.5%
+    'Financials': 0.025, // 2.5%
+    'Utilities': 0.035, // 3.5%
+    'Real Estate': 0.04, // 4%
+    'Consumer Discretionary': 0.01, // 1%
+    'Commodities': 0, // 0%
+    'Fixed Income': 0.03, // 3%
+    'Broad Market': 0.018, // 1.8%
+    'Cash': 0.042, // 4.2% (high-yield savings)
+    'Crypto': 0, // 0%
+    'Industrials': 0.02, // 2%
+    'Communication Services': 0.008, // 0.8%
+    'International': 0.023, // 2.3%
+    'Global Equity': 0.018, // 1.8%
+    'Large Cap Growth': 0.007, // 0.7%
+    'Mid Cap': 0.012, // 1.2%
+    'Small Cap': 0.01 // 1%
+  };
+  
+  // Calculate estimated annual dividend income
+  const dividendIncome = holdingsData.reduce((total, holding) => {
+    const sector = holding.sector || 'Other';
+    const yield_ = dividendYields[sector] || 0.01; // default to 1%
+    return total + (holding.value * yield_);
+  }, 0);
+  
+  // Categorize holdings by tax treatment
+  const taxableHoldings = holdingsData.filter(h => h.accountType === 'taxable');
+  const retirementHoldings = holdingsData.filter(h => h.accountType === 'retirement');
+  const cryptoHoldings = holdingsData.filter(h => h.accountType === 'crypto');
+  
+  // Calculate capital gains (assuming 10% avg price appreciation for taxable holdings, 15% for crypto)
+  const shortTermGains = taxableHoldings.reduce((total, h) => total + (h.value * 0.03), 0); // 3% of value for short-term
+  const longTermGains = taxableHoldings.reduce((total, h) => total + (h.value * 0.07), 0); // 7% of value for long-term
+  const cryptoGains = cryptoHoldings.reduce((total, h) => total + (h.value * 0.15), 0); // 15% for crypto
+  
+  // Tax rates
+  const shortTermRate = 0.32; // 32% tax rate
+  const longTermRate = 0.15; // 15% tax rate
+  const qualifiedDividendRate = 0.15; // 15% qualified dividend rate
+  const cryptoRate = 0.32; // 32% crypto tax rate
+  
+  // Tax amounts
+  const shortTermTax = shortTermGains * shortTermRate;
+  const longTermTax = longTermGains * longTermRate;
+  const dividendTax = dividendIncome * qualifiedDividendRate;
+  const cryptoTax = cryptoGains * cryptoRate;
+  const totalTax = shortTermTax + longTermTax + dividendTax + cryptoTax;
+  
+  // Find harvesting opportunities (positions with losses)
+  const harvestingOpportunities = taxableHoldings
+    .filter(h => Math.random() < 0.2) // Randomly select some holdings for demonstration
+    .map(h => {
+      const lossPercent = Math.random() * 0.1 + 0.05; // 5-15% loss
+      const lossAmount = h.value * lossPercent;
+      const taxSaving = lossAmount * shortTermRate;
+      return {
+        name: h.name,
+        symbol: h.symbol,
+        lossAmount: lossAmount,
+        taxSaving: taxSaving
+      };
+    })
+    .sort((a, b) => b.taxSaving - a.taxSaving) // Sort by potential tax savings
+    .slice(0, 5); // Show top 5
+  
+  return {
+    taxableValue: taxableHoldings.reduce((sum, h) => sum + h.value, 0),
+    retirementValue: retirementHoldings.reduce((sum, h) => sum + h.value, 0),
+    cryptoValue: cryptoHoldings.reduce((sum, h) => sum + h.value, 0),
+    annualDividendIncome: dividendIncome,
+    dividendTax,
+    shortTermGains,
+    longTermGains,
+    cryptoGains,
+    shortTermTax,
+    longTermTax,
+    cryptoTax,
+    totalTax,
+    harvestingOpportunities,
+    currentYear: new Date().getFullYear(),
+    taxDocuments: [
+      { year: 2023, type: '1099-B', status: 'Completed', date: 'Feb 15, 2024' },
+      { year: 2023, type: '1099-DIV', status: 'Completed', date: 'Feb 15, 2024' },
+      { year: 2022, type: '1099-B', status: 'Completed', date: 'Feb 10, 2023' },
+      { year: 2022, type: '1099-DIV', status: 'Completed', date: 'Feb 10, 2023' }
+    ]
+  };
+};
+
+// Tax & Profit Content
+const TaxAndProfitContent = () => {
+  const taxData = calculateTaxData();
+  
+  return (
+    <div className="bg-[#172033] text-white p-6">
+      <div className="mb-6">
+        <h2 className="text-2xl font-semibold mb-2">Tax & Profit Overview</h2>
+        <p className="text-gray-400">Current Tax Year: {taxData.currentYear}</p>
+      </div>
+      
+      {/* Account Types and Tax Status */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div className="bg-[#1D2939] rounded-lg p-4">
+          <h3 className="text-lg font-medium mb-2 flex items-center">
+            <DollarSign className="h-5 w-5 mr-2 text-green-400" />
+            Taxable Accounts
+          </h3>
+          <div className="text-2xl font-bold">
+            ${taxData.taxableValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </div>
+          <div className="text-gray-400 text-sm mt-1">Subject to capital gains tax</div>
+        </div>
+        
+        <div className="bg-[#1D2939] rounded-lg p-4">
+          <h3 className="text-lg font-medium mb-2 flex items-center">
+            <Calendar className="h-5 w-5 mr-2 text-blue-400" />
+            Retirement Accounts
+          </h3>
+          <div className="text-2xl font-bold">
+            ${taxData.retirementValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </div>
+          <div className="text-gray-400 text-sm mt-1">Tax-deferred or tax-free growth</div>
+        </div>
+        
+        <div className="bg-[#1D2939] rounded-lg p-4">
+          <h3 className="text-lg font-medium mb-2 flex items-center">
+            <BarChart2 className="h-5 w-5 mr-2 text-purple-400" />
+            Crypto Assets
+          </h3>
+          <div className="text-2xl font-bold">
+            ${taxData.cryptoValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </div>
+          <div className="text-gray-400 text-sm mt-1">Taxed as property</div>
+        </div>
+      </div>
+      
+      {/* Realized Gains and Income */}
+      <div className="mb-8">
+        <h3 className="text-xl font-semibold mb-4">Realized Gains & Income (Est. {taxData.currentYear})</h3>
+        <div className="bg-[#1D2939] rounded-lg overflow-hidden">
+          <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <h4 className="text-lg font-medium mb-3">Capital Gains</h4>
+              <div className="space-y-4">
+                <div>
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-gray-400">Short-Term Gains</span>
+                    <span className="text-green-400">${taxData.shortTermGains.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-gray-500">Est. Tax (32%)</span>
+                    <span className="text-red-400">${taxData.shortTermTax.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                  </div>
+                </div>
+                
+                <div>
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-gray-400">Long-Term Gains</span>
+                    <span className="text-green-400">${taxData.longTermGains.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-gray-500">Est. Tax (15%)</span>
+                    <span className="text-red-400">${taxData.longTermTax.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                  </div>
+                </div>
+                
+                <div>
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-gray-400">Crypto Gains</span>
+                    <span className="text-green-400">${taxData.cryptoGains.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-gray-500">Est. Tax (32%)</span>
+                    <span className="text-red-400">${taxData.cryptoTax.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <div>
+              <h4 className="text-lg font-medium mb-3">Dividend Income</h4>
+              <div className="space-y-4">
+                <div>
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-gray-400">Est. Annual Dividends</span>
+                    <span className="text-green-400">${taxData.annualDividendIncome.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-gray-500">Est. Tax (15%)</span>
+                    <span className="text-red-400">${taxData.dividendTax.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                  </div>
+                </div>
+                
+                <div className="pt-4">
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="font-medium">Total Estimated Tax</span>
+                    <span className="text-red-400 font-medium">${taxData.totalTax.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      {/* Tax Optimization Opportunities */}
+      <div className="mb-8">
+        <h3 className="text-xl font-semibold mb-4">Tax Optimization Opportunities</h3>
+        <div className="bg-[#1D2939] rounded-lg p-4">
+          <h4 className="text-lg font-medium mb-3 flex items-center">
+            <AlertTriangle className="h-5 w-5 mr-2 text-yellow-500" />
+            Tax Loss Harvesting Opportunities
+          </h4>
+          
+          {taxData.harvestingOpportunities.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-700">
+                <thead>
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Security</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Symbol</th>
+                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-400 uppercase tracking-wider">Potential Loss</th>
+                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-400 uppercase tracking-wider">Tax Savings</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-700">
+                  {taxData.harvestingOpportunities.map((opportunity, index) => (
+                    <tr key={index} className="hover:bg-[#2D3748]">
+                      <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-white">{opportunity.name}</td>
+                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-300">{opportunity.symbol}</td>
+                      <td className="px-4 py-3 whitespace-nowrap text-sm text-right text-red-400">
+                        -${opportunity.lossAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-sm text-right text-green-400">
+                        ${opportunity.taxSaving.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p className="text-gray-400">No tax loss harvesting opportunities identified at this time.</p>
+          )}
+          
+          <div className="mt-4 text-sm text-gray-400">
+            <p className="mb-2">
+              <strong>Strategy:</strong> Consider selling securities with losses to offset capital gains and reduce your tax liability.
+            </p>
+            <p>
+              <strong>Note:</strong> Be aware of wash sale rules when repurchasing similar securities.
+            </p>
+          </div>
+        </div>
+      </div>
+      
+      {/* Tax Documents */}
+      <div>
+        <h3 className="text-xl font-semibold mb-4">Tax Documents</h3>
+        <div className="bg-[#1D2939] rounded-lg p-4">
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-700">
+              <thead>
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Tax Year</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Document</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Status</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Date</th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-400 uppercase tracking-wider">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-700">
+                {taxData.taxDocuments.map((doc, index) => (
+                  <tr key={index} className="hover:bg-[#2D3748]">
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-white">{doc.year}</td>
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-300">{doc.type}</td>
+                    <td className="px-4 py-3 whitespace-nowrap text-sm">
+                      <span className="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-800 text-green-100">
+                        {doc.status}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-300">{doc.date}</td>
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-right">
+                      <button className="text-blue-400 hover:text-blue-300 flex items-center justify-end w-full">
+                        <FileText className="h-4 w-4 mr-1" />
+                        <span>Download</span>
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // Content components for different tabs
-const TaxAndProfitContent = () => <div className="p-4">Tax and Profit content placeholder</div>;
 const InKindTransferContent = () => <div className="p-4">In-Kind Transfer content placeholder</div>;
 const GoalSystemContent = () => <div className="p-4">Goals & Tracking content placeholder</div>;
 const PortfolioSimulationContent = () => <div className="p-4">Simulation content placeholder</div>;
