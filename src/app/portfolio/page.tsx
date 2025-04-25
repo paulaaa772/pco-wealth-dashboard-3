@@ -58,89 +58,154 @@ const chartData: DataPoint[] = [
   { date: new Date('2025-04-15'), value: 7516.61 }
 ];
 
-// Portfolio allocation data for pie chart with the specific color scheme
-const allocationData = [
-  { name: 'Technology', value: 20, color: '#4169E1' },
-  { name: 'Healthcare', value: 15, color: '#9370DB' },
-  { name: 'Financial Services', value: 10, color: '#20B2AA' },
-  { name: 'Consumer Discretionary', value: 12, color: '#3CB371' },
-  { name: 'Communication', value: 9, color: '#FF6347' },
-  { name: 'Industrials', value: 8, color: '#6495ED' },
-  { name: 'Other Sectors', value: 26, color: '#A9A9A9' }
-];
-
-// Portfolio data
-const portfolioData = {
-  totalValue: 7516.61,
-  cash: 1.01,
-  buyingPower: 3682.98,
-  margin: 3681.97,
-  startValue: 0,
-  endValue: 7516.61,
-  netCashFlow: 7592.52,
-  returnRate: -13.75,
-  date: 'Apr 24, 2025',
-  startDate: 'Jul 23, 2024',
-  endDate: 'Apr 24, 2025'
-};
-
-// Define a type for holdings
+// Define a type for holdings with sector information
 interface Holding {
   name: string;
   symbol: string;
   quantity: number;
   value: number;
   sector?: string;
+  accountType?: 'taxable' | 'retirement' | 'crypto' | 'cash';
 }
 
-// Add the holdings data
+// Add the holdings data with sector information
 const holdingsData: Holding[] = [
-  { name: "Tencent", symbol: "TCEHY", quantity: 2, value: 111.84 },
-  { name: "Taiwan Semiconductor", symbol: "TSM", quantity: 2.17, value: 323.89 },
-  { name: "ASML Holding NV", symbol: "ASML", quantity: 1.04, value: 667.48 },
-  { name: "Morgan Stanley CD (4.2%)", symbol: "CD", quantity: 1, value: 2000.00 },
-  { name: "BlackRock Technology Opportuni", symbol: "BGSAX", quantity: 1, value: 57.38 },
-  { name: "Berkshire Hathaway B", symbol: "BRK.B", quantity: 2, value: 584.65 },
-  { name: "Caterpillar", symbol: "CAT", quantity: 2, value: 378.74 },
-  { name: "iShares Gold Trust", symbol: "IAU", quantity: 1, value: 59.66 },
-  { name: "Northrop Grumman", symbol: "NOC", quantity: 1, value: 507.62 },
-  { name: "Novo Nordisk ADR", symbol: "NVO", quantity: 1, value: 252.87 },
-  { name: "SPDR S&P 500 ETF", symbol: "SPY", quantity: 2, value: 310.10 },
-  { name: "Vanguard Dividend Appreciation", symbol: "VIG", quantity: 1, value: 192.36 },
-  { name: "Vanguard Total Stock Market ET", symbol: "VTI", quantity: 3, value: 465.21 },
-  { name: "Vanguard Growth ETF", symbol: "VUG", quantity: 2, value: 313.00 },
-  { name: "Consumer Discretionary SPDR", symbol: "XLY", quantity: 1, value: 155.05 },
-  { name: "Vistra Corp", symbol: "VST", quantity: 1, value: 50.00 },
-  { name: "Vanguard Real Estate ETF", symbol: "VNQ", quantity: 2, value: 180.00 },
-  { name: "Health Care Select Sector SPDR", symbol: "XLV", quantity: 1, value: 100.00 },
-  { name: "Pacer Data & Infra REIT ETF", symbol: "SRVR", quantity: 5, value: 120.00 },
-  { name: "NVIDIA", symbol: "NVDA", quantity: 14, value: 1260.00 },
-  { name: "Lam Research", symbol: "LRCX", quantity: 1, value: 900.00 },
-  { name: "Kratos Defense", symbol: "KTOS", quantity: 8, value: 120.00 },
-  { name: "Intel Corp", symbol: "INTC", quantity: 5, value: 185.00 },
-  { name: "Agrify Corp", symbol: "AGFY", quantity: 3, value: 5.00 },
-  { name: "MicroStrategy", symbol: "MSTR", quantity: 0, value: 0.00 },
-  { name: "Fundrise Portfolio", symbol: "Fundrise", quantity: 1, value: 1117.70 },
-  { name: "Bitcoin", symbol: "BTC", quantity: 0.05, value: 3000.00 },
-  { name: "High-Yield Savings", symbol: "HYSA", quantity: 1, value: 12000.00 },
+  // Taxable account investments
+  { name: "Tencent", symbol: "TCEHY", quantity: 2, value: 111.84, sector: "Communication Services", accountType: "taxable" },
+  { name: "Taiwan Semiconductor", symbol: "TSM", quantity: 2.17, value: 323.89, sector: "Technology", accountType: "taxable" },
+  { name: "ASML Holding NV", symbol: "ASML", quantity: 1.04, value: 667.48, sector: "Technology", accountType: "taxable" },
+  { name: "Morgan Stanley CD (4.2%)", symbol: "CD", quantity: 1, value: 2000.00, sector: "Fixed Income", accountType: "taxable" },
+  { name: "BlackRock Technology Opportuni", symbol: "BGSAX", quantity: 1, value: 57.38, sector: "Technology", accountType: "taxable" },
+  { name: "Berkshire Hathaway B", symbol: "BRK.B", quantity: 2, value: 584.65, sector: "Financials", accountType: "taxable" },
+  { name: "Caterpillar", symbol: "CAT", quantity: 2, value: 378.74, sector: "Industrials", accountType: "taxable" },
+  { name: "iShares Gold Trust", symbol: "IAU", quantity: 1, value: 59.66, sector: "Commodities", accountType: "taxable" },
+  { name: "Northrop Grumman", symbol: "NOC", quantity: 1, value: 507.62, sector: "Industrials", accountType: "taxable" },
+  { name: "Novo Nordisk ADR", symbol: "NVO", quantity: 1, value: 252.87, sector: "Healthcare", accountType: "taxable" },
+  { name: "SPDR S&P 500 ETF", symbol: "SPY", quantity: 2, value: 310.10, sector: "Broad Market", accountType: "taxable" },
+  { name: "Vanguard Dividend Appreciation", symbol: "VIG", quantity: 1, value: 192.36, sector: "Broad Market", accountType: "taxable" },
+  { name: "Vanguard Total Stock Market ET", symbol: "VTI", quantity: 3, value: 465.21, sector: "Broad Market", accountType: "taxable" },
+  { name: "Vanguard Growth ETF", symbol: "VUG", quantity: 2, value: 313.00, sector: "Broad Market", accountType: "taxable" },
+  { name: "Consumer Discretionary SPDR", symbol: "XLY", quantity: 1, value: 155.05, sector: "Consumer Discretionary", accountType: "taxable" },
+  { name: "Vistra Corp", symbol: "VST", quantity: 1, value: 50.00, sector: "Utilities", accountType: "taxable" },
+  { name: "Vanguard Real Estate ETF", symbol: "VNQ", quantity: 2, value: 180.00, sector: "Real Estate", accountType: "taxable" },
+  { name: "Health Care Select Sector SPDR", symbol: "XLV", quantity: 1, value: 100.00, sector: "Healthcare", accountType: "taxable" },
+  { name: "Pacer Data & Infra REIT ETF", symbol: "SRVR", quantity: 5, value: 120.00, sector: "Real Estate", accountType: "taxable" },
+  { name: "NVIDIA", symbol: "NVDA", quantity: 14, value: 1260.00, sector: "Technology", accountType: "taxable" },
+  { name: "Lam Research", symbol: "LRCX", quantity: 1, value: 900.00, sector: "Technology", accountType: "taxable" },
+  { name: "Kratos Defense", symbol: "KTOS", quantity: 8, value: 120.00, sector: "Industrials", accountType: "taxable" },
+  { name: "Intel Corp", symbol: "INTC", quantity: 5, value: 185.00, sector: "Technology", accountType: "taxable" },
+  { name: "Agrify Corp", symbol: "AGFY", quantity: 3, value: 5.00, sector: "Consumer Discretionary", accountType: "taxable" },
+  { name: "MicroStrategy", symbol: "MSTR", quantity: 0, value: 0.00, sector: "Technology", accountType: "taxable" },
+  { name: "Fundrise Portfolio", symbol: "Fundrise", quantity: 1, value: 1117.70, sector: "Real Estate", accountType: "taxable" },
+  { name: "Bitcoin", symbol: "BTC", quantity: 0.05, value: 3000.00, sector: "Crypto", accountType: "crypto" },
+  { name: "High-Yield Savings", symbol: "HYSA", quantity: 1, value: 12000.00, sector: "Cash", accountType: "cash" },
   
-  // New investments from retirement accounts
-  { name: "BlackRock Equity Index Fund GG", symbol: "BEIFGG", quantity: 1, value: 16962.49 },
-  { name: "Large Cap Growth III Fund (AmerCentury)", symbol: "LCGFAC", quantity: 1, value: 16011.20 },
-  { name: "American Funds Growth Fund of Amer R6", symbol: "RGAGX", quantity: 1, value: 10972.12 },
-  { name: "Great-West Life Stock", symbol: "GWO", quantity: 1, value: 5478.62 },
-  { name: "BlackRock US Debt Index Fund L", symbol: "BRDIX", quantity: 1, value: 3137.62 },
-  { name: "American Funds Capital World G/I R6", symbol: "RWIGX", quantity: 1, value: 3000.52 },
-  { name: "BlackRock Mid Capitalization Eqy Index J", symbol: "BMCIX", quantity: 1, value: 2681.10 },
-  { name: "BlackRock Russell 2000 Index J", symbol: "BR2KX", quantity: 1, value: 2626.73 },
-  { name: "BlackRock MSCI EAFE Equity Index Fund M", symbol: "BEIFM", quantity: 1, value: 113.19 },
-  { name: "Mid Cap Growth / Artisan Partners Fund", symbol: "ARTMX", quantity: 1, value: 81.43 },
-  { name: "Allspring Small Company Growth Inst", symbol: "WSCGX", quantity: 1, value: 40.15 },
-  { name: "American Beacon Small Cap Value Cl I CIT", symbol: "ABSCI", quantity: 1, value: 39.45 },
-  { name: "Allspring Special Mid Cap Value CIT E2", symbol: "ASMCE", quantity: 1, value: 39.10 },
-  { name: "Capital Group EuroPacific Growth SA", symbol: "CEUSX", quantity: 1, value: 32.18 },
-  { name: "Empower Multi-Sector Bond Inst", symbol: "EMPBX", quantity: 1, value: 29.97 }
+  // Retirement account investments
+  { name: "BlackRock Equity Index Fund GG", symbol: "BEIFGG", quantity: 1, value: 16962.49, sector: "Broad Market", accountType: "retirement" },
+  { name: "Large Cap Growth III Fund (AmerCentury)", symbol: "LCGFAC", quantity: 1, value: 16011.20, sector: "Large Cap Growth", accountType: "retirement" },
+  { name: "American Funds Growth Fund of Amer R6", symbol: "RGAGX", quantity: 1, value: 10972.12, sector: "Large Cap Growth", accountType: "retirement" },
+  { name: "Great-West Life Stock", symbol: "GWO", quantity: 1, value: 5478.62, sector: "Financials", accountType: "retirement" },
+  { name: "BlackRock US Debt Index Fund L", symbol: "BRDIX", quantity: 1, value: 3137.62, sector: "Fixed Income", accountType: "retirement" },
+  { name: "American Funds Capital World G/I R6", symbol: "RWIGX", quantity: 1, value: 3000.52, sector: "Global Equity", accountType: "retirement" },
+  { name: "BlackRock Mid Capitalization Eqy Index J", symbol: "BMCIX", quantity: 1, value: 2681.10, sector: "Mid Cap", accountType: "retirement" },
+  { name: "BlackRock Russell 2000 Index J", symbol: "BR2KX", quantity: 1, value: 2626.73, sector: "Small Cap", accountType: "retirement" },
+  { name: "BlackRock MSCI EAFE Equity Index Fund M", symbol: "BEIFM", quantity: 1, value: 113.19, sector: "International", accountType: "retirement" },
+  { name: "Mid Cap Growth / Artisan Partners Fund", symbol: "ARTMX", quantity: 1, value: 81.43, sector: "Mid Cap", accountType: "retirement" },
+  { name: "Allspring Small Company Growth Inst", symbol: "WSCGX", quantity: 1, value: 40.15, sector: "Small Cap", accountType: "retirement" },
+  { name: "American Beacon Small Cap Value Cl I CIT", symbol: "ABSCI", quantity: 1, value: 39.45, sector: "Small Cap", accountType: "retirement" },
+  { name: "Allspring Special Mid Cap Value CIT E2", symbol: "ASMCE", quantity: 1, value: 39.10, sector: "Mid Cap", accountType: "retirement" },
+  { name: "Capital Group EuroPacific Growth SA", symbol: "CEUSX", quantity: 1, value: 32.18, sector: "International", accountType: "retirement" },
+  { name: "Empower Multi-Sector Bond Inst", symbol: "EMPBX", quantity: 1, value: 29.97, sector: "Fixed Income", accountType: "retirement" }
 ];
+
+// Calculate total portfolio value from holdings
+const calculateTotalPortfolioValue = () => {
+  return holdingsData.reduce((total, holding) => total + holding.value, 0);
+};
+
+// Calculate sector allocations for the donut chart
+const calculateSectorAllocations = () => {
+  const sectors: { [key: string]: number } = {};
+  
+  // Sum values by sector
+  holdingsData.forEach(holding => {
+    const sector = holding.sector || 'Other';
+    sectors[sector] = (sectors[sector] || 0) + holding.value;
+  });
+  
+  // Convert to array and calculate percentages
+  const totalValue = calculateTotalPortfolioValue();
+  const allocations = Object.entries(sectors).map(([name, value]) => {
+    return { name, value: Math.round((value / totalValue) * 100) };
+  });
+  
+  // Sort by percentage (descending)
+  return allocations.sort((a, b) => b.value - a.value);
+};
+
+// Generate color for each sector
+const getSectorColors = () => {
+  const colors = [
+    '#4169E1', // Royal Blue
+    '#9370DB', // Medium Purple
+    '#20B2AA', // Light Sea Green
+    '#3CB371', // Medium Sea Green
+    '#FF6347', // Tomato
+    '#6495ED', // Cornflower Blue
+    '#A9A9A9', // Dark Gray
+    '#FFD700', // Gold
+    '#8A2BE2', // Blue Violet
+    '#32CD32', // Lime Green
+    '#FF4500', // Orange Red
+    '#4682B4', // Steel Blue
+    '#7B68EE', // Medium Slate Blue
+    '#2E8B57', // Sea Green
+    '#CD5C5C'  // Indian Red
+  ];
+  
+  const sectorAllocations = calculateSectorAllocations();
+  
+  // Assign colors to sectors
+  return sectorAllocations.map((sector, index) => ({
+    ...sector,
+    color: colors[index % colors.length]
+  }));
+};
+
+// Updated portfolio data with calculations from holdings
+const getPortfolioData = () => {
+  const totalValue = calculateTotalPortfolioValue();
+  const cash = holdingsData
+    .filter(holding => holding.sector === 'Cash')
+    .reduce((sum, holding) => sum + holding.value, 0);
+  
+  return {
+    totalValue,
+    cash,
+    buyingPower: cash * 2, // Assume 2x leverage for buying power
+    margin: cash,
+    startValue: totalValue * 0.9, // Assume 10% growth from start
+    endValue: totalValue,
+    netCashFlow: totalValue * 0.7, // Assume 70% of value is from contributions
+    returnRate: 13.92, // Using static value for now
+    date: new Date().toLocaleDateString('en-US', { 
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    }),
+    startDate: 'Jan 1, 2024',
+    endDate: new Date().toLocaleDateString('en-US', { 
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    })
+  };
+};
+
+// Get allocations for donut chart
+const getAllocationData = () => {
+  return getSectorColors();
+};
 
 // Content components for different tabs
 const TaxAndProfitContent = () => <div className="p-4">Tax and Profit content placeholder</div>;
@@ -153,6 +218,8 @@ export default function Portfolio() {
   const [selectedTimeframe, setSelectedTimeframe] = useState('1M');
   const [isLoading, setIsLoading] = useState(true);
   const [netWorthData, setNetWorthData] = useState<DataPoint[]>([]);
+  const [portfolioData, setPortfolioData] = useState(getPortfolioData());
+  const [allocationData, setAllocationData] = useState(getAllocationData());
   
   // Add state for holdings filtering and sorting
   const [holdingsFilter, setHoldingsFilter] = useState('');
@@ -177,6 +244,8 @@ export default function Portfolio() {
         // For now, we'll simulate loading with a timeout
         setTimeout(() => {
           setNetWorthData(chartData);
+          setPortfolioData(getPortfolioData());
+          setAllocationData(getAllocationData());
           setIsLoading(false);
         }, 1000);
       } catch (error) {
@@ -682,7 +751,7 @@ export default function Portfolio() {
                       <span className="text-gray-400 mr-2">Cash</span>
                       <div className="bg-gray-700 rounded-full w-4 h-4 flex items-center justify-center text-xs">?</div>
                     </div>
-                    <div className="text-xl font-bold">${portfolioData.cash.toLocaleString()}</div>
+                    <div className="text-xl font-bold">${portfolioData.cash.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                   </div>
                   
                   <div>
@@ -690,12 +759,12 @@ export default function Portfolio() {
                       <span className="text-gray-400 mr-2">Margin</span>
                       <div className="bg-gray-700 rounded-full w-4 h-4 flex items-center justify-center text-xs">?</div>
                     </div>
-                    <div className="text-xl font-bold text-blue-400">${portfolioData.margin.toLocaleString()} ›</div>
+                    <div className="text-xl font-bold text-blue-400">${portfolioData.margin.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ›</div>
                   </div>
                   
                   <div>
                     <span className="text-gray-400">Total buying power</span>
-                    <div className="text-xl font-bold">${portfolioData.buyingPower.toLocaleString()}</div>
+                    <div className="text-xl font-bold">${portfolioData.buyingPower.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                   </div>
                   
                   <div className="md:col-span-3 flex justify-end">
@@ -710,7 +779,7 @@ export default function Portfolio() {
                   <div className="w-full lg:w-1/3">
                     <div className="bg-[#1D2939] rounded-lg p-6 h-full">
                       <div className="text-center">
-                        <div className="text-4xl font-bold mb-1">${portfolioData.totalValue.toLocaleString()}</div>
+                        <div className="text-4xl font-bold mb-1">${portfolioData.totalValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                         <div className="text-sm text-gray-400">as of {portfolioData.date}</div>
                       </div>
                       
@@ -721,6 +790,7 @@ export default function Portfolio() {
                           height={250} 
                           innerRadius={70} 
                           outerRadius={110} 
+                          darkMode={true}
                         />
                       </div>
                       
@@ -799,17 +869,17 @@ export default function Portfolio() {
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-8">
                         <div>
                           <div className="text-gray-400 text-sm">Starting value: {portfolioData.startDate}</div>
-                          <div className="font-medium">${portfolioData.startValue.toLocaleString()}</div>
+                          <div className="font-medium">${portfolioData.startValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                         </div>
                         
                         <div>
                           <div className="text-gray-400 text-sm">Ending value: {portfolioData.endDate}</div>
-                          <div className="font-medium">${portfolioData.endValue.toLocaleString()}</div>
+                          <div className="font-medium">${portfolioData.endValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                         </div>
                         
                         <div>
                           <div className="text-gray-400 text-sm">Net cash flow</div>
-                          <div className="font-medium">${portfolioData.netCashFlow.toLocaleString()}</div>
+                          <div className="font-medium">${portfolioData.netCashFlow.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                         </div>
                         
                         <div>

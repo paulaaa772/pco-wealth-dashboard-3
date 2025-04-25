@@ -44,12 +44,16 @@ const AiAssistantPanel: React.FC = () => {
     // Simulate AI response after a short delay
     setTimeout(() => {
       const aiResponses = [
-        "Based on your portfolio's performance, I recommend rebalancing your technology allocation.",
-        "Your current asset allocation appears to be well-aligned with your financial goals.",
-        "I noticed you have a high concentration in the technology sector. Would you like some diversification suggestions?",
-        "Your portfolio's annual return of 7.5% is below your target of 10%. Would you like some suggestions to improve performance?",
-        "Looking at your recent transactions, it might be beneficial to consider tax-loss harvesting for NVDA.",
-        "You're making good progress toward your house down payment goal. At this rate, you'll reach your target 3 months ahead of schedule."
+        "Your portfolio appears well-diversified, but you might consider reducing your Large Cap Growth exposure which is currently over 25% of your portfolio.",
+        "I notice you have significant assets in retirement accounts. Consider optimizing your tax efficiency by keeping growth-oriented investments in Roth accounts if available.",
+        "Your technology allocation is quite high. While the sector has performed well, consider diversification to reduce sector-specific risk.",
+        "Based on your current asset mix, you might benefit from increasing your international exposure for better geographic diversification.",
+        "Your fixed income allocation is relatively low at about 5%. Consider increasing this allocation if you're concerned about market volatility.",
+        "Looking at your holdings, NVIDIA represents a significant position. Make sure you're comfortable with the concentration risk this presents.",
+        "Your cash position is substantial. In this interest rate environment, ensure it's earning competitive yields in high-yield savings or short-term treasury funds.",
+        "The BlackRock Equity Index Fund and Large Cap Growth Fund III together represent over 30% of your portfolio. Consider if this aligns with your desired asset allocation.",
+        "Your real estate allocation through REITs and Fundrise provides good diversification. This asset class can offer inflation protection and income.",
+        "Based on your portfolio composition, I'd recommend periodic rebalancing to maintain your target asset allocation, especially after significant market movements."
       ];
       
       // Select a random response
