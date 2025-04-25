@@ -1,18 +1,215 @@
 'use client'
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import { PolygonService, PolygonCandle } from '../../lib/market-data/PolygonService';
 import TradingChart from '../../components/dashboard/TradingChart';
-import AlertMessage from '../../components/dashboard/AlertMessage';
 
-// Dynamically import components with SSR disabled to avoid hydration issues
+// Create a simple AlertMessage component inline since it's missing
+const AlertMessage = ({ 
+  type, 
+  message, 
+  onDismiss 
+}: { 
+  type: 'warning' | 'error' | 'success' | 'info'; 
+  message: string; 
+  onDismiss: () => void;
+}) => (
+  <div className={`p-4 rounded-md ${
+    type === 'warning' ? 'bg-yellow-50 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-300' : 
+    type === 'error' ? 'bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-300' :
+    type === 'success' ? 'bg-green-50 dark:bg-green-900/20 text-green-800 dark:text-green-300' :
+    'bg-blue-50 dark:bg-blue-900/20 text-blue-800 dark:text-blue-300'
+  }`}>
+    <div className="flex justify-between items-center">
+      <div>{message}</div>
+      <button 
+        onClick={onDismiss}
+        className="text-gray-400 hover:text-gray-600 dark:text-gray-300 dark:hover:text-gray-100"
+      >
+        <span className="sr-only">Dismiss</span>
+        <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+          <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+        </svg>
+      </button>
+    </div>
+  </div>
+);
+
+// Simplified inline implementation of SymbolSearch
+const SymbolSearch = ({ 
+  onSymbolSelect, 
+  defaultSymbol = 'AAPL' 
+}: { 
+  onSymbolSelect: (symbol: string) => void; 
+  defaultSymbol?: string;
+}) => {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [isOpen, setIsOpen] = useState(false);
+
+  const popularSymbols = [
+    { symbol: 'AAPL', name: 'Apple Inc.' },
+    { symbol: 'MSFT', name: 'Microsoft Corporation' },
+    { symbol: 'GOOGL', name: 'Alphabet Inc.' },
+    { symbol: 'AMZN', name: 'Amazon.com Inc.' },
+    { symbol: 'TSLA', name: 'Tesla Inc.' },
+  ];
+
+  return (
+    <div className="relative w-full">
+      <div className="relative">
+        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+          <svg className="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+        </div>
+        <input
+          type="text"
+          placeholder={`Search (${defaultSymbol})`}
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          onFocus={() => setIsOpen(true)}
+          className="pl-10 pr-4 py-2 w-full rounded-md border border-gray-300 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+        />
+      </div>
+      
+      {isOpen && (
+        <div className="absolute z-50 mt-1 w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg max-h-60 overflow-auto">
+          <div className="p-2">
+            <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Popular Symbols</div>
+            <div className="space-y-1">
+              {popularSymbols.map(item => (
+                <div
+                  key={item.symbol}
+                  className="flex items-center p-2 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer rounded"
+                  onClick={() => {
+                    onSymbolSelect(item.symbol);
+                    setIsOpen(false);
+                    setSearchTerm('');
+                  }}
+                >
+                  <div className="font-medium">{item.symbol}</div>
+                  <div className="ml-2 text-sm text-gray-500 dark:text-gray-400">{item.name}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Simplified inline implementation of AITradingPanel
+const AITradingPanel = ({ 
+  symbol, 
+  positions 
+}: { 
+  symbol: string; 
+  positions: AIPosition[];
+}) => {
+  const [isEnabled, setIsEnabled] = useState(false);
+  const [riskLevel, setRiskLevel] = useState<'low' | 'medium' | 'high'>('low');
+  
+  return (
+    <div>
+      <h3 className="text-lg font-semibold mb-3 text-gray-900 dark:text-white">AI Trading</h3>
+      
+      <div className="mb-4 flex items-center justify-between">
+        <div className="flex items-center">
+          <div 
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors cursor-pointer ${
+              isEnabled ? 'bg-blue-600' : 'bg-gray-200 dark:bg-gray-700'
+            }`}
+            onClick={() => setIsEnabled(!isEnabled)}
+          >
+            <span 
+              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                isEnabled ? 'translate-x-6' : 'translate-x-1'
+              }`} 
+            />
+          </div>
+          <span className="ml-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+            {isEnabled ? 'Enabled' : 'Disabled'}
+          </span>
+        </div>
+        
+        {isEnabled && (
+          <div className="flex items-center space-x-2">
+            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Risk:</label>
+            <div className="flex border border-gray-300 dark:border-gray-600 rounded-md overflow-hidden">
+              <button
+                className={`px-2 py-1 text-xs ${
+                  riskLevel === 'low' ? 'bg-blue-600 text-white' : 'bg-gray-100 dark:bg-gray-700'
+                }`}
+                onClick={() => setRiskLevel('low')}
+              >
+                Low
+              </button>
+              <button
+                className={`px-2 py-1 text-xs ${
+                  riskLevel === 'medium' ? 'bg-blue-600 text-white' : 'bg-gray-100 dark:bg-gray-700'
+                }`}
+                onClick={() => setRiskLevel('medium')}
+              >
+                Med
+              </button>
+              <button
+                className={`px-2 py-1 text-xs ${
+                  riskLevel === 'high' ? 'bg-blue-600 text-white' : 'bg-gray-100 dark:bg-gray-700'
+                }`}
+                onClick={() => setRiskLevel('high')}
+              >
+                High
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+      
+      {isEnabled && (
+        <div className="py-2 px-3 mb-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded text-sm text-blue-800 dark:text-blue-300">
+          AI Trading is analyzing {symbol} with {riskLevel} risk profile
+        </div>
+      )}
+      
+      <div className="mb-4">
+        <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Active Positions</h4>
+        
+        {positions.length === 0 ? (
+          <div className="text-center py-4 bg-gray-50 dark:bg-gray-800 rounded text-sm text-gray-500 dark:text-gray-400">
+            No active positions
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {positions.filter(p => p.status === 'open').map(position => (
+              <div key={position.id} className="p-3 bg-gray-50 dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <div className="font-medium text-gray-900 dark:text-white">{position.symbol}</div>
+                    <div className="text-sm text-gray-500 dark:text-gray-400">{position.strategy} Strategy</div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-sm font-medium">
+                      {position.quantity} shares @ ${position.entryPrice.toFixed(2)}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// Dynamically import remaining components with SSR disabled to avoid hydration issues
 const OrderEntryPanel = dynamic(() => import('../../components/brokerage/OrderEntryPanel'), { ssr: false });
 const OrderBook = dynamic(() => import('../../components/brokerage/OrderBook'), { ssr: false });
 const TradeHistory = dynamic(() => import('../../components/brokerage/TradeHistory'), { ssr: false });
-const AITradingPanel = dynamic(() => import('../../components/brokerage/AITradingPanel'), { ssr: false });
-const SymbolSearch = dynamic(() => import('../../components/brokerage/SymbolSearch'), { ssr: false });
 
+// Stock data interfaces
 export interface CandleData {
   timestamp: number;
   open: number;
@@ -27,6 +224,7 @@ export interface ChartDataPoint {
   value: number;
 }
 
+// Order and position interfaces
 export interface ManualOrder {
   id: string;
   symbol: string;
@@ -52,16 +250,24 @@ export interface AIPosition {
 }
 
 export default function BrokeragePage() {
+  // State for stock data
   const [symbol, setSymbol] = useState('AAPL');
   const [timeframe, setTimeframe] = useState('1D');
   const [candleData, setCandleData] = useState<CandleData[]>([]);
   const [currentPrice, setCurrentPrice] = useState<number>(0);
+  
+  // Orders and positions
   const [manualOrders, setManualOrders] = useState<ManualOrder[]>([]);
   const [aiPositions, setAiPositions] = useState<AIPosition[]>([]);
+  
+  // UI state
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [isApiKeyValid, setIsApiKeyValid] = useState<boolean>(true);
+  const [lastUpdateTime, setLastUpdateTime] = useState<Date>(new Date());
+  const [refreshInterval, setRefreshInterval] = useState<number>(60); // seconds
 
+  // Load initial data when page loads
   useEffect(() => {
     console.log('Brokerage page initialized');
     
@@ -73,7 +279,25 @@ export default function BrokeragePage() {
       loadMarketData(symbol, timeframe);
     }
 
-    // Add some sample orders and positions for demo
+    // Add sample orders for demo
+    initializeSampleOrders();
+    
+    // Start auto-refresh timer
+    const interval = setInterval(() => {
+      if (symbol) {
+        console.log(`Auto-refreshing data for ${symbol}`);
+        loadMarketData(symbol, timeframe, true);
+        setLastUpdateTime(new Date());
+      }
+    }, refreshInterval * 1000);
+    
+    return () => clearInterval(interval);
+  }, [refreshInterval]);
+
+  // Initialize sample orders and positions
+  const initializeSampleOrders = () => {
+    const now = Date.now();
+    
     setManualOrders([
       {
         id: '1',
@@ -81,7 +305,7 @@ export default function BrokeragePage() {
         type: 'buy',
         quantity: 10,
         price: 175.23,
-        timestamp: Date.now() - 3600000,
+        timestamp: now - 3600000,
         status: 'filled'
       },
       {
@@ -90,7 +314,7 @@ export default function BrokeragePage() {
         type: 'sell',
         quantity: 5,
         price: 178.45,
-        timestamp: Date.now() - 1800000,
+        timestamp: now - 1800000,
         status: 'open'
       }
     ]);
@@ -101,15 +325,17 @@ export default function BrokeragePage() {
         symbol: 'AAPL',
         entryPrice: 170.45,
         quantity: 15,
-        entryTime: Date.now() - 86400000,
+        entryTime: now - 86400000,
         status: 'open',
         strategy: 'Momentum'
       }
     ]);
-  }, []);
+  };
 
+  // Verify the API key
   const verifyApiKey = async () => {
     try {
+      console.log('Verifying API key...');
       const response = await fetch('/api/verify-api');
       const data = await response.json();
       
@@ -128,22 +354,64 @@ export default function BrokeragePage() {
     }
   };
 
-  const handleSymbolChange = (newSymbol: string) => {
+  // Handle symbol changes from search
+  const handleSymbolChange = useCallback((newSymbol: string) => {
     console.log('Symbol changed to:', newSymbol);
     setSymbol(newSymbol);
     setIsLoading(true);
+    setError(null);
     loadMarketData(newSymbol, timeframe);
-  };
+    
+    // Update positions for the new symbol
+    const now = Date.now();
+    setAiPositions(prev => {
+      // Keep existing positions
+      const existing = [...prev];
+      
+      // Add a position for the new symbol if none exists
+      if (!existing.some(p => p.symbol === newSymbol && p.status === 'open')) {
+        existing.push({
+          id: `position-${now}`,
+          symbol: newSymbol,
+          entryPrice: generateSimulatedPrice(newSymbol),
+          quantity: Math.floor(5 + Math.random() * 15),
+          entryTime: now - Math.floor(Math.random() * 604800000), // Random time in the last week
+          status: 'open',
+          strategy: 'Momentum'
+        });
+      }
+      
+      return existing;
+    });
+  }, [timeframe]);
 
-  const handleTimeframeChange = (newTimeframe: string) => {
+  // Handle timeframe changes
+  const handleTimeframeChange = useCallback((newTimeframe: string) => {
     console.log('Timeframe changed to:', newTimeframe);
     setTimeframe(newTimeframe);
     setIsLoading(true);
     loadMarketData(symbol, newTimeframe);
+  }, [symbol]);
+
+  // Set the refresh interval
+  const handleRefreshIntervalChange = (seconds: number) => {
+    console.log(`Setting refresh interval to ${seconds} seconds`);
+    setRefreshInterval(seconds);
   };
 
-  const loadMarketData = async (symbol: string, timeframe: string = '1D') => {
-    setError(null);
+  // Handle manual refresh button click
+  const handleManualRefresh = () => {
+    console.log('Manual refresh requested');
+    setIsLoading(true);
+    loadMarketData(symbol, timeframe);
+    setLastUpdateTime(new Date());
+  };
+
+  // Load market data from API or generate demo data
+  const loadMarketData = async (symbol: string, timeframe: string = '1D', isAutoRefresh = false) => {
+    if (!isAutoRefresh) {
+      setError(null);
+    }
     setIsLoading(true);
     
     try {
@@ -157,8 +425,10 @@ export default function BrokeragePage() {
       if (price !== null) {
         setCurrentPrice(price);
       } else {
-        console.error('Failed to get latest price');
-        setError('Failed to get latest price. Using demo data.');
+        console.error('Failed to get latest price, using simulated data');
+        if (!isAutoRefresh) {
+          setError('Failed to get latest price. Using demo data.');
+        }
         
         // Use a simulated price for demo purposes
         setCurrentPrice(generateSimulatedPrice(symbol));
@@ -167,7 +437,28 @@ export default function BrokeragePage() {
       // Get candle data
       const endDate = new Date();
       const startDate = new Date();
-      startDate.setMonth(startDate.getMonth() - 3); // 3 months of data
+      
+      // Adjust start date based on timeframe
+      switch(timeframe) {
+        case '1D':
+          startDate.setDate(endDate.getDate() - 1);
+          break;
+        case '1W':
+          startDate.setDate(endDate.getDate() - 7);
+          break;
+        case '1M':
+          startDate.setMonth(endDate.getMonth() - 1);
+          break;
+        case '3M':
+          startDate.setMonth(endDate.getMonth() - 3);
+          break;
+        case 'YTD':
+          startDate.setMonth(0);
+          startDate.setDate(1);
+          break;
+        default:
+          startDate.setMonth(endDate.getMonth() - 3);
+      }
       
       const formattedStartDate = startDate.toISOString().split('T')[0];
       const formattedEndDate = endDate.toISOString().split('T')[0];
@@ -196,29 +487,35 @@ export default function BrokeragePage() {
       } else {
         console.error('No candle data returned, using demo data');
         
-        if (!isApiKeyValid) {
-          setError('Using demo data - API key not configured');
-        } else {
-          setError('Failed to load chart data. Using demo data.');
+        if (!isAutoRefresh) {
+          if (!isApiKeyValid) {
+            setError('Using demo data - API key not configured');
+          } else {
+            setError('Failed to load chart data. Using demo data.');
+          }
         }
         
         // Generate demo candle data
-        setCandleData(generateDemoCandleData(symbol));
+        setCandleData(generateDemoCandleData(symbol, startDate, endDate));
       }
     } catch (error: any) {
       console.error('Error loading market data:', error);
-      setError(`Error: ${error.message || 'Failed to load market data'}. Using demo data.`);
+      if (!isAutoRefresh) {
+        setError(`Error: ${error.message || 'Failed to load market data'}. Using demo data.`);
+      }
       
       // Generate demo data if real data fails
       setCurrentPrice(generateSimulatedPrice(symbol));
       setCandleData(generateDemoCandleData(symbol));
     } finally {
       setIsLoading(false);
+      setLastUpdateTime(new Date());
     }
   };
 
+  // Generate a simulated price for a symbol
   const generateSimulatedPrice = (symbol: string): number => {
-    // Simple simulated prices for demo purposes
+    // Base prices for common stocks
     const basePrices: Record<string, number> = {
       'AAPL': 175.23,
       'MSFT': 420.45,
@@ -226,7 +523,15 @@ export default function BrokeragePage() {
       'AMZN': 183.92,
       'TSLA': 172.63,
       'NVDA': 930.12,
-      'META': 475.81
+      'META': 475.81,
+      'JPM': 182.45,
+      'V': 278.32,
+      'WMT': 62.15,
+      'JNJ': 152.78,
+      'PG': 165.92,
+      'UNH': 526.38,
+      'XOM': 113.55,
+      'HD': 342.80
     };
     
     // Use the base price or generate a random one if symbol not found
@@ -236,25 +541,48 @@ export default function BrokeragePage() {
     return parseFloat((basePrice + (Math.random() * 4 - 2)).toFixed(2));
   };
 
-  const generateDemoCandleData = (symbol: string): CandleData[] => {
+  // Generate realistic demo candle data
+  const generateDemoCandleData = (symbol: string, startDate?: Date, endDate?: Date): CandleData[] => {
     const candles: CandleData[] = [];
     const basePrice = generateSimulatedPrice(symbol);
-    const now = new Date();
+    const now = endDate || new Date();
+    const start = startDate || new Date(now.getTime() - (60 * 24 * 60 * 60 * 1000)); // Default to 60 days
     
-    // Generate 60 days of data
-    for (let i = 60; i >= 0; i--) {
-      const date = new Date();
+    // Calculate number of days between dates
+    const dayDiff = Math.floor((now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+    const numCandles = Math.max(20, dayDiff);
+    
+    // Generate candles
+    let prevClose = basePrice;
+    for (let i = numCandles; i >= 0; i--) {
+      const date = new Date(now);
       date.setDate(now.getDate() - i);
       
       // Skip weekends
       if (date.getDay() === 0 || date.getDay() === 6) continue;
       
-      // Generate random price movement (-3% to +3%)
-      const dailyChange = basePrice * (Math.random() * 0.06 - 0.03);
-      const open = basePrice + dailyChange * (Math.random() * 0.8);
-      const close = basePrice + dailyChange;
-      const high = Math.max(open, close) + (basePrice * Math.random() * 0.01);
-      const low = Math.min(open, close) - (basePrice * Math.random() * 0.01);
+      // Simulate realistic price movement based on previous close
+      // Use a random walk with momentum and mean reversion
+      const dailyVolatility = basePrice * 0.02; // 2% daily volatility
+      const meanReversionFactor = 0.3; // Pull toward basePrice
+      const momentumFactor = 0.2; // Continue previous direction
+      const randomFactor = Math.random() * 2 - 1; // Random component
+      
+      // Calculate today's movement
+      const distanceFromBase = prevClose - basePrice;
+      const meanReversion = -meanReversionFactor * distanceFromBase / basePrice;
+      const dailyChange = dailyVolatility * (randomFactor + meanReversion);
+      
+      // Generate OHLC values
+      const open = prevClose;
+      const direction = Math.random() > 0.5 ? 1 : -1;
+      const range = dailyVolatility * (0.5 + Math.random() * 0.5);
+      const high = Math.max(open, open + dailyChange) + (range * 0.5);
+      const low = Math.min(open, open + dailyChange) - (range * 0.5);
+      const close = open + dailyChange;
+      
+      // Update prevClose for next iteration
+      prevClose = close;
       
       candles.push({
         timestamp: date.getTime(),
@@ -269,7 +597,10 @@ export default function BrokeragePage() {
     return candles;
   };
 
+  // Handle manual order submission
   const handleManualOrder = (order: Omit<ManualOrder, 'id' | 'timestamp' | 'status' | 'price'>) => {
+    console.log('Submitting manual order:', order);
+    
     // Generate a new order with timestamp and ID
     const newOrder: ManualOrder = {
       ...order,
@@ -280,23 +611,55 @@ export default function BrokeragePage() {
     };
 
     setManualOrders(prevOrders => [...prevOrders, newOrder]);
+    
+    // Show a toast or notification here
+    
     return newOrder;
+  };
+
+  // Calculate the total value of owned shares
+  const calculatePortfolioValue = () => {
+    let portfolioValue = 0;
+    
+    // Add value from filled buy orders
+    const filledBuys = manualOrders.filter(order => order.status === 'filled' && order.type === 'buy');
+    const filledSells = manualOrders.filter(order => order.status === 'filled' && order.type === 'sell');
+    
+    for (const order of filledBuys) {
+      if (order.symbol === symbol) {
+        portfolioValue += order.quantity * currentPrice;
+      }
+    }
+    
+    // Subtract value from filled sell orders
+    for (const order of filledSells) {
+      if (order.symbol === symbol) {
+        portfolioValue -= order.quantity * currentPrice;
+      }
+    }
+    
+    return portfolioValue;
+  };
+
+  // Format the last update time
+  const formatLastUpdate = () => {
+    return lastUpdateTime.toLocaleTimeString();
   };
 
   return (
     <div className="flex flex-col">
       {/* Header section */}
-      <div className="mb-4 flex justify-between items-end">
+      <div className="mb-4 flex flex-col md:flex-row justify-between items-end gap-4">
         <div>
           <h1 className="text-2xl font-bold mb-2">Trading Dashboard</h1>
-          <div className="flex items-center gap-4">
-            <div>
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+            <div className="w-full sm:w-64">
               <SymbolSearch
                 onSymbolSelect={handleSymbolChange}
                 defaultSymbol={symbol}
               />
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
               {['1D', '1W', '1M', '3M', 'YTD'].map((tf) => (
                 <button
                   key={tf}
@@ -311,12 +674,23 @@ export default function BrokeragePage() {
                 </button>
               ))}
             </div>
-            {currentPrice > 0 && (
-              <div className="text-lg font-semibold">
-                ${currentPrice.toFixed(2)}
-              </div>
-            )}
           </div>
+        </div>
+        <div className="flex items-center gap-4">
+          {currentPrice > 0 && (
+            <div className="text-xl font-semibold bg-gray-100 dark:bg-gray-800 px-3 py-2 rounded-lg">
+              ${currentPrice.toFixed(2)}
+            </div>
+          )}
+          <button 
+            onClick={handleManualRefresh}
+            className="p-2 rounded-full bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200"
+            disabled={isLoading}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 ${isLoading ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+          </button>
         </div>
       </div>
 
@@ -330,6 +704,31 @@ export default function BrokeragePage() {
           />
         </div>
       )}
+
+      {/* Last updated indicator */}
+      <div className="mb-2 text-right text-xs text-gray-500 dark:text-gray-400">
+        Last updated: {formatLastUpdate()} (refreshes every {refreshInterval}s)
+        <div className="inline-flex ml-2">
+          <button 
+            onClick={() => handleRefreshIntervalChange(30)}
+            className={`px-1 text-xs rounded-l ${refreshInterval === 30 ? 'bg-blue-100 text-blue-700' : 'hover:bg-gray-100'}`}
+          >
+            30s
+          </button>
+          <button 
+            onClick={() => handleRefreshIntervalChange(60)}
+            className={`px-1 text-xs ${refreshInterval === 60 ? 'bg-blue-100 text-blue-700' : 'hover:bg-gray-100'}`}
+          >
+            1m
+          </button>
+          <button 
+            onClick={() => handleRefreshIntervalChange(300)}
+            className={`px-1 text-xs rounded-r ${refreshInterval === 300 ? 'bg-blue-100 text-blue-700' : 'hover:bg-gray-100'}`}
+          >
+            5m
+          </button>
+        </div>
+      </div>
 
       {/* Main content */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -351,6 +750,18 @@ export default function BrokeragePage() {
                 <p className="text-gray-500 dark:text-gray-400">No data available</p>
               </div>
             )}
+          </div>
+          
+          {/* Portfolio value */}
+          <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+            <div className="flex justify-between items-center">
+              <div className="text-sm text-gray-500 dark:text-gray-400">
+                Portfolio Value ({symbol})
+              </div>
+              <div className="text-lg font-semibold">
+                ${calculatePortfolioValue().toFixed(2)}
+              </div>
+            </div>
           </div>
         </div>
 
@@ -376,7 +787,7 @@ export default function BrokeragePage() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
         {/* Order book */}
         <div className="bg-white dark:bg-zinc-800 rounded-lg shadow p-4">
-          <OrderBook orders={manualOrders} />
+          <OrderBook orders={manualOrders.filter(order => order.status === 'open')} />
         </div>
 
         {/* Trade history */}
