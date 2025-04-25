@@ -19,22 +19,10 @@
       ]
     }
   ],
-  "overrides": {
-    "api/verify-api": {
-      "public": true,
-      "requireAuthentication": false
-    },
-    "api/polygon/candles": {
-      "public": true,
-      "requireAuthentication": false
-    },
-    "api/trades/load": {
-      "public": true,
-      "requireAuthentication": false
-    },
-    "api/trades/save": {
-      "public": true,
-      "requireAuthentication": false
-    }
-  }
+  "routes": [
+    { "src": "/api/verify-api", "dest": "/api/verify-api", "check": false },
+    { "src": "/api/polygon/candles", "dest": "/api/polygon/candles", "check": false },
+    { "src": "/api/trades/load", "dest": "/api/trades/load", "check": false },
+    { "src": "/api/trades/save", "dest": "/api/trades/save", "check": false }
+  ]
 }
