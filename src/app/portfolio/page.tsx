@@ -37,68 +37,122 @@ const chartData = [
 
 // Portfolio allocation data for pie chart
 const allocationData = [
-  { color: 'bg-blue-500', percentage: 20 },
-  { color: 'bg-indigo-700', percentage: 15 },
-  { color: 'bg-indigo-400', percentage: 12 },
-  { color: 'bg-teal-500', percentage: 10 },
-  { color: 'bg-green-500', percentage: 9 },
-  { color: 'bg-blue-300', percentage: 8 },
-  { color: 'bg-gray-300', percentage: 26 }
+  { color: 'bg-blue-500', percentage: 20, name: 'Technology' },
+  { color: 'bg-indigo-700', percentage: 15, name: 'Healthcare' },
+  { color: 'bg-indigo-400', percentage: 12, name: 'Consumer Discretionary' },
+  { color: 'bg-teal-500', percentage: 10, name: 'Financial Services' },
+  { color: 'bg-green-500', percentage: 9, name: 'Communication' },
+  { color: 'bg-blue-300', percentage: 8, name: 'Industrials' },
+  { color: 'bg-gray-300', percentage: 26, name: 'Other Sectors' }
 ]
 
-const renderDonutChart = () => (
-  <div className="relative w-64 h-64 mx-auto">
-    <svg className="w-full h-full" viewBox="0 0 100 100">
-      <circle className="fill-transparent stroke-gray-200" cx="50" cy="50" r="40" strokeWidth="20" />
-      
-      {/* We'll add a stroke-dasharray and stroke-dashoffset to create donut chart segments */}
-      {allocationData.map((segment, index) => {
-        const total = allocationData.reduce((sum, item) => sum + item.percentage, 0);
-        const startAngle = allocationData
-          .slice(0, index)
-          .reduce((sum, item) => sum + item.percentage, 0) / total * 100;
+const DonutChart = () => {
+  const [hoveredSegment, setHoveredSegment] = useState<number | null>(null);
+  
+  // Calculate the total value
+  const totalPercentage = allocationData.reduce((sum, item) => sum + item.percentage, 0);
+  
+  return (
+    <div className="relative w-64 h-64 mx-auto">
+      <svg className="w-full h-full" viewBox="0 0 100 100">
+        <circle className="fill-transparent stroke-gray-200" cx="50" cy="50" r="40" strokeWidth="20" />
         
-        return (
-          <circle
-            key={index}
-            className={`fill-transparent ${segment.color}`}
-            cx="50" 
-            cy="50" 
-            r="40"
-            strokeWidth="20"
-            strokeDasharray="251.2"
-            strokeDashoffset={`calc(251.2 - (251.2 * ${segment.percentage} / 100))`}
-            transform={`rotate(${-90 + (startAngle * 3.6)} 50 50)`}
-          />
-        );
-      })}
+        {/* Donut chart segments */}
+        {allocationData.map((segment, index) => {
+          const startAngle = allocationData
+            .slice(0, index)
+            .reduce((sum, item) => sum + item.percentage, 0) / totalPercentage * 100;
+          
+          return (
+            <circle
+              key={index}
+              className={`fill-transparent ${segment.color} cursor-pointer transition-all duration-200`}
+              cx="50" 
+              cy="50" 
+              r="40"
+              strokeWidth={hoveredSegment === index ? "22" : "20"}
+              strokeDasharray="251.2"
+              strokeDashoffset={`calc(251.2 - (251.2 * ${segment.percentage} / 100))`}
+              transform={`rotate(${-90 + (startAngle * 3.6)} 50 50)`}
+              onMouseEnter={() => setHoveredSegment(index)}
+              onMouseLeave={() => setHoveredSegment(null)}
+            />
+          );
+        })}
+        
+        {/* Center circle (empty) */}
+        <circle className="fill-white dark:fill-gray-900" cx="50" cy="50" r="30" />
+      </svg>
       
-      {/* Center circle (empty) */}
-      <circle className="fill-white dark:fill-gray-900" cx="50" cy="50" r="30" />
-    </svg>
-    
-    {/* Portfolio value in center */}
-    <div className="absolute inset-0 flex flex-col items-center justify-center">
-      <div className="text-2xl font-bold">${portfolioData.totalValue.toLocaleString()}</div>
-      <div className="text-sm text-gray-500">as of {portfolioData.date}</div>
+      {/* Portfolio value in center */}
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <div className="text-2xl font-bold">${portfolioData.totalValue.toLocaleString()}</div>
+        <div className="text-sm text-gray-500">as of {portfolioData.date}</div>
+      </div>
+      
+      {/* Tooltip for hovered segment */}
+      {hoveredSegment !== null && (
+        <div className="absolute z-10 bg-gray-800 text-white px-3 py-2 rounded shadow-lg text-sm"
+             style={{
+               left: '50%',
+               top: '-40px',
+               transform: 'translateX(-50%)'
+             }}>
+          <div className="font-bold">{allocationData[hoveredSegment].name}</div>
+          <div className="flex justify-between gap-3">
+            <span>${(portfolioData.totalValue * allocationData[hoveredSegment].percentage / 100).toFixed(2)}</span>
+            <span>{allocationData[hoveredSegment].percentage}%</span>
+          </div>
+        </div>
+      )}
+      
+      {/* Legend */}
+      <div className="mt-8 grid grid-cols-2 gap-2 text-xs">
+        {allocationData.map((segment, index) => (
+          <div key={index} className="flex items-center" 
+               onMouseEnter={() => setHoveredSegment(index)}
+               onMouseLeave={() => setHoveredSegment(null)}>
+            <div className={`w-3 h-3 rounded-full mr-2 ${segment.color}`}></div>
+            <div className={`${hoveredSegment === index ? 'font-bold' : ''}`}>
+              {segment.name} ({segment.percentage}%)
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 const PerformanceChart = () => {
   const maxValue = Math.max(...chartData.map(item => item.value));
+  const [hoveredPoint, setHoveredPoint] = useState<number | null>(null);
+  const [selectedTimeframe, setSelectedTimeframe] = useState('all');
   
   return (
     <div className="h-72 w-full">
       <div className="flex justify-between items-center mb-4">
         <div className="flex space-x-2">
-          <button className="px-2 py-1 text-xs rounded bg-gray-100 hover:bg-gray-200">1D</button>
-          <button className="px-2 py-1 text-xs rounded bg-gray-100 hover:bg-gray-200">1W</button>
-          <button className="px-2 py-1 text-xs rounded bg-gray-100 hover:bg-gray-200">1M</button>
-          <button className="px-2 py-1 text-xs rounded bg-gray-100 hover:bg-gray-200">3M</button>
-          <button className="px-2 py-1 text-xs rounded bg-gray-100 hover:bg-gray-200">YTD</button>
-          <button className="px-2 py-1 text-xs rounded bg-gray-100 hover:bg-gray-200">1Y</button>
-          <button className="px-2 py-1 text-xs rounded bg-gray-200 font-semibold">ALL</button>
+          {[
+            { id: '1d', label: '1D' },
+            { id: '1w', label: '1W' },
+            { id: '1m', label: '1M' },
+            { id: '3m', label: '3M' },
+            { id: 'ytd', label: 'YTD' },
+            { id: '1y', label: '1Y' },
+            { id: 'all', label: 'ALL' }
+          ].map(period => (
+            <button 
+              key={period.id}
+              className={`px-2 py-1 text-xs rounded ${
+                selectedTimeframe === period.id 
+                  ? 'bg-gray-200 font-semibold' 
+                  : 'bg-gray-100 hover:bg-gray-200'
+              }`}
+              onClick={() => setSelectedTimeframe(period.id)}
+            >
+              {period.label}
+            </button>
+          ))}
         </div>
         <button className="text-gray-500">
           {/* Three dots icon */}
@@ -127,20 +181,92 @@ const PerformanceChart = () => {
           <div className="absolute w-full h-px bg-gray-200 top-3/4"></div>
           <div className="absolute w-full h-px bg-gray-200 bottom-0"></div>
           
+          {/* Interactive chart area */}
+          <div className="absolute inset-0">
+            {/* Invisible hit areas for interaction */}
+            <div className="relative w-full h-full">
+              {chartData.map((point, i) => (
+                <div 
+                  key={i}
+                  className="absolute top-0 h-full cursor-pointer"
+                  style={{ 
+                    left: `${(i / (chartData.length - 1)) * 100}%`, 
+                    width: `${100 / chartData.length}%` 
+                  }}
+                  onMouseEnter={() => setHoveredPoint(i)}
+                  onMouseLeave={() => setHoveredPoint(null)}
+                />
+              ))}
+            </div>
+          </div>
+          
           {/* Line chart */}
           <svg className="absolute inset-0 h-full w-full" preserveAspectRatio="none">
             <polyline
               points={chartData.map((point, i) => `${(i / (chartData.length - 1)) * 100},${100 - (point.value / maxValue) * 100}`).join(' ')}
               className="stroke-blue-500 stroke-2 fill-none"
             />
+            
+            {/* Data points */}
+            {chartData.map((point, i) => (
+              <circle
+                key={i}
+                cx={`${(i / (chartData.length - 1)) * 100}%`}
+                cy={`${100 - (point.value / maxValue) * 100}%`}
+                r={hoveredPoint === i ? "4" : "0"}
+                className="fill-blue-600"
+              />
+            ))}
+            
+            {/* Vertical line at hovered point */}
+            {hoveredPoint !== null && (
+              <line
+                x1={`${(hoveredPoint / (chartData.length - 1)) * 100}%`}
+                y1="0%"
+                x2={`${(hoveredPoint / (chartData.length - 1)) * 100}%`}
+                y2="100%"
+                className="stroke-gray-400 stroke-dashed"
+                strokeWidth="1"
+                strokeDasharray="4"
+              />
+            )}
           </svg>
+          
+          {/* Value tooltip */}
+          {hoveredPoint !== null && (
+            <div 
+              className="absolute bg-gray-800 text-white px-3 py-2 rounded shadow-lg text-sm z-10"
+              style={{
+                left: `${(hoveredPoint / (chartData.length - 1)) * 100}%`,
+                top: `${100 - (chartData[hoveredPoint].value / maxValue) * 100}%`,
+                transform: 'translate(-50%, -120%)'
+              }}
+            >
+              <div className="font-bold">${chartData[hoveredPoint].value.toLocaleString()}</div>
+              <div className="text-xs text-gray-300">{chartData[hoveredPoint].date}</div>
+            </div>
+          )}
           
           {/* X-axis labels */}
           <div className="absolute w-full bottom-0 transform translate-y-6 flex justify-between text-xs text-gray-500">
             {chartData.map((point, i) => (
-              <div key={i}>{point.date}</div>
+              <div key={i} className={hoveredPoint === i ? "font-semibold text-blue-600" : ""}>{point.date}</div>
             ))}
           </div>
+        </div>
+      </div>
+      
+      {/* Current value display */}
+      <div className="mt-4 text-center">
+        <div className="text-sm text-gray-500">
+          {hoveredPoint !== null ? (
+            <span>Value on {chartData[hoveredPoint].date}</span>
+          ) : (
+            <span>Current value</span>
+          )}
+        </div>
+        <div className="text-xl font-bold">
+          ${hoveredPoint !== null ? chartData[hoveredPoint].value.toLocaleString() : chartData[chartData.length-1].value.toLocaleString()}
         </div>
       </div>
     </div>
@@ -221,7 +347,7 @@ export default function Portfolio() {
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 mb-8">
           {/* Left column with pie chart */}
           <div className="lg:col-span-2">
-            {renderDonutChart()}
+            <DonutChart />
           </div>
           
           {/* Right column with performance chart */}
