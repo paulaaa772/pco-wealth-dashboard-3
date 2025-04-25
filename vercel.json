@@ -18,11 +18,5 @@
         { "key": "Access-Control-Allow-Headers", "value": "X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version" }
       ]
     }
-  ],
-  "routes": [
-    { "src": "/api/verify-api", "dest": "/api/verify-api", "check": false },
-    { "src": "/api/polygon/candles", "dest": "/api/polygon/candles", "check": false },
-    { "src": "/api/trades/load", "dest": "/api/trades/load", "check": false },
-    { "src": "/api/trades/save", "dest": "/api/trades/save", "check": false }
   ]
 }
