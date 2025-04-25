@@ -1,6 +1,15 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import {
+  createChart,
+  CrosshairMode,
+  IChartApi,
+  ISeriesApi,
+  DeepPartial,
+  ChartOptions,
+  HistogramSeriesOptions
+} from 'lightweight-charts';
 
 // The original polygon data format
 interface PolygonCandle {
@@ -29,121 +38,166 @@ interface TradingChartProps {
 }
 
 const TradingChart: React.FC<TradingChartProps> = ({ symbol, data, currentPrice }) => {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
+  const chartContainerRef = useRef<HTMLDivElement>(null);
+  const chartRef = useRef<IChartApi | null>(null);
+  const seriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
+  const volumeSeriesRef = useRef<ISeriesApi<"Histogram"> | null>(null);
+  const resizeObserverRef = useRef<ResizeObserver | null>(null);
 
-  // Set up the canvas dimensions
   useEffect(() => {
-    if (canvasRef.current) {
-      const canvas = canvasRef.current;
-      const parent = canvas.parentElement;
+    // Only initialize the chart once
+    if (!chartRef.current && chartContainerRef.current) {
+      // Create the chart
+      const options: DeepPartial<ChartOptions> = {
+        width: chartContainerRef.current.clientWidth,
+        height: chartContainerRef.current.clientHeight,
+        layout: {
+          background: { color: '#253248' },
+          textColor: 'rgba(255, 255, 255, 0.9)',
+        },
+        grid: {
+          vertLines: {
+            color: 'rgba(197, 203, 206, 0.1)',
+          },
+          horzLines: {
+            color: 'rgba(197, 203, 206, 0.1)',
+          },
+        },
+        crosshair: {
+          mode: CrosshairMode.Normal,
+        },
+        rightPriceScale: {
+          borderColor: 'rgba(197, 203, 206, 0.3)',
+        },
+        timeScale: {
+          borderColor: 'rgba(197, 203, 206, 0.3)',
+          timeVisible: true,
+          secondsVisible: false,
+        },
+      };
+
+      chartRef.current = createChart(chartContainerRef.current, options);
+
+      // Add candlestick series
+      seriesRef.current = chartRef.current.addCandlestickSeries({
+        upColor: '#26a69a',
+        downColor: '#ef5350',
+        borderVisible: false,
+        wickUpColor: '#26a69a',
+        wickDownColor: '#ef5350',
+      });
+
+      // Add volume series
+      const volumeOptions: DeepPartial<HistogramSeriesOptions> = {
+        color: '#26a69a',
+        priceFormat: {
+          type: 'volume',
+        },
+        priceScaleId: '',
+      };
       
-      if (parent) {
-        const { width, height } = parent.getBoundingClientRect();
-        setDimensions({ width, height });
-        canvas.width = width;
-        canvas.height = height;
-      }
+      volumeSeriesRef.current = chartRef.current.addHistogramSeries(volumeOptions);
+      
+      // Set the scale margin for the volume series
+      volumeSeriesRef.current.priceScale().applyOptions({
+        scaleMargins: {
+          top: 0.8,
+          bottom: 0,
+        },
+      });
+
+      // Handle resize
+      resizeObserverRef.current = new ResizeObserver(entries => {
+        const { width, height } = entries[0].contentRect;
+        chartRef.current?.applyOptions({ width, height });
+        chartRef.current?.timeScale().fitContent();
+      });
+
+      resizeObserverRef.current.observe(chartContainerRef.current);
     }
+
+    return () => {
+      // Clean up
+      if (resizeObserverRef.current && chartContainerRef.current) {
+        resizeObserverRef.current.unobserve(chartContainerRef.current);
+      }
+      if (chartRef.current) {
+        chartRef.current.remove();
+        chartRef.current = null;
+        seriesRef.current = null;
+        volumeSeriesRef.current = null;
+      }
+    };
   }, []);
 
-  // Determine if data is in PolygonCandle format (has 'o' property)
-  const isPolygonFormat = (data: any[]): data is PolygonCandle[] => {
-    return data.length > 0 && 'o' in data[0];
-  };
-
-  // Draw the chart whenever data or dimensions change
   useEffect(() => {
-    if (canvasRef.current && data.length > 0) {
-      const canvas = canvasRef.current;
-      const ctx = canvas.getContext('2d');
-      
-      if (!ctx) return;
-      
-      // Clear the canvas
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      
-      // Map data to a consistent format for drawing
-      const formattedData = isPolygonFormat(data)
-        ? data.map(candle => ({
-            high: candle.h,
-            low: candle.l,
-            open: candle.o,
-            close: candle.c,
-            timestamp: candle.t,
-            volume: candle.v
-          }))
-        : data.map(candle => ({
-            high: candle.high,
-            low: candle.low,
-            open: candle.open,
-            close: candle.close,
-            timestamp: candle.timestamp,
-            volume: candle.volume
-          }));
-      
-      // Calculate min and max values for scaling
-      const prices = formattedData.flatMap(candle => [candle.high, candle.low]);
-      const minPrice = Math.min(...prices);
-      const maxPrice = Math.max(...prices);
-      const priceRange = maxPrice - minPrice;
-      
-      // Calculate the width of each candle
-      const candleWidth = Math.floor(canvas.width / formattedData.length);
-      const padding = 0.2 * candleWidth;
-      const bodyWidth = candleWidth - padding * 2;
-      
-      // Draw the candles
-      formattedData.forEach((candle, i) => {
-        const x = i * candleWidth;
-        
-        // Calculate y coordinates (inverted because canvas y-axis points down)
-        const yHigh = canvas.height - ((candle.high - minPrice) / priceRange) * canvas.height;
-        const yLow = canvas.height - ((candle.low - minPrice) / priceRange) * canvas.height;
-        const yOpen = canvas.height - ((candle.open - minPrice) / priceRange) * canvas.height;
-        const yClose = canvas.height - ((candle.close - minPrice) / priceRange) * canvas.height;
-        
-        // Determine if it's an up or down candle
-        const isUp = candle.close >= candle.open;
-        const color = isUp ? 'green' : 'red';
-        
-        // Draw the wick (high-low line)
-        ctx.beginPath();
-        ctx.moveTo(x + candleWidth / 2, yHigh);
-        ctx.lineTo(x + candleWidth / 2, yLow);
-        ctx.strokeStyle = color;
-        ctx.stroke();
-        
-        // Draw the body (open-close rectangle)
-        ctx.fillStyle = color;
-        ctx.fillRect(
-          x + padding,
-          Math.min(yOpen, yClose),
-          bodyWidth,
-          Math.abs(yClose - yOpen) || 1 // at least 1px height
-        );
+    if (!seriesRef.current || !volumeSeriesRef.current || data.length === 0) return;
+
+    const isPolygonFormat = 'o' in data[0];
+    
+    // Format the data for the chart
+    const formattedCandleData = isPolygonFormat 
+      ? (data as PolygonCandle[]).map(candle => ({
+          time: Math.floor(candle.t / 1000) as any,
+          open: candle.o,
+          high: candle.h,
+          low: candle.l,
+          close: candle.c,
+        }))
+      : (data as CandleData[]).map(candle => ({
+          time: Math.floor(candle.timestamp / 1000) as any,
+          open: candle.open,
+          high: candle.high,
+          low: candle.low,
+          close: candle.close,
+        }));
+
+    const formattedVolumeData = isPolygonFormat
+      ? (data as PolygonCandle[]).map(candle => ({
+          time: Math.floor(candle.t / 1000) as any,
+          value: candle.v,
+          color: candle.c >= candle.o ? '#26a69a' : '#ef5350',
+        }))
+      : (data as CandleData[]).map(candle => ({
+          time: Math.floor(candle.timestamp / 1000) as any,
+          value: candle.volume,
+          color: candle.close >= candle.open ? '#26a69a' : '#ef5350',
+        }));
+
+    // Set the data
+    seriesRef.current.setData(formattedCandleData);
+    volumeSeriesRef.current.setData(formattedVolumeData);
+
+    // Add a price line for the current price if available
+    if (currentPrice && seriesRef.current) {
+      seriesRef.current.createPriceLine({
+        price: currentPrice,
+        color: 'rgba(255, 255, 255, 0.8)',
+        lineWidth: 2,
+        lineStyle: 2, // Dashed
+        axisLabelVisible: true,
+        title: 'Current Price',
       });
-      
-      // Draw symbol and price info
-      ctx.font = '14px Arial';
-      ctx.fillStyle = 'white';
-      
-      // Draw background for text
-      ctx.fillRect(5, 5, 150, 25);
-      
-      // Draw text
-      ctx.fillStyle = 'black';
-      const displayPrice = currentPrice || (formattedData[formattedData.length - 1]?.close);
-      ctx.fillText(`${symbol}: $${displayPrice?.toFixed(2) || 'N/A'}`, 10, 20);
     }
-  }, [data, dimensions, symbol, currentPrice]);
+
+    // Fit the content to view
+    chartRef.current?.timeScale().fitContent();
+
+  }, [data, currentPrice]);
 
   return (
     <div className="relative w-full h-full">
-      <canvas 
-        ref={canvasRef} 
+      <div 
+        ref={chartContainerRef} 
         className="w-full h-full"
       />
+      <div className="absolute top-2 left-2 bg-gray-900 bg-opacity-75 text-white px-3 py-1 rounded">
+        {symbol}: ${currentPrice?.toFixed(2) || (data.length > 0 ? 
+          ('c' in data[data.length - 1] 
+            ? (data[data.length - 1] as PolygonCandle).c.toFixed(2)
+            : (data[data.length - 1] as CandleData).close.toFixed(2))
+          : 'N/A')}
+      </div>
     </div>
   );
 };

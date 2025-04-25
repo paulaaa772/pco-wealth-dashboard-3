@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import { PolygonService, PolygonCandle } from '../../lib/market-data/PolygonService';
 import TradingChart from '../../components/dashboard/TradingChart';
@@ -46,6 +46,23 @@ const SymbolSearch = ({
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [isOpen, setIsOpen] = useState(false);
+  const [selectedSymbol, setSelectedSymbol] = useState(defaultSymbol);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const inputTimeout = useRef<NodeJS.Timeout | null>(null);
+
+  // Handle clicks outside the dropdown to close it
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   const popularSymbols = [
     { symbol: 'AAPL', name: 'Apple Inc.' },
@@ -53,10 +70,47 @@ const SymbolSearch = ({
     { symbol: 'GOOGL', name: 'Alphabet Inc.' },
     { symbol: 'AMZN', name: 'Amazon.com Inc.' },
     { symbol: 'TSLA', name: 'Tesla Inc.' },
+    { symbol: 'NVDA', name: 'NVIDIA Corporation' },
+    { symbol: 'META', name: 'Meta Platforms Inc.' },
+    { symbol: 'JPM', name: 'JPMorgan Chase & Co.' },
+    { symbol: 'V', name: 'Visa Inc.' },
+    { symbol: 'WMT', name: 'Walmart Inc.' },
   ];
 
+  const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchTerm(e.target.value);
+    setIsOpen(true);
+    
+    // Debounce search to avoid excessive searching
+    if (inputTimeout.current) {
+      clearTimeout(inputTimeout.current);
+    }
+    
+    // If you want to implement API search, you can add it here
+    inputTimeout.current = setTimeout(() => {
+      // This is where you would call an API to search for symbols
+      // For now, we're just using the local popularSymbols list
+      console.log('Searching for:', e.target.value);
+    }, 300);
+  };
+
+  const handleSelect = (symbol: string) => {
+    console.log(`Selected symbol: ${symbol}`);
+    setSelectedSymbol(symbol);
+    setSearchTerm('');
+    setIsOpen(false);
+    onSymbolSelect(symbol);
+  };
+
+  // Filter symbols based on search term
+  const filteredSymbols = popularSymbols.filter(item => 
+    searchTerm === '' || 
+    item.symbol.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    item.name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
   return (
-    <div className="relative w-full">
+    <div className="relative w-full" ref={dropdownRef}>
       <div className="relative">
         <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
           <svg className="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -65,33 +119,40 @@ const SymbolSearch = ({
         </div>
         <input
           type="text"
-          placeholder={`Search (${defaultSymbol})`}
+          placeholder={`Search (${selectedSymbol})`}
           value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
+          onChange={handleSearch}
           onFocus={() => setIsOpen(true)}
           className="pl-10 pr-4 py-2 w-full rounded-md border border-gray-300 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+          aria-label="Search for stock symbols"
         />
       </div>
       
       {isOpen && (
         <div className="absolute z-50 mt-1 w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg max-h-60 overflow-auto">
           <div className="p-2">
-            <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Popular Symbols</div>
+            <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+              {searchTerm ? 'Search Results' : 'Popular Symbols'}
+            </div>
             <div className="space-y-1">
-              {popularSymbols.map(item => (
-                <div
-                  key={item.symbol}
-                  className="flex items-center p-2 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer rounded"
-                  onClick={() => {
-                    onSymbolSelect(item.symbol);
-                    setIsOpen(false);
-                    setSearchTerm('');
-                  }}
-                >
-                  <div className="font-medium">{item.symbol}</div>
-                  <div className="ml-2 text-sm text-gray-500 dark:text-gray-400">{item.name}</div>
+              {filteredSymbols.length > 0 ? (
+                filteredSymbols.map(item => (
+                  <div
+                    key={item.symbol}
+                    className={`flex items-center p-2 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer rounded ${
+                      item.symbol === selectedSymbol ? 'bg-blue-50 dark:bg-blue-900/20' : ''
+                    }`}
+                    onClick={() => handleSelect(item.symbol)}
+                  >
+                    <div className="font-medium">{item.symbol}</div>
+                    <div className="ml-2 text-sm text-gray-500 dark:text-gray-400">{item.name}</div>
+                  </div>
+                ))
+              ) : (
+                <div className="text-center py-2 text-gray-500 dark:text-gray-400">
+                  No matching symbols found
                 </div>
-              ))}
+              )}
             </div>
           </div>
         </div>
