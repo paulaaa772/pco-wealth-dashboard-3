@@ -10,6 +10,7 @@ import OrderEntryPanel from '@/components/brokerage/OrderEntryPanel';
 import { Maximize2 } from 'lucide-react';
 import { ManualOrder } from '@/components/brokerage/OrderEntryPanel';
 import { Position } from '@/lib/trading-engine/AITradingEngine';
+import MarketSummary from '../components/indicators/MarketSummary';
 
 // Import the TradingChart component with dynamic import to avoid SSR issues
 const TradingChart = dynamic(
@@ -230,6 +231,8 @@ export default function BrokeragePage() {
     <div className="container mx-auto px-4 py-6 text-white">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
         <div className="lg:col-span-2 flex flex-col gap-4">
+          <MarketSummary symbol={symbol} />
+          
           <div className={`bg-gray-900 rounded-lg p-1 flex flex-col ${isChartFullScreen ? 'h-[80vh]' : 'h-[60vh]'} relative`}>
             <button 
               onClick={toggleFullScreen}
