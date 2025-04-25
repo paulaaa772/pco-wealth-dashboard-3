@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { AITradingEngine, TradeSignal } from '@/lib/trading-engine/AITradingEngine';
 import { TradingMode } from '@/lib/trading-engine/TradingMode';
+import ADXIndicator from './ADXIndicator';
 
 // Define the Position interface locally since the imported one has issues
 interface Position {
@@ -45,6 +46,12 @@ export default function TradingInterface({
     winRate: 0,
     profitLoss: 0,
     totalTrades: 0,
+  });
+  // Add state for ADX values
+  const [adxValues, setAdxValues] = useState({
+    adx: 0,
+    plusDI: 0,
+    minusDI: 0
   });
   const aiEngine = useRef<AITradingEngine | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -120,6 +127,12 @@ export default function TradingInterface({
         aiEngine.current = new AITradingEngine(symbolToAnalyze, mode);
       }
       
+      // Fetch ADX values for display (new method to get indicator values)
+      const adxData = await fetchADXValues(symbolToAnalyze);
+      if (adxData) {
+        setAdxValues(adxData);
+      }
+      
       const signal = await aiEngine.current.analyzeMarket();
       
       if (signal) {
@@ -138,6 +151,20 @@ export default function TradingInterface({
       setErrorMessage('Failed to analyze market data');
     } finally {
       setIsAnalyzing(false);
+    }
+  };
+
+  // New method to fetch ADX values for display
+  const fetchADXValues = async (symbolToCheck: string) => {
+    try {
+      if (!aiEngine.current) return null;
+      
+      // Use the real ADX calculation from AITradingEngine
+      const adxValues = await aiEngine.current.getADXValues(symbolToCheck);
+      return adxValues;
+    } catch (error) {
+      console.error('[TRADING UI] Error fetching ADX values:', error);
+      return null;
     }
   };
 
@@ -347,6 +374,16 @@ export default function TradingInterface({
             {isAnalyzing ? 'Analyzing...' : 'Analyze Now'}
           </button>
         </div>
+      </div>
+      
+      {/* Add ADX Indicator component */}
+      <div className="mb-4">
+        <ADXIndicator 
+          aiEngine={aiEngine} 
+          adxValue={adxValues.adx} 
+          plusDI={adxValues.plusDI} 
+          minusDI={adxValues.minusDI} 
+        />
       </div>
       
       <div className="bg-gray-800 rounded-lg p-3">

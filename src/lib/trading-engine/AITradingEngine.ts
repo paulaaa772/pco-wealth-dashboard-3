@@ -87,7 +87,9 @@ export class AITradingEngine {
   private bbandsPeriod = 20;
   private bbandsStdDev = 2;
   private adxPeriod = 14;
-  private adxTrendThreshold = 25; // Example threshold for trend strength
+  private adxTrendThreshold = 25; // Threshold for trend strength
+  private adxFilterEnabled = true; // Toggle ADX filtering on/off
+  private adxCrossoverEnabled = true; // Enable DI+/DI- crossover signals
   private stochasticKPeriod = 14;
   private stochasticDPeriod = 3;
   private stochasticOverbought = 80;
@@ -98,7 +100,7 @@ export class AITradingEngine {
     this.symbol = symbol;
     this.mode = mode;
     this.polygonService = PolygonService.getInstance();
-    console.log(`AI Engine initialized for ${symbol} (${mode}). Strategies: MA(${this.fastSMAPeriod}/${this.slowSMAPeriod}), RSI(${this.rsiPeriod}), MACD(${this.macdFast}/${this.macdSlow}/${this.macdSignal}), BBands(${this.bbandsPeriod}/${this.bbandsStdDev}), ADX(${this.adxPeriod}), Stoch(${this.stochasticKPeriod}/${this.stochasticDPeriod}), OBV`);
+    console.log(`AI Engine initialized for ${symbol} (${mode}). Strategies: MA(${this.fastSMAPeriod}/${this.slowSMAPeriod}), RSI(${this.rsiPeriod}), MACD(${this.macdFast}/${this.macdSlow}/${this.macdSignal}), BBands(${this.bbandsPeriod}/${this.bbandsStdDev}), ADX(${this.adxPeriod}/${this.adxTrendThreshold}), Stoch(${this.stochasticKPeriod}/${this.stochasticDPeriod}), OBV`);
   }
 
   // Add a method to update the symbol
@@ -117,6 +119,29 @@ export class AITradingEngine {
     }
   }
 
+  // Configure ADX filter settings
+  public configureADX(period?: number, threshold?: number, enabled?: boolean, crossoverEnabled?: boolean): void {
+    if (period !== undefined && period >= 5 && period <= 50) {
+      console.log(`[AI Engine] ADX period changed from ${this.adxPeriod} to ${period}`);
+      this.adxPeriod = period;
+    }
+    
+    if (threshold !== undefined && threshold >= 10 && threshold <= 50) {
+      console.log(`[AI Engine] ADX threshold changed from ${this.adxTrendThreshold} to ${threshold}`);
+      this.adxTrendThreshold = threshold;
+    }
+    
+    if (enabled !== undefined) {
+      console.log(`[AI Engine] ADX filtering ${enabled ? 'enabled' : 'disabled'}`);
+      this.adxFilterEnabled = enabled;
+    }
+    
+    if (crossoverEnabled !== undefined) {
+      console.log(`[AI Engine] ADX DI+/DI- crossover signals ${crossoverEnabled ? 'enabled' : 'disabled'}`);
+      this.adxCrossoverEnabled = crossoverEnabled;
+    }
+  }
+
   // Calculate position size based on risk
   public calculatePositionSize(price: number): number {
     // Simple position sizing logic
@@ -124,6 +149,69 @@ export class AITradingEngine {
     const riskPercent = 0.02; // 2% risk per trade
     
     return Math.floor(accountBalance * riskPercent / price);
+  }
+
+  // Get current ADX values for the specified symbol or the current symbol
+  public async getADXValues(symbol?: string) {
+    const targetSymbol = symbol || this.symbol;
+    console.log(`[AI Engine] Getting ADX values for ${targetSymbol}`);
+    
+    try {
+      // Fetch sufficient historical data for ADX calculation
+      const historyNeeded = this.adxPeriod * 2; // Need extra data for calculation
+      const historyDays = historyNeeded + 10; // Add buffer
+      
+      const endDate = new Date();
+      const startDate = new Date();
+      startDate.setDate(endDate.getDate() - historyDays);
+      
+      const formatDate = (date: Date): string => { 
+        return date.toLocaleDateString('en-CA'); // YYYY-MM-DD format
+      }
+      const startDateStr = formatDate(startDate);
+      const endDateStr = formatDate(endDate);
+      
+      console.log(`[AI Engine] Fetching candles for ADX calculation from ${startDateStr} to ${endDateStr}`);
+      const candles: PolygonCandle[] | null = await this.polygonService.getStockCandles(
+        targetSymbol, 
+        startDateStr, 
+        endDateStr, 
+        'day'
+      );
+      
+      if (!candles || candles.length < historyNeeded) {
+        console.warn(`[AI Engine] Insufficient data for ADX calculation. Using default values.`);
+        return { adx: 0, plusDI: 0, minusDI: 0 };
+      }
+      
+      // Sort candles by timestamp
+      candles.sort((a, b) => a.t - b.t);
+      
+      // Calculate ADX
+      const adxResult = calculateADX(candles, this.adxPeriod);
+      
+      if (!adxResult || adxResult.adx.length === 0) {
+        console.warn(`[AI Engine] Failed to calculate ADX values. Using default values.`);
+        return { adx: 0, plusDI: 0, minusDI: 0 };
+      }
+      
+      // Get the latest values
+      const lastIndex = adxResult.adx.length - 1;
+      const adx = adxResult.adx[lastIndex];
+      const plusDI = adxResult.plusDI[lastIndex];
+      const minusDI = adxResult.minusDI[lastIndex];
+      
+      console.log(`[AI Engine] ADX values for ${targetSymbol}: ADX=${adx.toFixed(2)}, +DI=${plusDI.toFixed(2)}, -DI=${minusDI.toFixed(2)}`);
+      
+      return {
+        adx: parseFloat(adx.toFixed(1)),
+        plusDI: parseFloat(plusDI.toFixed(1)),
+        minusDI: parseFloat(minusDI.toFixed(1))
+      };
+    } catch (error) {
+      console.error(`[AI Engine] Error calculating ADX values:`, error);
+      return { adx: 0, plusDI: 0, minusDI: 0 };
+    }
   }
 
   // Execute a trade signal (simulated in demo mode)
@@ -382,6 +470,65 @@ export class AITradingEngine {
         return null;
   }
 
+  // New method to check for ADX DI+/DI- crossover signals
+  private checkADXCrossover(
+    adxResult: ADXResult | null,
+    index: number,
+    targetSymbol: string,
+    currentPrice: number
+  ): TradeSignal | null {
+    if (!adxResult || !this.adxCrossoverEnabled) return null;
+    
+    console.log(`[AI Engine] Checking ADX DI+/DI- crossovers...`);
+    
+    // Map index to ADX result index
+    const adxIndex = index - this.adxPeriod;
+    
+    if (adxIndex < 1 || adxIndex >= adxResult.plusDI.length) {
+      return null;
+    }
+    
+    const plusDI_prev = adxResult.plusDI[adxIndex - 1];
+    const plusDI_curr = adxResult.plusDI[adxIndex];
+    const minusDI_prev = adxResult.minusDI[adxIndex - 1];
+    const minusDI_curr = adxResult.minusDI[adxIndex];
+    const adx_curr = adxResult.adx[adxIndex];
+    
+    // Only generate signals when ADX indicates a strong trend
+    if (adx_curr < this.adxTrendThreshold) {
+      console.log(`[ADX Crossover] ADX value ${adx_curr.toFixed(2)} below threshold, no signal generated`);
+      return null;
+    }
+    
+    // Check for crossovers
+    if (plusDI_prev <= minusDI_prev && plusDI_curr > minusDI_curr) {
+      console.log(`[ADX Crossover] Bullish DI+/DI- crossover detected (DI+: ${plusDI_curr.toFixed(2)}, DI-: ${minusDI_curr.toFixed(2)})`);
+      return {
+        symbol: targetSymbol,
+        direction: 'buy',
+        price: currentPrice,
+        confidence: 0.85, // High confidence signal
+        timestamp: Date.now(),
+        strategy: `ADX DI+/DI- Bullish Crossover (${this.adxPeriod})`
+      };
+    }
+    
+    if (plusDI_prev >= minusDI_prev && plusDI_curr < minusDI_curr) {
+      console.log(`[ADX Crossover] Bearish DI+/DI- crossover detected (DI+: ${plusDI_curr.toFixed(2)}, DI-: ${minusDI_curr.toFixed(2)})`);
+      return {
+        symbol: targetSymbol,
+        direction: 'sell',
+        price: currentPrice,
+        confidence: 0.85, // High confidence signal
+        timestamp: Date.now(),
+        strategy: `ADX DI+/DI- Bearish Crossover (${this.adxPeriod})`
+      };
+    }
+    
+    console.log(`[ADX Crossover] No DI+/DI- crossover signal detected`);
+    return null;
+  }
+
   // --- Main Analysis Method (Adjusted to call refactored helpers) --- 
   async analyzeMarket(symbol?: string): Promise<TradeSignal | null> {
     const targetSymbol = symbol || this.symbol;
@@ -444,14 +591,24 @@ export class AITradingEngine {
         const obv = calculateOBV(candles);
         
         let adxValue = 0;
+        let plusDI = 0;
+        let minusDI = 0;
         if (adxResult && adxResult.adx.length > 0) {
-            adxValue = adxResult.adx[adxResult.adx.length - 1];
-            console.log(`[ADX] Latest ADX: ${adxValue.toFixed(2)}`);
+            const lastIdx = adxResult.adx.length - 1;
+            adxValue = adxResult.adx[lastIdx];
+            plusDI = adxResult.plusDI[lastIdx];
+            minusDI = adxResult.minusDI[lastIdx];
+            console.log(`[ADX] Latest values - ADX: ${adxValue.toFixed(2)}, DI+: ${plusDI.toFixed(2)}, DI-: ${minusDI.toFixed(2)}`);
         } else {
             console.warn(`[ADX] Live calculation failed.`);
         }
+        
         const isTrending = adxValue > this.adxTrendThreshold;
-        console.log(`[AI Engine] Market Trending (ADX > ${this.adxTrendThreshold}): ${isTrending}`);
+        const trendDirection = plusDI > minusDI ? 'bullish' : 'bearish';
+        console.log(`[AI Engine] Market Trending: ${isTrending ? 'YES' : 'NO'} (ADX: ${adxValue.toFixed(2)})`);
+        if (isTrending) {
+            console.log(`[AI Engine] Trend Direction: ${trendDirection.toUpperCase()} (DI+: ${plusDI.toFixed(2)}, DI-: ${minusDI.toFixed(2)})`);
+        }
         
         // Calculate OBV SMA if needed for filtering
         let latestObv = obv.length > 0 ? obv[obv.length - 1] : 0;
@@ -466,22 +623,53 @@ export class AITradingEngine {
         
         let confirmedSignal: TradeSignal | null = null;
 
+        // Check for ADX DI+/DI- crossover signals first (highest priority)
+        if (this.adxCrossoverEnabled) {
+            const adxCrossoverSignal = this.checkADXCrossover(adxResult, latestIndex, targetSymbol, latestPrice);
+            if (adxCrossoverSignal) {
+                console.log("[AI Engine] ADX DI+/DI- crossover signal generated with high confidence");
+                // Apply OBV confirmation for extra validation
+                if ((adxCrossoverSignal.direction === 'buy' && latestObv > obvSmaValue) || 
+                    (adxCrossoverSignal.direction === 'sell' && latestObv < obvSmaValue)) {
+                    console.log("[OBV Confirmed] ADX Crossover Signal with OBV confirmation");
+                    confirmedSignal = adxCrossoverSignal;
+                } else {
+                    console.log("[OBV Warning] ADX Crossover Signal lacks OBV confirmation, but proceeding due to high confidence");
+                    confirmedSignal = adxCrossoverSignal; // Still use it due to high confidence
+                }
+            }
+        }
+
+        // Skip ADX filtering if disabled
+        const useAdxFilter = this.adxFilterEnabled && !confirmedSignal;
+
         // Trend-Following Strategies (MA, MACD)
-        if (isTrending) {
-            console.log("[AI Engine] Trend detected (ADX > threshold), checking trend strategies...");
+        if (!confirmedSignal && (!useAdxFilter || isTrending)) {
+            console.log("[AI Engine] Checking trend-following strategies...");
+            
+            // If ADX filter enabled, only use trend-aligned signals
             const maSignal = this.checkMACrossover(fastSMA, slowSMA, latestIndex, targetSymbol, latestPrice);
             if (maSignal) {
-                // OBV Confirmation for BUY signal
-                if (maSignal.direction === 'buy' && latestObv > obvSmaValue) {
-                     console.log("[OBV Confirmed] MA Crossover Buy Signal.");
-                     confirmedSignal = maSignal;
-                } 
-                // OBV Confirmation for SELL signal
-                else if (maSignal.direction === 'sell' && latestObv < obvSmaValue) {
-                     console.log("[OBV Confirmed] MA Crossover Sell Signal.");
-                     confirmedSignal = maSignal;
+                // Apply additional directional filter when ADX is active
+                const signalAlignedWithTrend = !useAdxFilter || 
+                    (maSignal.direction === 'buy' && trendDirection === 'bullish') || 
+                    (maSignal.direction === 'sell' && trendDirection === 'bearish');
+                    
+                if (signalAlignedWithTrend) {
+                    // OBV Confirmation for BUY signal
+                    if (maSignal.direction === 'buy' && latestObv > obvSmaValue) {
+                        console.log("[OBV Confirmed] MA Crossover Buy Signal");
+                        confirmedSignal = maSignal;
+                    } 
+                    // OBV Confirmation for SELL signal
+                    else if (maSignal.direction === 'sell' && latestObv < obvSmaValue) {
+                        console.log("[OBV Confirmed] MA Crossover Sell Signal");
+                        confirmedSignal = maSignal;
+                    } else {
+                        console.log("[OBV Rejected] MA Crossover Signal");
+                    }
                 } else {
-                    console.log("[OBV Rejected] MA Crossover Signal.");
+                    console.log(`[ADX Filter] Rejected MA ${maSignal.direction.toUpperCase()} signal as it opposes the ${trendDirection} trend`);
                 }
             }
 
@@ -489,24 +677,33 @@ export class AITradingEngine {
             if (!confirmedSignal) {
                 const macdSignal = this.checkMACDCrossover(macdResult, latestIndex, targetSymbol, latestPrice);
                 if (macdSignal) {
-                     if (macdSignal.direction === 'buy' && latestObv > obvSmaValue) {
-                         console.log("[OBV Confirmed] MACD Buy Signal.");
-                         confirmedSignal = macdSignal;
-                     } else if (macdSignal.direction === 'sell' && latestObv < obvSmaValue) {
-                         console.log("[OBV Confirmed] MACD Sell Signal.");
-                         confirmedSignal = macdSignal;
-                     } else {
-                         console.log("[OBV Rejected] MACD Signal.");
-                     }
+                    // Apply additional directional filter when ADX is active
+                    const signalAlignedWithTrend = !useAdxFilter || 
+                        (macdSignal.direction === 'buy' && trendDirection === 'bullish') || 
+                        (macdSignal.direction === 'sell' && trendDirection === 'bearish');
+                        
+                    if (signalAlignedWithTrend) {
+                        if (macdSignal.direction === 'buy' && latestObv > obvSmaValue) {
+                            console.log("[OBV Confirmed] MACD Buy Signal");
+                            confirmedSignal = macdSignal;
+                        } else if (macdSignal.direction === 'sell' && latestObv < obvSmaValue) {
+                            console.log("[OBV Confirmed] MACD Sell Signal");
+                            confirmedSignal = macdSignal;
+                        } else {
+                            console.log("[OBV Rejected] MACD Signal");
+                        }
+                    } else {
+                        console.log(`[ADX Filter] Rejected MACD ${macdSignal.direction.toUpperCase()} signal as it opposes the ${trendDirection} trend`);
+                    }
                 }
             }
-        } else {
-            console.log("[AI Engine] No trend detected (ADX <= threshold), skipping trend strategies.");
+        } else if (useAdxFilter && !isTrending) {
+            console.log("[AI Engine] Skipping trend-following strategies as ADX indicates no strong trend");
         }
 
         // Mean-Reversion / Oscillator Strategies (RSI, BBands)
-        if (!confirmedSignal && !isTrending) { // Only check if no signal yet and not trending
-            console.log("[AI Engine] Range detected (ADX <= threshold), checking mean-reversion strategies...");
+        if (!confirmedSignal && (!useAdxFilter || !isTrending)) { // Only check if no signal yet and not trending
+            console.log("[AI Engine] Checking mean-reversion strategies...");
             const rsiSignal = this.checkRSIConditions(rsi, latestIndex, targetSymbol, latestPrice);
             if (rsiSignal) {
                  console.log("[RSI Signal - No OBV Check] RSI Signal generated.");
@@ -521,16 +718,25 @@ export class AITradingEngine {
                     confirmedSignal = bbandsSignal;
                 }
             }
-        } else if (!confirmedSignal) { 
-             console.log("[AI Engine] Trend detected (ADX > threshold), skipping mean-reversion strategies.");
+        } else if (useAdxFilter && isTrending) { 
+             console.log("[AI Engine] Skipping mean-reversion strategies as ADX indicates a strong trend");
         }
         
         // Stochastic Oscillator (Check last, regardless of trend, no OBV confirm for now)
         if (!confirmedSignal) {
             const stochSignal = this.checkStochastic(stochResult, latestIndex, targetSymbol, latestPrice);
             if (stochSignal) {
-                console.log("[Stoch Signal - No OBV Check] Stoch Signal generated.");
-                confirmedSignal = stochSignal;
+                // Apply additional directional filter when ADX is active
+                const signalAlignedWithTrend = !useAdxFilter || !isTrending || 
+                    (stochSignal.direction === 'buy' && trendDirection === 'bullish') || 
+                    (stochSignal.direction === 'sell' && trendDirection === 'bearish');
+                    
+                if (signalAlignedWithTrend) {
+                    console.log("[Stoch Signal - No OBV Check] Stoch Signal generated.");
+                    confirmedSignal = stochSignal;
+                } else {
+                    console.log(`[ADX Filter] Rejected Stochastic ${stochSignal.direction.toUpperCase()} signal as it opposes the ${trendDirection} trend`);
+                }
             }
         }
 
