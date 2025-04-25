@@ -80,7 +80,7 @@ const NetWorthChart: React.FC<NetWorthChartProps> = ({
     } else {
       // Find the correct timeframe object
       const timeframe = DEFAULT_TIMEFRAMES.find(tf => tf.label === selectedTimeframe);
-      if (timeframe && timeframe.days !== Infinity) {
+      if (timeframe && typeof timeframe.days === 'number' && timeframe.days !== Infinity) {
         // Subtract the specified number of days
         startDate.setDate(now.getDate() - timeframe.days);
       } else if (selectedTimeframe === "All") {
@@ -187,7 +187,6 @@ const NetWorthChart: React.FC<NetWorthChartProps> = ({
           color: darkMode ? 'rgba(255, 255, 255, 0.6)' : undefined
         },
         grid: {
-          borderDash: [5, 5],
           color: chartColors.grid
         },
       },
