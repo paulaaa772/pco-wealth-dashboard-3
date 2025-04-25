@@ -1568,10 +1568,24 @@ const PortfolioSimulationContent = () => {
     feePercentage: 0.25,
     taxRate: 25
   });
+  // Track allocation percentages separately
+  const [allocation, setAllocation] = useState({
+    usStocks: 60,
+    intlStocks: 20,
+    bonds: 15,
+    cash: 5
+  });
 
   const handleParameterChange = (name: keyof SimulationParameters, value: any) => {
     setParameters({
       ...parameters,
+      [name]: value
+    });
+  };
+
+  const handleAllocationChange = (name: keyof typeof allocation, value: number) => {
+    setAllocation({
+      ...allocation,
       [name]: value
     });
   };
@@ -1609,7 +1623,7 @@ const PortfolioSimulationContent = () => {
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Investment Strategy</label>
                     <select 
-                      className="w-full p-2 border rounded focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full p-2 border border-gray-300 rounded text-gray-900 focus:ring-blue-500 focus:border-blue-500 bg-white"
                       value={parameters.strategyId}
                       onChange={(e) => handleParameterChange('strategyId', parseInt(e.target.value))}
                     >
@@ -1625,7 +1639,7 @@ const PortfolioSimulationContent = () => {
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Time Period</label>
                     <select 
-                      className="w-full p-2 border rounded focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full p-2 border border-gray-300 rounded text-gray-900 focus:ring-blue-500 focus:border-blue-500 bg-white"
                       value={parameters.timeframeId}
                       onChange={(e) => handleParameterChange('timeframeId', parseInt(e.target.value))}
                     >
@@ -1641,14 +1655,14 @@ const PortfolioSimulationContent = () => {
                         <label className="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
                         <input 
                           type="date" 
-                          className="w-full p-2 border rounded focus:ring-blue-500 focus:border-blue-500" 
+                          className="w-full p-2 border border-gray-300 rounded text-gray-900 focus:ring-blue-500 focus:border-blue-500" 
                         />
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">End Date</label>
                         <input 
                           type="date" 
-                          className="w-full p-2 border rounded focus:ring-blue-500 focus:border-blue-500" 
+                          className="w-full p-2 border border-gray-300 rounded text-gray-900 focus:ring-blue-500 focus:border-blue-500" 
                         />
                       </div>
                     </div>
@@ -1657,7 +1671,7 @@ const PortfolioSimulationContent = () => {
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Benchmark</label>
                     <select 
-                      className="w-full p-2 border rounded focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full p-2 border border-gray-300 rounded text-gray-900 focus:ring-blue-500 focus:border-blue-500 bg-white"
                       value={parameters.benchmark}
                       onChange={(e) => handleParameterChange('benchmark', e.target.value)}
                     >
@@ -1680,7 +1694,7 @@ const PortfolioSimulationContent = () => {
                       </div>
                       <input 
                         type="number" 
-                        className="w-full pl-7 p-2 border rounded focus:ring-blue-500 focus:border-blue-500" 
+                        className="w-full pl-7 p-2 border border-gray-300 rounded text-gray-900 focus:ring-blue-500 focus:border-blue-500" 
                         value={parameters.initialAmount}
                         onChange={(e) => handleParameterChange('initialAmount', parseFloat(e.target.value))}
                       />
@@ -1695,7 +1709,7 @@ const PortfolioSimulationContent = () => {
                       </div>
                       <input 
                         type="number" 
-                        className="w-full pl-7 p-2 border rounded focus:ring-blue-500 focus:border-blue-500" 
+                        className="w-full pl-7 p-2 border border-gray-300 rounded text-gray-900 focus:ring-blue-500 focus:border-blue-500" 
                         value={parameters.monthlyContribution}
                         onChange={(e) => handleParameterChange('monthlyContribution', parseFloat(e.target.value))}
                       />
@@ -1705,7 +1719,7 @@ const PortfolioSimulationContent = () => {
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Rebalance Frequency</label>
                     <select 
-                      className="w-full p-2 border rounded focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full p-2 border border-gray-300 rounded text-gray-900 focus:ring-blue-500 focus:border-blue-500 bg-white"
                       value={parameters.rebalanceFrequency}
                       onChange={(e) => handleParameterChange('rebalanceFrequency', e.target.value)}
                     >
@@ -1752,7 +1766,7 @@ const PortfolioSimulationContent = () => {
                       <input 
                         type="number" 
                         step="0.01" 
-                        className="w-32 p-2 border rounded focus:ring-blue-500 focus:border-blue-500" 
+                        className="w-32 p-2 border border-gray-300 rounded text-gray-900 focus:ring-blue-500 focus:border-blue-500" 
                         value={parameters.feePercentage}
                         onChange={(e) => handleParameterChange('feePercentage', parseFloat(e.target.value))}
                       />
@@ -1763,7 +1777,7 @@ const PortfolioSimulationContent = () => {
                     <label className="block text-sm font-medium text-gray-700 mb-1">Tax Rate (%)</label>
                     <input 
                       type="number" 
-                      className="w-32 p-2 border rounded focus:ring-blue-500 focus:border-blue-500" 
+                      className="w-32 p-2 border border-gray-300 rounded text-gray-900 focus:ring-blue-500 focus:border-blue-500" 
                       value={parameters.taxRate}
                       onChange={(e) => handleParameterChange('taxRate', parseFloat(e.target.value))}
                     />
@@ -1782,8 +1796,9 @@ const PortfolioSimulationContent = () => {
                     <div className="relative w-32">
                       <input 
                         type="number" 
-                        className="w-full p-1 text-sm text-right border rounded" 
-                        value="60"
+                        className="w-full p-1 text-sm text-gray-900 text-right border border-gray-300 rounded" 
+                        value={allocation.usStocks}
+                        onChange={(e) => handleAllocationChange('usStocks', parseInt(e.target.value))}
                       />
                       <div className="absolute inset-y-0 right-2 flex items-center pointer-events-none">
                         <span className="text-gray-500 text-sm">%</span>
@@ -1799,8 +1814,9 @@ const PortfolioSimulationContent = () => {
                     <div className="relative w-32">
                       <input 
                         type="number" 
-                        className="w-full p-1 text-sm text-right border rounded" 
-                        value="20"
+                        className="w-full p-1 text-sm text-gray-900 text-right border border-gray-300 rounded" 
+                        value={allocation.intlStocks}
+                        onChange={(e) => handleAllocationChange('intlStocks', parseInt(e.target.value))}
                       />
                       <div className="absolute inset-y-0 right-2 flex items-center pointer-events-none">
                         <span className="text-gray-500 text-sm">%</span>
@@ -1816,8 +1832,9 @@ const PortfolioSimulationContent = () => {
                     <div className="relative w-32">
                       <input 
                         type="number" 
-                        className="w-full p-1 text-sm text-right border rounded" 
-                        value="15"
+                        className="w-full p-1 text-sm text-gray-900 text-right border border-gray-300 rounded" 
+                        value={allocation.bonds}
+                        onChange={(e) => handleAllocationChange('bonds', parseInt(e.target.value))}
                       />
                       <div className="absolute inset-y-0 right-2 flex items-center pointer-events-none">
                         <span className="text-gray-500 text-sm">%</span>
@@ -1833,8 +1850,9 @@ const PortfolioSimulationContent = () => {
                     <div className="relative w-32">
                       <input 
                         type="number" 
-                        className="w-full p-1 text-sm text-right border rounded" 
-                        value="5"
+                        className="w-full p-1 text-sm text-gray-900 text-right border border-gray-300 rounded" 
+                        value={allocation.cash}
+                        onChange={(e) => handleAllocationChange('cash', parseInt(e.target.value))}
                       />
                       <div className="absolute inset-y-0 right-2 flex items-center pointer-events-none">
                         <span className="text-gray-500 text-sm">%</span>
