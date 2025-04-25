@@ -22,6 +22,7 @@ import DonutChart from '@/components/dashboard/DonutChart';
 import LoadingSpinner from '@/components/dashboard/LoadingSpinner';
 import AiAssistantPanel from '@/components/dashboard/AiAssistantPanel';
 import ActivityContentComponent from '@/components/dashboard/ActivityContent';
+import FundingContentComponent from '@/components/dashboard/FundingContent';
 
 // Error boundary component for better error handling
 const ErrorBoundary = ({ children }: { children: React.ReactNode }) => {
@@ -2676,7 +2677,8 @@ const getFundingData = () => {
   };
 };
 
-const FundingContent = () => {
+// Renamed to PortfolioFundingContent to avoid conflicts
+const PortfolioFundingContent = () => {
   const fundingData = getFundingData();
   const portfolioData = getPortfolioData();
   
@@ -3123,7 +3125,7 @@ export default function Portfolio() {
       case 'activity':
         return <ActivityContentComponent />;
       case 'funding':
-        return <FundingContent />;
+        return <FundingContentComponent />;
       case 'portfolio':
       default:
         return (
