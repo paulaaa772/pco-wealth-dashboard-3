@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import { PolygonService, PolygonCandle } from '../../lib/market-data/PolygonService';
 import TradingChart from '../../components/dashboard/TradingChart';
+import CongressTradingPanel from '../../components/brokerage/CongressTradingPanel';
 
 // Create a simple AlertMessage component inline since it's missing
 const AlertMessage = ({ 
@@ -310,6 +311,30 @@ export interface AIPosition {
   strategy: string;
 }
 
+// Add handling for Congress trades
+export interface CongressTrade {
+  id: number;
+  representative: string;
+  party: string;
+  state: string;
+  symbol: string;
+  company: string;
+  type: string;
+  amount: string;
+  date: string;
+  disclosure: string;
+  performance: number;
+  analysis?: {
+    sentiment: 'bullish' | 'bearish' | 'neutral';
+    confidence: number;
+    factors: {
+      market: string;
+      economic: string;
+      political: string;
+    };
+  };
+}
+
 export default function BrokeragePage() {
   // State for stock data
   const [symbol, setSymbol] = useState('AAPL');
@@ -327,6 +352,10 @@ export default function BrokeragePage() {
   const [isApiKeyValid, setIsApiKeyValid] = useState<boolean>(true);
   const [lastUpdateTime, setLastUpdateTime] = useState<Date>(new Date());
   const [refreshInterval, setRefreshInterval] = useState<number>(60); // seconds
+  const [activeTab, setActiveTab] = useState<'ai' | 'congress'>('ai'); // Tab navigation state
+  
+  // Add state for copied Congress trades
+  const [copiedCongressTrades, setCopiedCongressTrades] = useState<CongressTrade[]>([]);
 
   // Load initial data when page loads
   useEffect(() => {
@@ -707,6 +736,37 @@ export default function BrokeragePage() {
     return lastUpdateTime.toLocaleTimeString();
   };
 
+  // Handle copying a trade from a Congress member
+  const handleCopyCongressTrade = (trade: CongressTrade) => {
+    // Add to copied trades list
+    setCopiedCongressTrades(prev => [...prev, trade]);
+    
+    // Create a corresponding manual order
+    const newOrder: Omit<ManualOrder, 'id' | 'timestamp' | 'status' | 'price'> = {
+      symbol: trade.symbol,
+      type: trade.type.toLowerCase() as 'buy' | 'sell',
+      quantity: calculateQuantityFromAmount(trade.amount),
+    };
+    
+    // Submit the order
+    handleManualOrder(newOrder);
+  };
+  
+  // Helper to estimate quantity based on amount range
+  const calculateQuantityFromAmount = (amountRange: string): number => {
+    // Parse amount range like "1,000,000-5,000,000"
+    const amounts = amountRange.split('-').map(a => 
+      parseInt(a.replace(/[^0-9]/g, ''))
+    );
+    
+    // Use the lower end of the range and divide by current price to get shares
+    const estimatedAmount = amounts[0] || 100000;
+    const price = currentPrice || generateSimulatedPrice(symbol);
+    
+    // Calculate quantity (minimum 1 share)
+    return Math.max(1, Math.floor(estimatedAmount / price));
+  };
+
   return (
     <div className="flex flex-col">
       {/* Header section */}
@@ -837,9 +897,43 @@ export default function BrokeragePage() {
             />
           </div>
 
-          {/* AI Trading Panel */}
-          <div className="bg-white dark:bg-zinc-800 rounded-lg shadow p-4">
-            <AITradingPanel symbol={symbol} positions={aiPositions} />
+          {/* Trading tools with tabs */}
+          <div className="bg-white dark:bg-zinc-800 rounded-lg shadow">
+            {/* Tab navigation */}
+            <div className="flex border-b border-gray-200 dark:border-gray-700">
+              <button
+                className={`px-4 py-2 text-sm font-medium ${
+                  activeTab === 'ai' 
+                    ? 'text-blue-600 border-b-2 border-blue-600 dark:text-blue-400 dark:border-blue-400' 
+                    : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+                }`}
+                onClick={() => setActiveTab('ai')}
+              >
+                AI Trading
+              </button>
+              <button
+                className={`px-4 py-2 text-sm font-medium ${
+                  activeTab === 'congress' 
+                    ? 'text-blue-600 border-b-2 border-blue-600 dark:text-blue-400 dark:border-blue-400' 
+                    : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+                }`}
+                onClick={() => setActiveTab('congress')}
+              >
+                Congress Trading
+              </button>
+            </div>
+            
+            {/* Tab content */}
+            <div className="p-4">
+              {activeTab === 'ai' ? (
+                <AITradingPanel symbol={symbol} positions={aiPositions} />
+              ) : (
+                <CongressTradingPanel 
+                  symbol={symbol} 
+                  onCopyTrade={handleCopyCongressTrade} 
+                />
+              )}
+            </div>
           </div>
         </div>
       </div>
