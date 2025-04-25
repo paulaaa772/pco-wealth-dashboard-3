@@ -25,8 +25,8 @@ const MarketSummary: React.FC<MarketSummaryProps> = ({ symbol }) => {
       setError(null);
       
       try {
-        // Create an instance of the PolygonService
-        const polygonService = new PolygonService();
+        // Get an instance of the PolygonService using the static method
+        const polygonService = PolygonService.getInstance();
         
         // Fetch the latest price
         const priceData = await polygonService.getLatestPrice(symbol);
