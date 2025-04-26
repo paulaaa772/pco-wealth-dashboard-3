@@ -39,7 +39,7 @@ import AiAssistantPanel from '@/components/dashboard/AiAssistantPanel';
 import ActivityContentComponent from '@/components/dashboard/ActivityContent';
 import FundingContentComponent from '@/components/dashboard/FundingContent';
 import ResponsiveDataTable from '@/components/dashboard/ResponsiveDataTable';
-import ErrorBoundary from '@/components/ErrorBoundary';
+import ErrorBoundaryComponent from '@/components/ErrorBoundary';
 
 // Import custom hooks
 import { useNetWorthChartData, useAllocationData, useHoldingsData } from '@/hooks/usePortfolioData';
@@ -3392,7 +3392,7 @@ export default function Portfolio() {
   };
 
   return (
-    <ErrorBoundary>
+    <ErrorBoundaryComponent>
       <div className="bg-[#172033] min-h-screen text-white">
         <div className="container mx-auto px-2 sm:px-4 py-4 sm:py-6">
           {/* Mobile Navigation Dropdown */}
@@ -3737,7 +3737,7 @@ export default function Portfolio() {
         {/* AI Assistant */}
         <AiAssistantPanel />
       </div>
-    </ErrorBoundary>
+    </ErrorBoundaryComponent>
   );
 }
 
