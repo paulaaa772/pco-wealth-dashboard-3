@@ -25,6 +25,9 @@ import ActivityContentComponent from '@/components/dashboard/ActivityContent';
 import FundingContentComponent from '@/components/dashboard/FundingContent';
 import ResponsiveDataTable from '@/components/dashboard/ResponsiveDataTable';
 
+// Import custom hooks
+import { useNetWorthChartData, useAllocationData, useHoldingsData } from '@/hooks/usePortfolioData';
+
 // Error boundary component for better error handling
 const ErrorBoundary = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
@@ -2924,16 +2927,53 @@ const PortfolioFundingContent = () => {
 export default function Portfolio() {
   const [activeTab, setActiveTab] = useState('portfolio');
   const [selectedTimeframe, setSelectedTimeframe] = useState('1M');
-  const [isLoading, setIsLoading] = useState(true);
-  const [netWorthData, setNetWorthData] = useState<DataPoint[]>(chartData); // Initialize with chartData instead of empty array
-  const [portfolioData, setPortfolioData] = useState(getPortfolioData());
-  const [allocationData, setAllocationData] = useState(getAllocationData());
+  const [isLoading, setIsLoading] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   
   // Add state for holdings filtering and sorting
   const [holdingsFilter, setHoldingsFilter] = useState('');
   const [holdingsSortField, setHoldingsSortField] = useState<'name' | 'value'>('value');
   const [holdingsSortDirection, setHoldingsSortDirection] = useState<'asc' | 'desc'>('desc');
+  
+  // Use SWR hooks for data fetching
+  const { chartData: netWorthData, isLoading: isChartLoading, error: chartError } = useNetWorthChartData();
+  const { allocationData, isLoading: isAllocationLoading, error: allocationError } = useAllocationData();
+  const { holdings, isLoading: isHoldingsLoading, error: holdingsError } = useHoldingsData();
+  
+  // Fall back to mock data if API fails or data is not available
+  const finalNetWorthData = (netWorthData && netWorthData.length > 0) ? netWorthData : chartData;
+  const finalAllocationData = (allocationData && allocationData.length > 0) ? allocationData : getAllocationData();
+  
+  // Use API holdings data if available, otherwise use mock holdings
+  useEffect(() => {
+    if (holdings && holdings.length > 0) {
+      // Replace holdingsData with the API data
+      holdingsData = [...holdings];
+    }
+  }, [holdings]);
+  
+  // Calculate portfolio stats from holdings data
+  const portfolioData = getPortfolioData();
+  
+  // Set overall loading state 
+  useEffect(() => {
+    setIsLoading(isChartLoading || isAllocationLoading || isHoldingsLoading);
+  }, [isChartLoading, isAllocationLoading, isHoldingsLoading]);
+  
+  // Handle any errors in data loading
+  useEffect(() => {
+    if (chartError) {
+      console.error('Error loading chart data:', chartError);
+    }
+    
+    if (allocationError) {
+      console.error('Error loading allocation data:', allocationError);
+    }
+    
+    if (holdingsError) {
+      console.error('Error loading holdings data:', holdingsError);
+    }
+  }, [chartError, allocationError, holdingsError]);
   
   const timeframes = [
     { id: '1D', label: '1D' },
@@ -2945,98 +2985,6 @@ export default function Portfolio() {
     { id: '1Y', label: '1Y' },
     { id: 'ALL', label: 'ALL' }
   ];
-  
-  // Fetch data from MongoDB
-  useEffect(() => {
-    const loadPortfolioData = async () => {
-      try {
-        setIsLoading(true);
-        
-        // Fetch portfolios from the API
-        const portfoliosResponse = await fetch('/api/portfolios');
-        if (!portfoliosResponse.ok) {
-          throw new Error('Failed to fetch portfolios');
-        }
-        const portfoliosData = await portfoliosResponse.json();
-        console.log('Portfolios from MongoDB:', portfoliosData);
-        
-        if (portfoliosData && portfoliosData.length > 0) {
-          const portfolio = portfoliosData[0]; // Use the first portfolio for now
-          
-          // Map performance history to chart data
-          const chartDataFromDB = portfolio.performanceHistory?.map((entry: { date: string; value: number }) => ({
-            date: new Date(entry.date),
-            value: entry.value
-          })) || chartData;
-          setNetWorthData(chartDataFromDB);
-          
-          // Create portfolio data object
-          const portfolioDataFromDB = {
-            totalValue: portfolio.stats.totalValue,
-            cash: portfolio.cashBalance,
-            buyingPower: portfolio.cashBalance * 2,
-            margin: portfolio.cashBalance,
-            startValue: portfolio.stats.totalValue * 0.9,
-            endValue: portfolio.stats.totalValue,
-            netCashFlow: 0,
-            returnRate: portfolio.stats.annualReturn || 0,
-            date: new Date().toLocaleDateString('en-US', { 
-              year: 'numeric', month: 'short', day: 'numeric'
-            }),
-            startDate: 'Jan 1, 2024',
-            endDate: new Date().toLocaleDateString('en-US', { 
-              year: 'numeric', month: 'short', day: 'numeric'
-            })
-          };
-          setPortfolioData(portfolioDataFromDB);
-          
-          // Map asset allocation data
-          if (portfolio.assetAllocation && portfolio.assetAllocation.length > 0) {
-            const colors = [
-              '#4169E1', '#9370DB', '#20B2AA', '#3CB371', '#FF6347', 
-              '#6495ED', '#A9A9A9', '#FFD700', '#8A2BE2', '#32CD32',
-              '#FF4500', '#4682B4', '#7B68EE', '#2E8B57', '#CD5C5C'
-            ];
-            
-            const allocationDataFromDB = portfolio.assetAllocation.map((allocation: { category: string; percentage: number }, index: number) => ({
-              name: allocation.category,
-              value: allocation.percentage,
-              color: colors[index % colors.length]
-            }));
-            setAllocationData(allocationDataFromDB);
-          }
-          
-          // Replace holdings data if positions exist
-          if (portfolio.positions && portfolio.positions.length > 0) {
-            const newHoldings = portfolio.positions.map((position: { 
-              symbol: string; 
-              quantity: number; 
-              marketValue: number; 
-              sector?: string;
-            }) => ({
-              name: position.symbol,
-              symbol: position.symbol,
-              quantity: position.quantity,
-              value: position.marketValue,
-              sector: position.sector || 'Unknown',
-              accountType: 'taxable'
-            }));
-            
-            // Directly modify the array content instead of reassigning
-            holdingsData.length = 0;
-            newHoldings.forEach((holding: Holding) => holdingsData.push(holding));
-          }
-        }
-        
-        setIsLoading(false);
-      } catch (error) {
-        console.error('Error loading portfolio data:', error);
-        setIsLoading(false);
-      }
-    };
-    
-    loadPortfolioData();
-  }, []);
   
   if (isLoading) {
     return (
@@ -3209,7 +3157,7 @@ export default function Portfolio() {
                 {/* Net Worth Chart - Using our NetWorthChart component */}
                 <div className="mb-8">
                   <NetWorthChart 
-                    data={netWorthData}
+                    data={finalNetWorthData}
                     title="Net Worth History"
                     height={300}
                     timeframes={['1D', '1W', '1M', '3M', '6M', 'YTD', '1Y', 'ALL']}
@@ -3274,7 +3222,7 @@ export default function Portfolio() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="bg-white rounded-lg shadow p-6">
                 <h2 className="text-xl font-semibold mb-4">Sector Allocation</h2>
-                <DonutChart data={allocationData} />
+                <DonutChart data={finalAllocationData} />
               </div>
               
               <div className="bg-white rounded-lg shadow p-6">
@@ -3672,7 +3620,7 @@ export default function Portfolio() {
                       
                       <div className="mt-4 flex justify-center">
                         <DonutChart 
-                          data={allocationData} 
+                          data={finalAllocationData} 
                           width={250} 
                           height={250} 
                           innerRadius={70} 
@@ -3727,7 +3675,7 @@ export default function Portfolio() {
                       {/* Net Worth Chart */}
                       <div className="h-52 sm:h-64">
                         <NetWorthChart 
-                          data={netWorthData}
+                          data={finalNetWorthData}
                           title=""
                           height={256}
                           timeframes={['1D', '1W', '1M', '3M', '6M', 'YTD', '1Y', 'ALL']}
