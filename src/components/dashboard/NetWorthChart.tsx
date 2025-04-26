@@ -50,7 +50,7 @@ const DEFAULT_TIMEFRAMES = [
   { label: '6M', days: 180 },
   { label: 'YTD', isYTD: true },
   { label: '1Y', days: 365 },
-  { label: 'All', days: Infinity }
+  { label: 'ALL', days: Infinity }
 ];
 
 const NetWorthChart: React.FC<NetWorthChartProps> = ({
@@ -89,6 +89,9 @@ const NetWorthChart: React.FC<NetWorthChartProps> = ({
     const now = new Date();
     let startDate = new Date();
     
+    console.log('NetWorthChart: Selected timeframe:', selectedTimeframe);
+    console.log('NetWorthChart: Total data points:', data.length);
+    
     // Handle YTD case specially
     if (selectedTimeframe === "YTD") {
       startDate = new Date(now.getFullYear(), 0, 1); // January 1st of current year
@@ -109,6 +112,7 @@ const NetWorthChart: React.FC<NetWorthChartProps> = ({
     
     // Filter the data to include only points after the start date
     const filtered = data.filter(item => new Date(item.date) >= startDate);
+    console.log('NetWorthChart: Filtered data points:', filtered.length, 'Start date:', startDate);
     setFilteredData(filtered);
   }, [selectedTimeframe, data]);
 

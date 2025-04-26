@@ -2924,7 +2924,7 @@ export default function Portfolio() {
   const [activeTab, setActiveTab] = useState('portfolio');
   const [selectedTimeframe, setSelectedTimeframe] = useState('1M');
   const [isLoading, setIsLoading] = useState(true);
-  const [netWorthData, setNetWorthData] = useState<DataPoint[]>([]);
+  const [netWorthData, setNetWorthData] = useState<DataPoint[]>(chartData); // Initialize with chartData instead of empty array
   const [portfolioData, setPortfolioData] = useState(getPortfolioData());
   const [allocationData, setAllocationData] = useState(getAllocationData());
   
@@ -2940,7 +2940,8 @@ export default function Portfolio() {
     { id: '3M', label: '3M' },
     { id: '6M', label: '6M' },
     { id: 'YTD', label: 'YTD' },
-    { id: '1Y', label: '1Y' }
+    { id: '1Y', label: '1Y' },
+    { id: 'ALL', label: 'ALL' }
   ];
   
   // Fetch data from MongoDB
@@ -3212,7 +3213,9 @@ export default function Portfolio() {
                     data={netWorthData}
                     title="Net Worth History"
                     height={300}
-                    timeframes={['1W', '1M', '3M', '6M', 'YTD', '1Y', 'All']}
+                    timeframes={['1D', '1W', '1M', '3M', '6M', 'YTD', '1Y', 'ALL']}
+                    selectedTimeframe={selectedTimeframe}
+                    onTimeframeChange={setSelectedTimeframe}
                   />
                 </div>
                 
@@ -3615,7 +3618,7 @@ export default function Portfolio() {
                           data={netWorthData}
                           title=""
                           height={256}
-                          timeframes={['1D', '1W', '1M', '3M', '6M', 'YTD', '1Y']}
+                          timeframes={['1D', '1W', '1M', '3M', '6M', 'YTD', '1Y', 'ALL']}
                           darkMode={true}
                           selectedTimeframe={selectedTimeframe}
                           onTimeframeChange={setSelectedTimeframe}
