@@ -38,6 +38,8 @@ interface NetWorthChartProps {
   timeframes?: string[];
   height?: number;
   darkMode?: boolean;
+  selectedTimeframe?: string;
+  onTimeframeChange?: (timeframe: string) => void;
 }
 
 const DEFAULT_TIMEFRAMES = [
@@ -56,9 +58,25 @@ const NetWorthChart: React.FC<NetWorthChartProps> = ({
   title = "Net Worth Over Time",
   timeframes = ["1W", "1M", "3M", "6M", "1Y", "All"],
   height = 300,
-  darkMode = false
+  darkMode = false,
+  selectedTimeframe: propSelectedTimeframe,
+  onTimeframeChange
 }) => {
-  const [selectedTimeframe, setSelectedTimeframe] = useState<string>("1M");
+  // Keep internal state as fallback if props aren't provided
+  const [internalSelectedTimeframe, setInternalSelectedTimeframe] = useState<string>("1M");
+  
+  // Use prop value if provided, otherwise use internal state
+  const selectedTimeframe = propSelectedTimeframe || internalSelectedTimeframe;
+  
+  // Handle timeframe changes
+  const handleTimeframeChange = (timeframe: string) => {
+    if (onTimeframeChange) {
+      onTimeframeChange(timeframe);
+    } else {
+      setInternalSelectedTimeframe(timeframe);
+    }
+  };
+  
   const [filteredData, setFilteredData] = useState<DataPoint[]>([]);
   
   // Filter available timeframes based on prop
@@ -238,23 +256,21 @@ const NetWorthChart: React.FC<NetWorthChartProps> = ({
               </div>
             )}
           </div>
-          {!darkMode && (
-            <div className="flex space-x-2">
-              {availableTimeframes.map(timeframe => (
-                <button
-                  key={timeframe.label}
-                  className={`px-3 py-1 text-sm rounded ${
-                    selectedTimeframe === timeframe.label 
-                      ? 'bg-indigo-600 text-white' 
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
-                  onClick={() => setSelectedTimeframe(timeframe.label)}
-                >
-                  {timeframe.label}
-                </button>
-              ))}
-            </div>
-          )}
+          <div className="flex space-x-2">
+            {availableTimeframes.map(timeframe => (
+              <button
+                key={timeframe.label}
+                className={`px-2 py-1 text-xs rounded mx-1 ${
+                  selectedTimeframe === timeframe.label 
+                    ? 'bg-blue-500 text-white' 
+                    : darkMode ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+                onClick={() => handleTimeframeChange(timeframe.label)}
+              >
+                {timeframe.label}
+              </button>
+            ))}
+          </div>
         </div>
       )}
       

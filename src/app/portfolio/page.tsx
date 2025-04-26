@@ -71,7 +71,7 @@ interface Holding {
 }
 
 // Add the holdings data with sector information
-const holdingsData: Holding[] = [
+let holdingsData: Holding[] = [
   // Taxable account investments
   { name: "Tencent", symbol: "TCEHY", quantity: 2, value: 111.84, sector: "Communication Services", accountType: "taxable" },
   { name: "Taiwan Semiconductor", symbol: "TSM", quantity: 2.17, value: 323.89, sector: "Technology", accountType: "taxable" },
@@ -2943,25 +2943,91 @@ export default function Portfolio() {
     { id: '1Y', label: '1Y' }
   ];
   
-  // Simulate data loading
+  // Fetch data from MongoDB
   useEffect(() => {
-    const loadNetWorthData = async () => {
+    const loadPortfolioData = async () => {
       try {
-        // In a real app, you would fetch this data from an API
-        // For now, we'll simulate loading with a timeout
-        setTimeout(() => {
-          setNetWorthData(chartData);
-          setPortfolioData(getPortfolioData());
-          setAllocationData(getAllocationData());
-          setIsLoading(false);
-        }, 1000);
+        setIsLoading(true);
+        
+        // Fetch portfolios from the API
+        const portfoliosResponse = await fetch('/api/portfolios');
+        if (!portfoliosResponse.ok) {
+          throw new Error('Failed to fetch portfolios');
+        }
+        const portfoliosData = await portfoliosResponse.json();
+        console.log('Portfolios from MongoDB:', portfoliosData);
+        
+        if (portfoliosData && portfoliosData.length > 0) {
+          const portfolio = portfoliosData[0]; // Use the first portfolio for now
+          
+          // Map performance history to chart data
+          const chartDataFromDB = portfolio.performanceHistory?.map(entry => ({
+            date: new Date(entry.date),
+            value: entry.value
+          })) || chartData;
+          setNetWorthData(chartDataFromDB);
+          
+          // Create portfolio data object
+          const portfolioDataFromDB = {
+            totalValue: portfolio.stats.totalValue,
+            cash: portfolio.cashBalance,
+            buyingPower: portfolio.cashBalance * 2,
+            margin: portfolio.cashBalance,
+            startValue: portfolio.stats.totalValue * 0.9,
+            endValue: portfolio.stats.totalValue,
+            netCashFlow: 0,
+            returnRate: portfolio.stats.annualReturn || 0,
+            date: new Date().toLocaleDateString('en-US', { 
+              year: 'numeric', month: 'short', day: 'numeric'
+            }),
+            startDate: 'Jan 1, 2024',
+            endDate: new Date().toLocaleDateString('en-US', { 
+              year: 'numeric', month: 'short', day: 'numeric'
+            })
+          };
+          setPortfolioData(portfolioDataFromDB);
+          
+          // Map asset allocation data
+          if (portfolio.assetAllocation && portfolio.assetAllocation.length > 0) {
+            const colors = [
+              '#4169E1', '#9370DB', '#20B2AA', '#3CB371', '#FF6347', 
+              '#6495ED', '#A9A9A9', '#FFD700', '#8A2BE2', '#32CD32',
+              '#FF4500', '#4682B4', '#7B68EE', '#2E8B57', '#CD5C5C'
+            ];
+            
+            const allocationDataFromDB = portfolio.assetAllocation.map((allocation, index) => ({
+              name: allocation.category,
+              value: allocation.percentage,
+              color: colors[index % colors.length]
+            }));
+            setAllocationData(allocationDataFromDB);
+          }
+          
+          // Replace holdings data if positions exist
+          if (portfolio.positions && portfolio.positions.length > 0) {
+            const newHoldings = portfolio.positions.map(position => ({
+              name: position.symbol,
+              symbol: position.symbol,
+              quantity: position.quantity,
+              value: position.marketValue,
+              sector: position.sector || 'Unknown',
+              accountType: 'taxable'
+            }));
+            
+            // Directly modify the array content instead of reassigning
+            holdingsData.length = 0;
+            newHoldings.forEach(holding => holdingsData.push(holding));
+          }
+        }
+        
+        setIsLoading(false);
       } catch (error) {
-        console.error('Error loading net worth data:', error);
+        console.error('Error loading portfolio data:', error);
         setIsLoading(false);
       }
     };
     
-    loadNetWorthData();
+    loadPortfolioData();
   }, []);
   
   if (isLoading) {
@@ -3538,23 +3604,6 @@ export default function Portfolio() {
                   {/* Right side - Line Chart */}
                   <div className="w-full lg:w-2/3">
                     <div className="bg-[#1D2939] rounded-lg p-6">
-                      {/* Time Frame Buttons */}
-                      <div className="flex justify-end mb-4">
-                        {timeframes.map((tf) => (
-                          <button
-                            key={tf.id}
-                            onClick={() => setSelectedTimeframe(tf.id)}
-                            className={`px-2 py-1 text-xs rounded mx-1 ${
-                              selectedTimeframe === tf.id
-                                ? 'bg-blue-500 text-white'
-                                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                            }`}
-                          >
-                            {tf.label}
-                          </button>
-                        ))}
-                      </div>
-                      
                       {/* Net Worth Chart */}
                       <div className="h-64">
                         <NetWorthChart 
@@ -3563,6 +3612,8 @@ export default function Portfolio() {
                           height={256}
                           timeframes={['1D', '1W', '1M', '3M', '6M', 'YTD', '1Y']}
                           darkMode={true}
+                          selectedTimeframe={selectedTimeframe}
+                          onTimeframeChange={setSelectedTimeframe}
                         />
                       </div>
                       
