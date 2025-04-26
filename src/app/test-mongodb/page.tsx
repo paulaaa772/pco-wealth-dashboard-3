@@ -62,18 +62,18 @@ export default function TestMongoDB() {
       fetchPortfolios(); // Refresh the list
     } catch (err) {
       console.error('Error adding portfolio:', err);
-      setMessage(`Error: ${err.message}`);
+      setMessage(`Error: ${err instanceof Error ? err.message : 'Unknown error occurred'}`);
     }
   }
 
-  function handleChange(e) {
+  function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) {
     const { name, value } = e.target;
     if (name.includes('.')) {
       const [parent, child] = name.split('.');
       setFormData({
         ...formData,
         [parent]: {
-          ...formData[parent],
+          ...(formData as any)[parent],
           [child]: Number(value)
         }
       });
