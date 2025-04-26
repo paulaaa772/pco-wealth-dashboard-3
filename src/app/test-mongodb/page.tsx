@@ -40,7 +40,7 @@ export default function TestMongoDB() {
     }
   }
 
-  async function handleSubmit(e) {
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     try {
       setMessage('');

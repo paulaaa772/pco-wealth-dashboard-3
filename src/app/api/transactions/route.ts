@@ -97,7 +97,7 @@ export async function POST(req: NextRequest) {
           }
         } else if (body.type === 'sell') {
           // Find the holding
-          const holdingIndex = portfolio.holdings.findIndex(h => h.symbol === body.symbol);
+          const holdingIndex = portfolio.holdings.findIndex((h: { symbol: string }) => h.symbol === body.symbol);
           
           if (holdingIndex === -1) {
             throw new Error('Holding not found in portfolio');

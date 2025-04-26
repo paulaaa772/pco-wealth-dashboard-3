@@ -2961,7 +2961,7 @@ export default function Portfolio() {
           const portfolio = portfoliosData[0]; // Use the first portfolio for now
           
           // Map performance history to chart data
-          const chartDataFromDB = portfolio.performanceHistory?.map(entry => ({
+          const chartDataFromDB = portfolio.performanceHistory?.map((entry: { date: string; value: number }) => ({
             date: new Date(entry.date),
             value: entry.value
           })) || chartData;
@@ -2995,7 +2995,7 @@ export default function Portfolio() {
               '#FF4500', '#4682B4', '#7B68EE', '#2E8B57', '#CD5C5C'
             ];
             
-            const allocationDataFromDB = portfolio.assetAllocation.map((allocation, index) => ({
+            const allocationDataFromDB = portfolio.assetAllocation.map((allocation: { category: string; percentage: number }, index: number) => ({
               name: allocation.category,
               value: allocation.percentage,
               color: colors[index % colors.length]
@@ -3005,7 +3005,12 @@ export default function Portfolio() {
           
           // Replace holdings data if positions exist
           if (portfolio.positions && portfolio.positions.length > 0) {
-            const newHoldings = portfolio.positions.map(position => ({
+            const newHoldings = portfolio.positions.map((position: { 
+              symbol: string; 
+              quantity: number; 
+              marketValue: number; 
+              sector?: string;
+            }) => ({
               name: position.symbol,
               symbol: position.symbol,
               quantity: position.quantity,
@@ -3016,7 +3021,7 @@ export default function Portfolio() {
             
             // Directly modify the array content instead of reassigning
             holdingsData.length = 0;
-            newHoldings.forEach(holding => holdingsData.push(holding));
+            newHoldings.forEach((holding: Holding) => holdingsData.push(holding));
           }
         }
         
