@@ -442,7 +442,7 @@ const BusinessInsiderTradingPanel: React.FC<BusinessInsiderTradingPanelProps> = 
             <div className="flex justify-between items-start mb-4">
               <div>
                 <h3 className="text-lg font-medium text-gray-900 dark:text-white">
-                  AI Analysis: {selectedTrade.name}'s Trade
+                  AI Analysis: {selectedTrade.name}&apos;s Trade
                 </h3>
                 <p className="text-sm text-gray-500 dark:text-gray-400">
                   {selectedTrade.type} {formatLargeNumber(selectedTrade.shares)} {selectedTrade.symbol} shares

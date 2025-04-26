@@ -871,7 +871,7 @@ const InKindTransferContent = () => {
                       Start Transfer Process
                     </button>
                     <p className="text-xs text-gray-400 mt-2">
-                      You'll need to upload account statements in the next step for verification.
+                      You&apos;ll need to upload account statements in the next step for verification.
                     </p>
                   </div>
                 </div>
@@ -923,7 +923,7 @@ const InKindTransferContent = () => {
                 <div>
                   <h4 className="font-medium text-white mb-2">What if I have unsupported securities?</h4>
                   <p className="text-gray-300 text-sm">
-                    If we don't support certain securities in your current portfolio, you have options to liquidate them before transfer or we can help you transfer them elsewhere.
+                    If we don&apos;t support certain securities in your current portfolio, you have options to liquidate them before transfer or we can help you transfer them elsewhere.
                   </p>
                 </div>
               </div>
