@@ -56,7 +56,7 @@ const DEFAULT_TIMEFRAMES = [
 const NetWorthChart: React.FC<NetWorthChartProps> = ({
   data,
   title = "Net Worth Over Time",
-  timeframes = ["1W", "1M", "3M", "6M", "1Y", "All"],
+  timeframes = ["1W", "1M", "3M", "6M", "1Y", "ALL"],
   height = 300,
   darkMode = false,
   selectedTimeframe: propSelectedTimeframe,
@@ -75,14 +75,32 @@ const NetWorthChart: React.FC<NetWorthChartProps> = ({
     } else {
       setInternalSelectedTimeframe(timeframe);
     }
+    console.log(`Changing timeframe to ${timeframe}`);
   };
   
   const [filteredData, setFilteredData] = useState<DataPoint[]>([]);
+  const [isMobile, setIsMobile] = useState<boolean>(false);
+  
+  // Check if we're on a mobile device
+  useEffect(() => {
+    const checkIsMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    
+    checkIsMobile();
+    window.addEventListener('resize', checkIsMobile);
+    return () => window.removeEventListener('resize', checkIsMobile);
+  }, []);
   
   // Filter available timeframes based on prop
   const availableTimeframes = DEFAULT_TIMEFRAMES.filter(tf => 
     timeframes.includes(tf.label)
   );
+  
+  // If we're on mobile, we might want to show fewer timeframes
+  const displayTimeframes = isMobile 
+    ? availableTimeframes.filter(tf => ['1M', '3M', '1Y', 'ALL'].includes(tf.label))
+    : availableTimeframes;
   
   useEffect(() => {
     // Filter data based on selected timeframe
@@ -104,7 +122,7 @@ const NetWorthChart: React.FC<NetWorthChartProps> = ({
       if (timeframe && typeof timeframe.days === 'number' && timeframe.days !== Infinity) {
         // Subtract the specified number of days
         startDate.setDate(now.getDate() - timeframe.days);
-      } else if (selectedTimeframe === "All") {
+      } else if (selectedTimeframe === "ALL") {
         // Show all data by setting a very old date
         startDate = new Date(0);
       }
@@ -118,6 +136,14 @@ const NetWorthChart: React.FC<NetWorthChartProps> = ({
 
   // Format dates for chart labels
   const formatDate = (date: Date) => {
+    // For mobile, use a more compact date format
+    if (isMobile) {
+      return new Date(date).toLocaleDateString('en-US', { 
+        month: 'short',
+        day: 'numeric'
+      });
+    }
+    
     return new Date(date).toLocaleDateString('en-US', { 
       month: 'short',
       day: 'numeric',
@@ -153,7 +179,7 @@ const NetWorthChart: React.FC<NetWorthChartProps> = ({
         backgroundColor: chartColors.background,
         fill: true,
         tension: 0.4,
-        pointRadius: filteredData.length > 30 ? 0 : 3, // Hide points if there are too many data points
+        pointRadius: isMobile || filteredData.length > 30 ? 0 : 3, // Hide points on mobile or if there are too many data points
         pointBackgroundColor: chartColors.line,
         pointBorderColor: darkMode ? '#1D2939' : '#fff',
         pointBorderWidth: 2,
@@ -165,7 +191,7 @@ const NetWorthChart: React.FC<NetWorthChartProps> = ({
     ],
   };
   
-  // Chart.js options
+  // Chart.js options - with responsive adjustments
   const options: ChartOptions<'line'> = {
     responsive: true,
     maintainAspectRatio: false,
@@ -194,19 +220,32 @@ const NetWorthChart: React.FC<NetWorthChartProps> = ({
           display: false,
         },
         ticks: {
-          maxRotation: 45,
+          maxRotation: isMobile ? 45 : 0,
           autoSkip: true,
-          maxTicksLimit: filteredData.length > 30 ? 12 : 8,
-          color: darkMode ? 'rgba(255, 255, 255, 0.6)' : undefined
+          maxTicksLimit: isMobile ? 6 : (filteredData.length > 30 ? 12 : 8),
+          color: darkMode ? 'rgba(255, 255, 255, 0.6)' : undefined,
+          font: {
+            size: isMobile ? 8 : 11
+          }
         },
       },
       y: {
         beginAtZero: false,
         ticks: {
           callback: function(value) {
+            // Compact display for mobile
+            if (isMobile) {
+              return '$' + Number(value).toLocaleString(undefined, {
+                notation: 'compact',
+                compactDisplay: 'short'
+              });
+            }
             return '$' + Number(value).toLocaleString();
           },
-          color: darkMode ? 'rgba(255, 255, 255, 0.6)' : undefined
+          color: darkMode ? 'rgba(255, 255, 255, 0.6)' : undefined,
+          font: {
+            size: isMobile ? 9 : 11
+          }
         },
         grid: {
           color: chartColors.grid
@@ -221,12 +260,12 @@ const NetWorthChart: React.FC<NetWorthChartProps> = ({
   };
   
   const containerClass = darkMode 
-    ? "bg-[#1D2939] p-4 rounded-lg" 
-    : "bg-white p-4 rounded-lg shadow";
+    ? "bg-[#1D2939] p-2 sm:p-4 rounded-lg" 
+    : "bg-white p-2 sm:p-4 rounded-lg shadow";
   
   const titleClass = darkMode 
-    ? "text-lg font-semibold text-white" 
-    : "text-lg font-semibold text-gray-900";
+    ? "text-base sm:text-lg font-semibold text-white" 
+    : "text-base sm:text-lg font-semibold text-gray-900";
   
   const positiveClass = darkMode 
     ? "text-green-400" 
@@ -237,13 +276,13 @@ const NetWorthChart: React.FC<NetWorthChartProps> = ({
     : "text-red-600";
   
   const dateRangeClass = darkMode 
-    ? "text-sm text-gray-400" 
-    : "text-sm text-gray-500";
+    ? "text-xs sm:text-sm text-gray-400" 
+    : "text-xs sm:text-sm text-gray-500";
   
   return (
     <div className={containerClass}>
       {title && (
-        <div className="flex justify-between items-center mb-4">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-2 sm:mb-4">
           <div>
             <h3 className={titleClass}>{title}</h3>
             {filteredData.length > 0 && (
@@ -254,17 +293,18 @@ const NetWorthChart: React.FC<NetWorthChartProps> = ({
                     maximumFractionDigits: 2
                   })}
                 </span>
-                <span className={`ml-2 text-sm ${isPositive ? positiveClass : negativeClass}`}>
+                <span className={`ml-2 text-xs sm:text-sm ${isPositive ? positiveClass : negativeClass}`}>
                   ({isPositive ? '+' : ''}{percentChange.toFixed(2)}%)
                 </span>
               </div>
             )}
           </div>
-          <div className="flex space-x-2">
-            {availableTimeframes.map(timeframe => (
+          
+          <div className="flex flex-wrap gap-1 mt-2 sm:mt-0 sm:flex-nowrap sm:space-x-2">
+            {displayTimeframes.map(timeframe => (
               <button
                 key={timeframe.label}
-                className={`px-2 py-1 text-xs rounded mx-1 ${
+                className={`px-1.5 sm:px-2 py-1 text-[10px] sm:text-xs rounded ${
                   selectedTimeframe === timeframe.label 
                     ? 'bg-blue-500 text-white' 
                     : darkMode ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -278,30 +318,30 @@ const NetWorthChart: React.FC<NetWorthChartProps> = ({
         </div>
       )}
       
-      <div style={{ height: `${height}px` }}>
+      <div style={{ height: `${isMobile ? height * 0.7 : height}px` }}>
         {filteredData.length > 0 ? (
           <Line data={chartData} options={options} height={height} />
         ) : (
           <div className="flex items-center justify-center h-full">
-            <p className={darkMode ? "text-gray-400" : "text-gray-500"}>No data available for the selected time period</p>
+            <p className={darkMode ? "text-gray-400 text-sm" : "text-gray-500 text-sm"}>No data available for the selected time period</p>
           </div>
         )}
       </div>
       
       {filteredData.length > 0 && (
-        <div className="mt-4 flex justify-between">
+        <div className="mt-2 sm:mt-4 flex justify-between">
           <span className={dateRangeClass}>
             {new Date(filteredData[0].date).toLocaleDateString('en-US', {
               month: 'short',
               day: 'numeric',
-              year: 'numeric'
+              year: isMobile ? undefined : 'numeric'
             })}
           </span>
           <span className={dateRangeClass}>
             {new Date(filteredData[filteredData.length - 1].date).toLocaleDateString('en-US', {
               month: 'short',
               day: 'numeric',
-              year: 'numeric'
+              year: isMobile ? undefined : 'numeric'
             })}
           </span>
         </div>

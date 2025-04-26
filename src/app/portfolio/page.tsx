@@ -23,6 +23,7 @@ import LoadingSpinner from '@/components/dashboard/LoadingSpinner';
 import AiAssistantPanel from '@/components/dashboard/AiAssistantPanel';
 import ActivityContentComponent from '@/components/dashboard/ActivityContent';
 import FundingContentComponent from '@/components/dashboard/FundingContent';
+import ResponsiveDataTable from '@/components/dashboard/ResponsiveDataTable';
 
 // Error boundary component for better error handling
 const ErrorBoundary = ({ children }: { children: React.ReactNode }) => {
@@ -2927,6 +2928,7 @@ export default function Portfolio() {
   const [netWorthData, setNetWorthData] = useState<DataPoint[]>(chartData); // Initialize with chartData instead of empty array
   const [portfolioData, setPortfolioData] = useState(getPortfolioData());
   const [allocationData, setAllocationData] = useState(getAllocationData());
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
   
   // Add state for holdings filtering and sorting
   const [holdingsFilter, setHoldingsFilter] = useState('');
@@ -3052,45 +3054,86 @@ export default function Portfolio() {
       holding.symbol.toLowerCase().includes(holdingsFilter.toLowerCase())
     );
     
-    // Sort the holdings
-    const sortedHoldings = [...filteredHoldings].sort((a, b) => {
-      if (holdingsSortField === 'name') {
-        return holdingsSortDirection === 'asc' 
-          ? a.name.localeCompare(b.name) 
-          : b.name.localeCompare(a.name);
-      } else {
-        return holdingsSortDirection === 'asc' 
-          ? a.value - b.value 
-          : b.value - a.value;
-      }
-    });
-    
     // Calculate total portfolio value
     const totalValue = holdingsData.reduce((sum, holding) => sum + holding.value, 0);
+    
+    // Define columns for the ResponsiveDataTable
+    const columns = [
+      { 
+        header: 'Name', 
+        accessor: 'name' as keyof Holding,
+        isSortable: true,
+        isMobileVisible: true,
+        className: 'font-medium text-white'
+      },
+      { 
+        header: 'Symbol', 
+        accessor: 'symbol' as keyof Holding,
+        isSortable: true,
+        isMobileVisible: true
+      },
+      { 
+        header: 'Quantity', 
+        accessor: 'quantity' as keyof Holding,
+        isSortable: true,
+        isMobileVisible: false,
+        className: 'text-right'
+      },
+      { 
+        header: 'Value', 
+        accessor: (holding: Holding) => (
+          <span className="font-medium text-white">
+            ${holding.value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </span>
+        ),
+        isSortable: true,
+        isMobileVisible: true,
+        className: 'text-right'
+      },
+      { 
+        header: '% of Portfolio', 
+        accessor: (holding: Holding) => {
+          const percentage = (holding.value / totalValue) * 100;
+          return (
+            <div>
+              <div>{percentage.toFixed(2)}%</div>
+              <div className="w-full bg-gray-700 h-1 mt-1 rounded-full overflow-hidden">
+                <div 
+                  className="bg-blue-500 h-1 rounded-full" 
+                  style={{ width: `${percentage}%` }}
+                ></div>
+              </div>
+            </div>
+          );
+        },
+        isMobileVisible: false,
+        className: 'text-right'
+      }
+    ];
 
-  return (
-      <div className="bg-[#172033] text-white p-6">
-        <div className="mb-6">
-          <h2 className="text-2xl font-semibold mb-2">Holdings</h2>
+    return (
+      <div className="bg-[#172033] text-white p-3 sm:p-6">
+        <div className="mb-4 sm:mb-6">
+          <h2 className="text-xl sm:text-2xl font-semibold mb-2">Holdings</h2>
           <p className="text-gray-400">Total Portfolio Value: ${totalValue.toLocaleString()}</p>
         </div>
         
         {/* Search and Sort Controls */}
-        <div className="flex flex-col md:flex-row justify-between mb-6 gap-4">
+        <div className="flex flex-col sm:flex-row justify-between mb-4 sm:mb-6 gap-4">
           <div className="relative">
             <input
               type="text"
               placeholder="Search holdings..."
               value={holdingsFilter}
               onChange={(e) => setHoldingsFilter(e.target.value)}
-              className="bg-[#1D2939] text-white border border-gray-700 rounded-md p-2 pl-8 w-full md:w-64"
+              className="bg-[#1D2939] text-white border border-gray-700 rounded-md p-2 pl-8 w-full sm:w-64"
             />
             <svg className="absolute left-2 top-3 h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
           </div>
-          <div className="flex items-center space-x-4">
-            <span className="text-gray-400">Sort by:</span>
+          <div className="flex items-center space-x-2 sm:space-x-4">
+            <span className="text-gray-400 text-sm">Sort by:</span>
             <button
               onClick={() => {
                 setHoldingsSortField('name');
@@ -3100,7 +3143,7 @@ export default function Portfolio() {
                   setHoldingsSortDirection('asc');
                 }
               }}
-              className={`px-3 py-1 rounded ${
+              className={`px-2 sm:px-3 py-1 rounded text-xs sm:text-sm ${
                 holdingsSortField === 'name' ? 'bg-blue-600 text-white' : 'bg-[#1D2939] text-gray-300'
               }`}
             >
@@ -3115,7 +3158,7 @@ export default function Portfolio() {
                   setHoldingsSortDirection('desc');
                 }
               }}
-              className={`px-3 py-1 rounded ${
+              className={`px-2 sm:px-3 py-1 rounded text-xs sm:text-sm ${
                 holdingsSortField === 'value' ? 'bg-blue-600 text-white' : 'bg-[#1D2939] text-gray-300'
               }`}
             >
@@ -3124,61 +3167,17 @@ export default function Portfolio() {
           </div>
         </div>
         
-        {/* Holdings Table */}
-        <div className="bg-[#1D2939] rounded-lg overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-700">
-              <thead className="bg-[#1A202C]">
-                <tr>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
-                    Name
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
-                    Symbol
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">
-                    Quantity
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">
-                    Value
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">
-                    % of Portfolio
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-700">
-                {sortedHoldings.map((holding, index) => {
-                  const percentage = (holding.value / totalValue) * 100;
-                  return (
-                    <tr key={index} className="hover:bg-[#2D3748]">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-white">
-                        {holding.name}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
-                        {holding.symbol}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-gray-300">
-                        {holding.quantity}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-white">
-                        ${holding.value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-gray-300">
-                        {percentage.toFixed(2)}%
-                        <div className="w-full bg-gray-700 h-1 mt-1 rounded-full overflow-hidden">
-                          <div 
-                            className="bg-blue-500 h-1 rounded-full" 
-                            style={{ width: `${percentage}%` }}
-                          ></div>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+        {/* Holdings Table using ResponsiveDataTable */}
+        <div className="bg-[#1D2939] rounded-lg overflow-hidden p-2 sm:p-4">
+          <ResponsiveDataTable 
+            data={filteredHoldings}
+            columns={columns}
+            keyField="symbol"
+            darkMode={true}
+            defaultSortField={holdingsSortField}
+            defaultSortDirection={holdingsSortDirection}
+            emptyMessage="No holdings match your search criteria"
+          />
         </div>
       </div>
     );
@@ -3436,13 +3435,126 @@ export default function Portfolio() {
   return (
     <ErrorBoundary>
       <div className="bg-[#172033] min-h-screen text-white">
-        <div className="container mx-auto px-4 py-6">
-          {/* Navigation Tabs */}
-          <div className="mb-8">
-            <nav className="flex space-x-8 border-b border-gray-700">
+        <div className="container mx-auto px-2 sm:px-4 py-4 sm:py-6">
+          {/* Mobile Navigation Dropdown */}
+          <div className="block md:hidden mb-4">
+            <div className="flex justify-between items-center">
+              <h1 className="text-xl font-bold">Portfolio</h1>
+              <button 
+                className="p-2 rounded-md bg-[#1D2939] text-white"
+                onClick={() => setShowMobileMenu(!showMobileMenu)}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16m-7 6h7" />
+                </svg>
+              </button>
+            </div>
+            
+            {showMobileMenu && (
+              <div className="mt-2 bg-[#1D2939] rounded-md p-2 shadow-lg">
+                <div className="flex flex-col space-y-2">
+                  <button
+                    onClick={() => {
+                      setActiveTab('portfolio');
+                      setShowMobileMenu(false);
+                    }}
+                    className={`py-2 px-3 rounded ${
+                      activeTab === 'portfolio'
+                        ? 'bg-blue-600 text-white'
+                        : 'text-gray-300 hover:bg-gray-700'
+                    }`}
+                  >
+                    Portfolio
+                  </button>
+                  <button
+                    onClick={() => {
+                      setActiveTab('activity');
+                      setShowMobileMenu(false);
+                    }}
+                    className={`py-2 px-3 rounded ${
+                      activeTab === 'activity'
+                        ? 'bg-blue-600 text-white'
+                        : 'text-gray-300 hover:bg-gray-700'
+                    }`}
+                  >
+                    Activity
+                  </button>
+                  <button
+                    onClick={() => {
+                      setActiveTab('holdings');
+                      setShowMobileMenu(false);
+                    }}
+                    className={`py-2 px-3 rounded ${
+                      activeTab === 'holdings'
+                        ? 'bg-blue-600 text-white'
+                        : 'text-gray-300 hover:bg-gray-700'
+                    }`}
+                  >
+                    Holdings
+                  </button>
+                  <button
+                    onClick={() => {
+                      setActiveTab('tax');
+                      setShowMobileMenu(false);
+                    }}
+                    className={`py-2 px-3 rounded ${
+                      activeTab === 'tax'
+                        ? 'bg-blue-600 text-white'
+                        : 'text-gray-300 hover:bg-gray-700'
+                    }`}
+                  >
+                    Tax & Profit
+                  </button>
+                  <button
+                    onClick={() => {
+                      setActiveTab('transfers');
+                      setShowMobileMenu(false);
+                    }}
+                    className={`py-2 px-3 rounded ${
+                      activeTab === 'transfers'
+                        ? 'bg-blue-600 text-white'
+                        : 'text-gray-300 hover:bg-gray-700'
+                    }`}
+                  >
+                    Transfers
+                  </button>
+                  <button
+                    onClick={() => {
+                      setActiveTab('goals');
+                      setShowMobileMenu(false);
+                    }}
+                    className={`py-2 px-3 rounded ${
+                      activeTab === 'goals'
+                        ? 'bg-blue-600 text-white'
+                        : 'text-gray-300 hover:bg-gray-700'
+                    }`}
+                  >
+                    Goals
+                  </button>
+                  <button
+                    onClick={() => {
+                      setActiveTab('simulation');
+                      setShowMobileMenu(false);
+                    }}
+                    className={`py-2 px-3 rounded ${
+                      activeTab === 'simulation'
+                        ? 'bg-blue-600 text-white'
+                        : 'text-gray-300 hover:bg-gray-700'
+                    }`}
+                  >
+                    Simulation
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+          
+          {/* Desktop Navigation Tabs */}
+          <div className="hidden md:block mb-8">
+            <nav className="flex space-x-1 md:space-x-4 lg:space-x-8 overflow-x-auto scrollbar-hide border-b border-gray-700">
               <button
                 onClick={() => setActiveTab('portfolio')}
-                className={`pb-4 px-1 ${
+                className={`pb-4 px-1 whitespace-nowrap ${
                   activeTab === 'portfolio'
                     ? 'border-b-2 border-blue-500 text-blue-400 font-medium'
                     : 'border-b-2 border-transparent text-gray-400 hover:text-gray-300'
@@ -3452,7 +3564,7 @@ export default function Portfolio() {
               </button>
               <button
                 onClick={() => setActiveTab('activity')}
-                className={`pb-4 px-1 ${
+                className={`pb-4 px-1 whitespace-nowrap ${
                   activeTab === 'activity'
                     ? 'border-b-2 border-blue-500 text-blue-400 font-medium'
                     : 'border-b-2 border-transparent text-gray-400 hover:text-gray-300'
@@ -3462,7 +3574,7 @@ export default function Portfolio() {
               </button>
               <button
                 onClick={() => setActiveTab('holdings')}
-                className={`pb-4 px-1 ${
+                className={`pb-4 px-1 whitespace-nowrap ${
                   activeTab === 'holdings'
                     ? 'border-b-2 border-blue-500 text-blue-400 font-medium'
                     : 'border-b-2 border-transparent text-gray-400 hover:text-gray-300'
@@ -3472,7 +3584,7 @@ export default function Portfolio() {
               </button>
               <button
                 onClick={() => setActiveTab('tax')}
-                className={`pb-4 px-1 ${
+                className={`pb-4 px-1 whitespace-nowrap ${
                   activeTab === 'tax'
                     ? 'border-b-2 border-blue-500 text-blue-400 font-medium'
                     : 'border-b-2 border-transparent text-gray-400 hover:text-gray-300'
@@ -3482,7 +3594,7 @@ export default function Portfolio() {
               </button>
               <button
                 onClick={() => setActiveTab('transfers')}
-                className={`pb-4 px-1 ${
+                className={`pb-4 px-1 whitespace-nowrap ${
                   activeTab === 'transfers'
                     ? 'border-b-2 border-blue-500 text-blue-400 font-medium'
                     : 'border-b-2 border-transparent text-gray-400 hover:text-gray-300'
@@ -3492,7 +3604,7 @@ export default function Portfolio() {
               </button>
               <button
                 onClick={() => setActiveTab('goals')}
-                className={`pb-4 px-1 ${
+                className={`pb-4 px-1 whitespace-nowrap ${
                   activeTab === 'goals'
                     ? 'border-b-2 border-blue-500 text-blue-400 font-medium'
                     : 'border-b-2 border-transparent text-gray-400 hover:text-gray-300'
@@ -3502,7 +3614,7 @@ export default function Portfolio() {
               </button>
               <button
                 onClick={() => setActiveTab('simulation')}
-                className={`pb-4 px-1 ${
+                className={`pb-4 px-1 whitespace-nowrap ${
                   activeTab === 'simulation'
                     ? 'border-b-2 border-blue-500 text-blue-400 font-medium'
                     : 'border-b-2 border-transparent text-gray-400 hover:text-gray-300'
@@ -3517,16 +3629,16 @@ export default function Portfolio() {
           <div>
             {activeTab === 'portfolio' && (
               <>
-                <h2 className="text-2xl font-semibold mb-6">Stocks</h2>
+                <h2 className="text-xl sm:text-2xl font-semibold mb-4 sm:mb-6">Stocks</h2>
                 
                 {/* Cash, Margin, Buying Power Metrics */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-8 mb-6 sm:mb-8">
                   <div>
                     <div className="flex items-center">
                       <span className="text-gray-400 mr-2">Cash</span>
                       <div className="bg-gray-700 rounded-full w-4 h-4 flex items-center justify-center text-xs">?</div>
                     </div>
-                    <div className="text-xl font-bold">${portfolioData.cash.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                    <div className="text-base sm:text-xl font-bold">${portfolioData.cash.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                   </div>
                   
                   <div>
@@ -3534,31 +3646,31 @@ export default function Portfolio() {
                       <span className="text-gray-400 mr-2">Margin</span>
                       <div className="bg-gray-700 rounded-full w-4 h-4 flex items-center justify-center text-xs">?</div>
                     </div>
-                    <div className="text-xl font-bold text-blue-400">${portfolioData.margin.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ›</div>
+                    <div className="text-base sm:text-xl font-bold text-blue-400">${portfolioData.margin.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ›</div>
                   </div>
                   
                   <div>
                     <span className="text-gray-400">Total buying power</span>
-                    <div className="text-xl font-bold">${portfolioData.buyingPower.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                    <div className="text-base sm:text-xl font-bold">${portfolioData.buyingPower.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                   </div>
                   
-                  <div className="md:col-span-3 flex justify-end">
-                    <button className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded">
+                  <div className="sm:col-span-2 md:col-span-3 flex justify-end">
+                    <button className="bg-blue-500 hover:bg-blue-600 text-white px-3 sm:px-4 py-1.5 sm:py-2 rounded text-sm">
                       Move money
                     </button>
                   </div>
                 </div>
                 
-                <div className="flex flex-col lg:flex-row gap-8">
+                <div className="flex flex-col lg:flex-row gap-4 sm:gap-8">
                   {/* Left side - Donut Chart */}
                   <div className="w-full lg:w-1/3">
-                    <div className="bg-[#1D2939] rounded-lg p-6 h-full">
+                    <div className="bg-[#1D2939] rounded-lg p-4 sm:p-6 h-full">
                       <div className="text-center">
-                        <div className="text-4xl font-bold mb-1">${portfolioData.totalValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-                        <div className="text-sm text-gray-400">as of {portfolioData.date}</div>
+                        <div className="text-2xl sm:text-4xl font-bold mb-1">${portfolioData.totalValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                        <div className="text-xs sm:text-sm text-gray-400">as of {portfolioData.date}</div>
                       </div>
                       
-                      <div className="mt-4">
+                      <div className="mt-4 flex justify-center">
                         <DonutChart 
                           data={allocationData} 
                           width={250} 
@@ -3570,40 +3682,40 @@ export default function Portfolio() {
                       </div>
                       
                       {/* Action Buttons */}
-                      <div className="mt-6 grid grid-cols-5 gap-2">
+                      <div className="mt-6 grid grid-cols-5 gap-1 sm:gap-2">
                         <div className="flex flex-col items-center">
-                          <button className="w-12 h-12 rounded-full bg-gray-700 hover:bg-gray-600 flex items-center justify-center mb-1">
-                            <Plus className="h-6 w-6" />
+                          <button className="w-8 h-8 sm:w-12 sm:h-12 rounded-full bg-gray-700 hover:bg-gray-600 flex items-center justify-center mb-1">
+                            <Plus className="h-4 w-4 sm:h-6 sm:w-6" />
                           </button>
-                          <span className="text-xs text-gray-300">Buy</span>
+                          <span className="text-[10px] sm:text-xs text-gray-300">Buy</span>
                         </div>
                         
                         <div className="flex flex-col items-center">
-                          <button className="w-12 h-12 rounded-full bg-gray-700 hover:bg-gray-600 flex items-center justify-center mb-1">
-                            <MinusCircle className="h-6 w-6" />
+                          <button className="w-8 h-8 sm:w-12 sm:h-12 rounded-full bg-gray-700 hover:bg-gray-600 flex items-center justify-center mb-1">
+                            <MinusCircle className="h-4 w-4 sm:h-6 sm:w-6" />
                           </button>
-                          <span className="text-xs text-gray-300">Sell</span>
+                          <span className="text-[10px] sm:text-xs text-gray-300">Sell</span>
                         </div>
                         
                         <div className="flex flex-col items-center">
-                          <button className="w-12 h-12 rounded-full bg-gray-700 hover:bg-gray-600 flex items-center justify-center mb-1">
-                            <RefreshCw className="h-6 w-6" />
+                          <button className="w-8 h-8 sm:w-12 sm:h-12 rounded-full bg-gray-700 hover:bg-gray-600 flex items-center justify-center mb-1">
+                            <RefreshCw className="h-4 w-4 sm:h-6 sm:w-6" />
                           </button>
-                          <span className="text-xs text-gray-300">Rebalance</span>
+                          <span className="text-[10px] sm:text-xs text-gray-300">Rebalance</span>
                         </div>
                         
                         <div className="flex flex-col items-center">
-                          <button className="w-12 h-12 rounded-full bg-gray-700 hover:bg-gray-600 flex items-center justify-center mb-1">
-                            <Edit className="h-6 w-6" />
+                          <button className="w-8 h-8 sm:w-12 sm:h-12 rounded-full bg-gray-700 hover:bg-gray-600 flex items-center justify-center mb-1">
+                            <Edit className="h-4 w-4 sm:h-6 sm:w-6" />
                           </button>
-                          <span className="text-xs text-gray-300">Edit</span>
+                          <span className="text-[10px] sm:text-xs text-gray-300">Edit</span>
                         </div>
                         
                         <div className="flex flex-col items-center">
-                          <button className="w-12 h-12 rounded-full bg-gray-700 hover:bg-gray-600 flex items-center justify-center mb-1">
-                            <Share2 className="h-6 w-6" />
+                          <button className="w-8 h-8 sm:w-12 sm:h-12 rounded-full bg-gray-700 hover:bg-gray-600 flex items-center justify-center mb-1">
+                            <Share2 className="h-4 w-4 sm:h-6 sm:w-6" />
                           </button>
-                          <span className="text-xs text-gray-300">Share</span>
+                          <span className="text-[10px] sm:text-xs text-gray-300">Share</span>
                         </div>
                       </div>
                     </div>
@@ -3611,9 +3723,9 @@ export default function Portfolio() {
                   
                   {/* Right side - Line Chart */}
                   <div className="w-full lg:w-2/3">
-                    <div className="bg-[#1D2939] rounded-lg p-6">
+                    <div className="bg-[#1D2939] rounded-lg p-4 sm:p-6">
                       {/* Net Worth Chart */}
-                      <div className="h-64">
+                      <div className="h-52 sm:h-64">
                         <NetWorthChart 
                           data={netWorthData}
                           title=""
@@ -3626,24 +3738,24 @@ export default function Portfolio() {
                       </div>
                       
                       {/* Portfolio Performance Metrics */}
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-8">
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-4 mt-4 sm:mt-8 text-sm sm:text-base">
                         <div>
-                          <div className="text-gray-400 text-sm">Starting value: {portfolioData.startDate}</div>
+                          <div className="text-gray-400 text-xs sm:text-sm">Starting value: {portfolioData.startDate}</div>
                           <div className="font-medium">${portfolioData.startValue.toLocaleString()}</div>
                         </div>
                         
                         <div>
-                          <div className="text-gray-400 text-sm">Ending value: {portfolioData.endDate}</div>
+                          <div className="text-gray-400 text-xs sm:text-sm">Ending value: {portfolioData.endDate}</div>
                           <div className="font-medium">${portfolioData.endValue.toLocaleString()}</div>
                         </div>
                         
                         <div>
-                          <div className="text-gray-400 text-sm">Net cash flow</div>
+                          <div className="text-gray-400 text-xs sm:text-sm">Net cash flow</div>
                           <div className="font-medium">${portfolioData.netCashFlow.toLocaleString()}</div>
                         </div>
                         
                         <div>
-                          <div className="text-gray-400 text-sm">Money weighted rate of return</div>
+                          <div className="text-gray-400 text-xs sm:text-sm">Money weighted rate of return</div>
                           <div className="font-medium text-red-500">↓ {portfolioData.returnRate}%</div>
                         </div>
                       </div>
@@ -3653,16 +3765,12 @@ export default function Portfolio() {
               </>
             )}
             
+            {/* Remaining tabs - keep existing content */}
             {activeTab === 'holdings' && renderHoldingsTab()}
-            
             {activeTab === 'activity' && <ActivityContentComponent />}
-            
             {activeTab === 'tax' && <TaxAndProfitContent />}
-            
             {activeTab === 'transfers' && <InKindTransferContent />}
-            
             {activeTab === 'goals' && <GoalSystemContent />}
-            
             {activeTab === 'simulation' && <PortfolioSimulationContent />}
           </div>
         </div>

@@ -1,20 +1,21 @@
 'use client';
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
-interface SectorAllocation {
+interface ChartData {
   name: string;
   value: number;
   color: string;
 }
 
 interface DonutChartProps {
-  data?: SectorAllocation[];
+  data: ChartData[];
   width?: number;
   height?: number;
   innerRadius?: number;
   outerRadius?: number;
   darkMode?: boolean;
+  showLegend?: boolean;
 }
 
 const defaultData = [
@@ -31,100 +32,185 @@ const DonutChart: React.FC<DonutChartProps> = ({
   data = defaultData,
   width = 300,
   height = 300,
-  innerRadius = 75,
-  outerRadius = 130,
-  darkMode = false
+  innerRadius: propsInnerRadius = 60,
+  outerRadius: propsOuterRadius = 100,
+  darkMode = false,
+  showLegend = true
 }) => {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const totalValue = data.reduce((sum, item) => sum + item.value, 0);
+  const chartRef = useRef<HTMLDivElement>(null);
+  const [chartSize, setChartSize] = useState({ width, height });
+  const [isMobile, setIsMobile] = useState(false);
   
+  // Calculate inner and outer radius based on container size
+  const innerRadius = isMobile ? propsInnerRadius * 0.7 : propsInnerRadius;
+  const outerRadius = isMobile ? propsOuterRadius * 0.7 : propsOuterRadius;
+  
+  // Check if on mobile and adjust chart size
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    
-    // Clear canvas
-    ctx.clearRect(0, 0, width, height);
-    
-    // Calculate center position
-    const centerX = width / 2;
-    const centerY = height / 2;
-    
-    // Start angle at top (negative PI/2)
-    let startAngle = -Math.PI / 2;
-    
-    // Draw each sector
-    data.forEach(sector => {
-      // Calculate angles
-      const sectorAngle = (sector.value / totalValue) * 2 * Math.PI;
-      const endAngle = startAngle + sectorAngle;
+    const checkIsMobile = () => {
+      const isMobileView = window.innerWidth < 768;
+      setIsMobile(isMobileView);
       
-      // Draw sector
-      ctx.beginPath();
-      ctx.moveTo(centerX, centerY);
-      ctx.arc(centerX, centerY, outerRadius, startAngle, endAngle);
-      ctx.closePath();
-      
-      // Set colors
-      ctx.fillStyle = sector.color;
-      ctx.fill();
-      
-      // Increment start angle for next sector
-      startAngle = endAngle;
-    });
+      // If we're on mobile, make the chart smaller
+      if (chartRef.current) {
+        const containerWidth = chartRef.current.clientWidth;
+        const newSize = isMobileView 
+          ? Math.min(containerWidth, Math.min(width, height) * 0.8) 
+          : Math.min(containerWidth, Math.min(width, height));
+        
+        setChartSize({
+          width: newSize,
+          height: newSize
+        });
+      }
+    };
     
-    // Draw inner circle to create donut effect
-    ctx.beginPath();
-    ctx.arc(centerX, centerY, innerRadius, 0, 2 * Math.PI);
-    ctx.fillStyle = darkMode ? '#1D2939' : '#FFFFFF';
-    ctx.fill();
-    
-    // Draw center text
-    ctx.fillStyle = darkMode ? '#FFFFFF' : '#1F2937';
-    ctx.font = 'bold 20px Inter, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(`${totalValue}%`, centerX, centerY - 12);
-    
-    ctx.fillStyle = darkMode ? '#A1A1AA' : '#6B7280';
-    ctx.font = '14px Inter, sans-serif';
-    ctx.fillText('Allocated', centerX, centerY + 12);
-    
-  }, [data, width, height, innerRadius, outerRadius, totalValue, darkMode]);
+    checkIsMobile();
+    window.addEventListener('resize', checkIsMobile);
+    return () => window.removeEventListener('resize', checkIsMobile);
+  }, [width, height]);
   
-  const legendItemClass = darkMode 
-    ? "text-gray-300" 
-    : "text-gray-700";
-  
-  const legendValueClass = darkMode 
-    ? "font-medium text-white" 
-    : "font-medium";
-  
+  // Calculate total value from all sectors
+  const total = data.reduce((sum, item) => sum + item.value, 0);
+
+  // Sort data by value (descending)
+  const sortedData = [...data].sort((a, b) => b.value - a.value);
+
+  // Calculate angles and arcs
+  let currentAngle = 0;
+  const sectors = sortedData.map(item => {
+    const angle = (item.value / total) * 360;
+    const startAngle = currentAngle;
+    const endAngle = currentAngle + angle;
+    currentAngle = endAngle;
+
+    return {
+      ...item,
+      startAngle,
+      endAngle
+    };
+  });
+
+  // Convert angle to radians
+  const angleToRadians = (angle: number) => (angle * Math.PI) / 180;
+
+  // Calculate coordinates on the circle
+  const getCoordinates = (angle: number, radius: number) => {
+    const centerX = chartSize.width / 2;
+    const centerY = chartSize.height / 2;
+    const x = centerX + radius * Math.cos(angleToRadians(angle - 90));
+    const y = centerY + radius * Math.sin(angleToRadians(angle - 90));
+    return { x, y };
+  };
+
+  // Draw each sector's arc
+  const drawSector = (sector: any) => {
+    const centerX = chartSize.width / 2;
+    const centerY = chartSize.height / 2;
+    const startCoord = getCoordinates(sector.startAngle, outerRadius);
+    const endCoord = getCoordinates(sector.endAngle, outerRadius);
+    const largeArcFlag = sector.endAngle - sector.startAngle <= 180 ? 0 : 1;
+
+    // SVG path
+    const path = [
+      `M ${centerX},${centerY}`,
+      `L ${startCoord.x},${startCoord.y}`,
+      `A ${outerRadius},${outerRadius} 0 ${largeArcFlag} 1 ${endCoord.x},${endCoord.y}`,
+      'Z'
+    ].join(' ');
+
+    return path;
+  };
+
+  // Draw inner circle for the donut effect
+  const drawInnerCircle = () => {
+    const centerX = chartSize.width / 2;
+    const centerY = chartSize.height / 2;
+    return {
+      cx: centerX,
+      cy: centerY,
+      r: innerRadius
+    };
+  };
+
+  // Add value labels
+  const getLabelPosition = (sector: any) => {
+    const midAngle = (sector.startAngle + sector.endAngle) / 2;
+    const labelRadius = (innerRadius + outerRadius) / 2;
+    const pos = getCoordinates(midAngle, labelRadius);
+    return pos;
+  };
+
+  const textClass = darkMode ? 'fill-white' : 'fill-gray-800';
+  const bgClass = darkMode ? 'fill-[#1D2939]' : 'fill-white';
+  const legendTextClass = darkMode ? 'text-gray-300' : 'text-gray-700';
+  const containerClass = `flex flex-col items-center ${isMobile ? 'mx-auto' : ''}`;
+
   return (
-    <div className="relative">
-      <canvas 
-        ref={canvasRef}
-        width={width}
-        height={height}
-        className="mx-auto"
-      />
-      
-      <div className="grid grid-cols-2 gap-y-2 gap-x-8 mt-4">
-        {data.map((sector, index) => (
-          <div key={index} className="flex items-center gap-2">
-            <div 
-              className="w-3 h-3 rounded-full" 
-              style={{ backgroundColor: sector.color }}
+    <div className={containerClass} ref={chartRef}>
+      <div style={{ position: 'relative', width: chartSize.width, height: chartSize.height }}>
+        <svg width={chartSize.width} height={chartSize.height} viewBox={`0 0 ${chartSize.width} ${chartSize.height}`}>
+          {/* Sectors */}
+          {sectors.map((sector, index) => (
+            <path
+              key={`sector-${index}`}
+              d={drawSector(sector)}
+              fill={sector.color}
+              stroke={darkMode ? '#172033' : '#fff'}
+              strokeWidth={1}
             />
-            <div className="text-sm flex justify-between w-full">
-              <span className={legendItemClass}>{sector.name}</span>
-              <span className={legendValueClass}>{sector.value}%</span>
-            </div>
-          </div>
-        ))}
+          ))}
+
+          {/* Inner Circle */}
+          <circle
+            {...drawInnerCircle()}
+            className={bgClass}
+          />
+
+          {/* Value Labels (show only for sectors with enough space) */}
+          {sectors.map((sector, index) => {
+            const angleSize = sector.endAngle - sector.startAngle;
+            // Only show label if the sector is big enough
+            if (angleSize > 25) {
+              const pos = getLabelPosition(sector);
+              return (
+                <text
+                  key={`label-${index}`}
+                  x={pos.x}
+                  y={pos.y}
+                  textAnchor="middle"
+                  dominantBaseline="middle"
+                  className={`text-xs font-medium ${textClass}`}
+                  style={{
+                    fontSize: isMobile ? '8px' : '10px'  
+                  }}
+                >
+                  {sector.value}%
+                </text>
+              );
+            }
+            return null;
+          })}
+        </svg>
       </div>
+
+      {/* Legend */}
+      {showLegend && (
+        <div className={`mt-4 grid grid-cols-2 gap-x-4 gap-y-2 text-sm ${isMobile ? 'text-xs' : ''}`}>
+          {sortedData.map((item, index) => (
+            <div key={`legend-${index}`} className="flex items-center">
+              <div
+                className="w-3 h-3 rounded-full mr-2"
+                style={{ backgroundColor: item.color }}
+              ></div>
+              <span className={`truncate ${legendTextClass}`} style={{ maxWidth: isMobile ? '80px' : '120px' }}>
+                {item.name}
+              </span>
+              <span className={`ml-1 ${legendTextClass}`}>{item.value}%</span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 };
