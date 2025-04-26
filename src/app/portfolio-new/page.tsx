@@ -9,11 +9,7 @@ import NetWorthChart from '@/components/dashboard/NetWorthChart';
 import DonutChart from '@/components/dashboard/DonutChart';
 import LoadingSpinner from '@/components/dashboard/LoadingSpinner';
 import AiAssistantPanel from '@/components/dashboard/AiAssistantPanel';
-
-// Simple error boundary component
-const ErrorBoundary = ({ children }: { children: React.ReactNode }) => {
-  return <>{children}</>;
-};
+import ErrorBoundary from '@/components/ErrorBoundary';
 
 // Data type for chart
 interface DataPoint {
@@ -249,7 +245,15 @@ export default function Portfolio() {
               <div className="mb-6">
                 <h3 className="text-lg font-semibold mb-3">Asset Allocation</h3>
                 <div className="flex justify-center">
-                  <DonutChart />
+                  <DonutChart data={[
+                    { name: 'Technology', value: 20, color: '#4169E1' },
+                    { name: 'Healthcare', value: 15, color: '#9370DB' },
+                    { name: 'Financial Services', value: 10, color: '#20B2AA' },
+                    { name: 'Consumer Discretionary', value: 12, color: '#3CB371' },
+                    { name: 'Communication', value: 9, color: '#FF6347' },
+                    { name: 'Industrials', value: 8, color: '#6495ED' },
+                    { name: 'Other Sectors', value: 26, color: '#A9A9A9' }
+                  ]} />
                 </div>
               </div>
             </div>
