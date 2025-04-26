@@ -2,18 +2,33 @@
 
 import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
+import { Tab } from '@headlessui/react'
+import { useRouter } from 'next/navigation'
 import {
-  RefreshCw,
-  Edit2,
-  Download,
-  Plus,
+  ChartPieIcon,
+  CurrencyDollarIcon,
+  BanknotesIcon,
+  CogIcon,
+  ArrowPathIcon,
+  ArrowTrendingUpIcon,
+  ArrowDownTrayIcon,
+  ArrowUpTrayIcon,
+  DocumentTextIcon,
+  ExclamationTriangleIcon,
+  InformationCircleIcon,
+} from '@heroicons/react/24/outline'
+import {
   PlusCircle,
   CheckSquare,
   Flag,
   LineChart,
-  Share2,
+  RefreshCw,
+  Download,
+  Plus,
+  MinusCircle,
   Edit,
-  MinusCircle
+  Share2
 } from 'lucide-react'
 
 // Import our custom components
@@ -24,14 +39,10 @@ import AiAssistantPanel from '@/components/dashboard/AiAssistantPanel';
 import ActivityContentComponent from '@/components/dashboard/ActivityContent';
 import FundingContentComponent from '@/components/dashboard/FundingContent';
 import ResponsiveDataTable from '@/components/dashboard/ResponsiveDataTable';
+import ErrorBoundary from '@/components/ErrorBoundary';
 
 // Import custom hooks
 import { useNetWorthChartData, useAllocationData, useHoldingsData } from '@/hooks/usePortfolioData';
-
-// Error boundary component for better error handling
-const ErrorBoundary = ({ children }: { children: React.ReactNode }) => {
-  return <>{children}</>;
-};
 
 // Updated chart data points for the line graph with more detailed data
 interface DataPoint {
