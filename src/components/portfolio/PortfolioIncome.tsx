@@ -1,19 +1,19 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ResponsiveContainer, BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, Legend } from 'recharts';
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Legend } from 'recharts';
+import { ResponsiveContainer as SparklineContainer, LineChart, Line } from 'recharts';
 
 interface IncomeSource {
-  symbol: string;
   name: string;
   type: 'dividend' | 'interest' | 'distribution';
+  frequency: 'monthly' | 'quarterly' | 'annual';
   amount: number;
-  frequency: 'monthly' | 'quarterly' | 'semi-annual' | 'annual';
+  nextPayment: string;
   yield: number;
-  nextPaymentDate: string;
-  paymentHistory: {
+  paymentHistory: Array<{
     date: string;
     amount: number;
-  }[];
+  }>;
 }
 
 interface MonthlyIncome {
@@ -21,25 +21,24 @@ interface MonthlyIncome {
   dividends: number;
   interest: number;
   distributions: number;
-  total: number;
 }
 
 interface PortfolioIncomeProps {
+  projectedAnnualIncome: number;
+  ytdIncome: number;
+  lastYearIncome: number;
   incomeSources: IncomeSource[];
   monthlyIncome: MonthlyIncome[];
-  projectedAnnualIncome: number;
-  lastYearIncome: number;
-  ytdIncome: number;
-  incomeGrowth: number;
+  annualTarget: number;
 }
 
 export function PortfolioIncome({
-  incomeSources,
-  monthlyIncome,
-  projectedAnnualIncome,
-  lastYearIncome,
-  ytdIncome,
-  incomeGrowth
+  projectedAnnualIncome = 0,
+  ytdIncome = 0,
+  lastYearIncome = 0,
+  incomeSources = [],
+  monthlyIncome = [],
+  annualTarget = 0
 }: PortfolioIncomeProps) {
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -55,85 +54,88 @@ export function PortfolioIncome({
       style: 'percent',
       minimumFractionDigits: 2,
       maximumFractionDigits: 2
-    }).format(value / 100);
+    }).format(value);
   };
 
-  const getNextPayment = (source: IncomeSource) => {
-    const nextDate = new Date(source.nextPaymentDate);
-    const today = new Date();
-    const daysUntil = Math.ceil((nextDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-    return `${formatCurrency(source.amount)} in ${daysUntil} days`;
+  const formatDate = (date: string) => {
+    return new Date(date).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
   };
 
-  const getIncomeTypeColor = (type: IncomeSource['type']) => {
+  const getIncomeTypeColor = (type: string) => {
     switch (type) {
-      case 'dividend': return 'text-blue-600';
-      case 'interest': return 'text-green-600';
-      case 'distribution': return 'text-purple-600';
-      default: return 'text-gray-600';
+      case 'dividend':
+        return 'text-blue-600';
+      case 'interest':
+        return 'text-green-600';
+      case 'distribution':
+        return 'text-purple-600';
+      default:
+        return 'text-gray-600';
     }
   };
 
-  const getFrequencyLabel = (frequency: IncomeSource['frequency']) => {
-    switch (frequency) {
-      case 'monthly': return 'Monthly';
-      case 'quarterly': return 'Quarterly';
-      case 'semi-annual': return 'Semi-Annual';
-      case 'annual': return 'Annual';
-      default: return '';
-    }
-  };
+  const yearOverYearGrowth = ((projectedAnnualIncome - lastYearIncome) / lastYearIncome) * 100;
+  const progressToTarget = (ytdIncome / annualTarget) * 100;
 
   return (
     <div className="space-y-6">
-      {/* Income Summary */}
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
         <Card>
           <CardHeader>
-            <CardTitle className="text-sm font-medium">Projected Annual Income</CardTitle>
+            <CardTitle>Projected Annual Income</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(projectedAnnualIncome)}</div>
-            <p className={`text-sm ${incomeGrowth >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-              {incomeGrowth >= 0 ? '↑' : '↓'} {formatPercent(Math.abs(incomeGrowth))} vs last year
-            </p>
+            <div className="space-y-2">
+              <p className="text-2xl font-bold">{formatCurrency(projectedAnnualIncome)}</p>
+              <p className={`text-sm ${yearOverYearGrowth >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                {yearOverYearGrowth >= 0 ? '↑' : '↓'} {formatPercent(Math.abs(yearOverYearGrowth / 100))} YoY
+              </p>
+            </div>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-sm font-medium">YTD Income</CardTitle>
+            <CardTitle>YTD Income</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(ytdIncome)}</div>
-            <p className="text-sm text-gray-500">
-              {formatPercent((ytdIncome / projectedAnnualIncome) * 100)} of annual target
-            </p>
+            <div className="space-y-2">
+              <p className="text-2xl font-bold">{formatCurrency(ytdIncome)}</p>
+              <div className="w-full bg-gray-200 rounded-full h-2">
+                <div
+                  className="bg-blue-600 h-2 rounded-full"
+                  style={{ width: `${Math.min(progressToTarget, 100)}%` }}
+                />
+              </div>
+              <p className="text-sm text-gray-500">{formatPercent(progressToTarget / 100)} of target</p>
+            </div>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-sm font-medium">Last Year Income</CardTitle>
+            <CardTitle>Last Year's Income</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(lastYearIncome)}</div>
-            <p className="text-sm text-gray-500">Total income received</p>
+            <p className="text-2xl font-bold">{formatCurrency(lastYearIncome)}</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-sm font-medium">Income Sources</CardTitle>
+            <CardTitle>Income Sources</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{incomeSources.length}</div>
-            <p className="text-sm text-gray-500">Active income streams</p>
+            <p className="text-2xl font-bold">{incomeSources.length}</p>
+            <p className="text-sm text-gray-500">Active sources</p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Monthly Income Chart */}
       <Card>
         <CardHeader>
           <CardTitle>Monthly Income Breakdown</CardTitle>
@@ -144,88 +146,72 @@ export function PortfolioIncome({
               <BarChart data={monthlyIncome}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="month" />
-                <YAxis tickFormatter={(value) => `$${value}`} />
-                <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                <YAxis tickFormatter={(value) => formatCurrency(value)} />
+                <Tooltip
+                  formatter={(value: number) => formatCurrency(value)}
+                />
                 <Legend />
-                <Bar name="Dividends" dataKey="dividends" stackId="a" fill="#3b82f6" />
-                <Bar name="Interest" dataKey="interest" stackId="a" fill="#22c55e" />
-                <Bar name="Distributions" dataKey="distributions" stackId="a" fill="#a855f7" />
+                <Bar dataKey="dividends" name="Dividends" stackId="a" fill="#3b82f6" />
+                <Bar dataKey="interest" name="Interest" stackId="a" fill="#22c55e" />
+                <Bar dataKey="distributions" name="Distributions" stackId="a" fill="#a855f7" />
               </BarChart>
             </ResponsiveContainer>
           </div>
         </CardContent>
       </Card>
 
-      {/* Income Sources */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Income Sources</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {incomeSources.map((source, index) => (
-              <div key={index} className="border rounded-lg p-4">
-                <div className="flex justify-between items-start mb-2">
+      <div className="grid md:grid-cols-2 gap-6">
+        {incomeSources.map((source, index) => (
+          <Card key={index}>
+            <CardHeader>
+              <div className="flex justify-between items-center">
+                <CardTitle>{source.name}</CardTitle>
+                <span className={`text-sm font-medium ${getIncomeTypeColor(source.type)}`}>
+                  {source.type.charAt(0).toUpperCase() + source.type.slice(1)}
+                </span>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <h4 className="font-semibold">{source.symbol}</h4>
-                    <p className="text-sm text-gray-500">{source.name}</p>
+                    <p className="text-sm text-gray-500">Payment Amount</p>
+                    <p className="font-medium">{formatCurrency(source.amount)}</p>
                   </div>
-                  <div className="text-right">
-                    <div className={`font-medium ${getIncomeTypeColor(source.type)}`}>
-                      {formatCurrency(source.amount)}
-                    </div>
-                    <div className="text-sm text-gray-500">
-                      {getFrequencyLabel(source.frequency)}
-                    </div>
+                  <div>
+                    <p className="text-sm text-gray-500">Frequency</p>
+                    <p className="font-medium">
+                      {source.frequency.charAt(0).toUpperCase() + source.frequency.slice(1)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">Next Payment</p>
+                    <p className="font-medium">{formatDate(source.nextPayment)}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">Yield</p>
+                    <p className="font-medium">{formatPercent(source.yield)}</p>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4 mb-3 text-sm">
-                  <div>
-                    <span className="text-gray-500">Yield: </span>
-                    <span className="font-medium">{formatPercent(source.yield)}</span>
-                  </div>
-                  <div>
-                    <span className="text-gray-500">Next Payment: </span>
-                    <span className="font-medium">{getNextPayment(source)}</span>
-                  </div>
-                </div>
-
-                {/* Payment History Chart */}
-                <div className="h-[100px]">
-                  <ResponsiveContainer width="100%" height="100%">
+                <div className="h-[50px]">
+                  <SparklineContainer width="100%" height="100%">
                     <LineChart data={source.paymentHistory}>
-                      <YAxis 
-                        domain={['dataMin', 'dataMax']}
-                        hide={true}
-                      />
-                      <XAxis 
-                        dataKey="date"
-                        hide={true}
-                      />
-                      <Tooltip
-                        formatter={(value: number) => [formatCurrency(value), 'Payment']}
-                        labelFormatter={(date) => new Date(date).toLocaleDateString()}
-                      />
                       <Line
                         type="monotone"
                         dataKey="amount"
-                        stroke={
-                          source.type === 'dividend' ? '#3b82f6' :
-                          source.type === 'interest' ? '#22c55e' :
-                          '#a855f7'
-                        }
+                        stroke="#4f46e5"
                         strokeWidth={2}
                         dot={false}
                       />
                     </LineChart>
-                  </ResponsiveContainer>
+                  </SparklineContainer>
                 </div>
               </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
     </div>
   );
 } 

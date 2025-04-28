@@ -1,214 +1,147 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ResponsiveContainer, LineChart, Line, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid, Legend } from 'recharts';
-
-interface PerformanceMetric {
-  date: string;
-  value: number;
-  benchmark: number;
-}
+import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid, Legend } from 'recharts';
 
 interface RiskMetric {
-  label: string;
+  name: string;
   value: number;
   change: number;
   description: string;
 }
 
-interface SectorExposure {
+interface SectorRisk {
   sector: string;
   allocation: number;
   risk: number;
+  return: number;
 }
 
 interface PortfolioAnalyticsProps {
-  performanceData: PerformanceMetric[];
+  performanceData: Array<{
+    date: string;
+    portfolioValue: number;
+    benchmarkValue: number;
+  }>;
   riskMetrics: RiskMetric[];
-  sectorExposure: SectorExposure[];
-  sharpeRatio: number;
-  beta: number;
-  alpha: number;
-  volatility: number;
-  maxDrawdown: number;
-  trackingError: number;
+  sectorRisks: SectorRisk[];
 }
 
-export function PortfolioAnalytics({
-  performanceData,
-  riskMetrics,
-  sectorExposure,
-  sharpeRatio,
-  beta,
-  alpha,
-  volatility,
-  maxDrawdown,
-  trackingError
+export function PortfolioAnalytics({ 
+  performanceData = [], 
+  riskMetrics = [], 
+  sectorRisks = [] 
 }: PortfolioAnalyticsProps) {
-  const formatPercent = (value: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'percent',
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
-    }).format(value / 100);
-  };
-
-  const formatDecimal = (value: number) => {
-    return new Intl.NumberFormat('en-US', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
-    }).format(value);
-  };
+  const formatPercent = (value: number) => `${(value * 100).toFixed(2)}%`;
+  const getChangeColor = (value: number) => value >= 0 ? 'text-green-600' : 'text-red-600';
 
   return (
     <div className="space-y-6">
-      {/* Performance vs Benchmark */}
       <Card>
         <CardHeader>
           <CardTitle>Performance vs Benchmark</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="h-[300px]">
+          <div className="h-[400px]">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={performanceData}>
+              <AreaChart data={performanceData}>
+                <defs>
+                  <linearGradient id="portfolioGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#4F46E5" stopOpacity={0.8}/>
+                    <stop offset="95%" stopColor="#4F46E5" stopOpacity={0}/>
+                  </linearGradient>
+                  <linearGradient id="benchmarkGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#10B981" stopOpacity={0.8}/>
+                    <stop offset="95%" stopColor="#10B981" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis 
                   dataKey="date" 
-                  tickFormatter={(date) => new Date(date).toLocaleDateString('en-US', { month: 'short', year: '2-digit' })}
+                  tickFormatter={(value) => new Date(value).toLocaleDateString()}
                 />
                 <YAxis 
-                  tickFormatter={(value) => `${value}%`}
+                  tickFormatter={formatPercent}
                 />
-                <Tooltip 
-                  formatter={(value: number) => [`${value.toFixed(2)}%`, 'Return']}
-                  labelFormatter={(date) => new Date(date).toLocaleDateString('en-US', { 
-                    month: 'long',
-                    day: 'numeric',
-                    year: 'numeric'
-                  })}
+                <Tooltip
+                  formatter={(value: number) => formatPercent(value)}
+                  labelFormatter={(label) => new Date(label).toLocaleDateString()}
                 />
                 <Legend />
-                <Line 
-                  type="monotone" 
-                  dataKey="value" 
-                  name="Portfolio" 
-                  stroke="#8884d8" 
-                  strokeWidth={2}
-                  dot={false}
+                <Area
+                  type="monotone"
+                  dataKey="portfolioValue"
+                  name="Portfolio"
+                  stroke="#4F46E5"
+                  fill="url(#portfolioGradient)"
                 />
-                <Line 
-                  type="monotone" 
-                  dataKey="benchmark" 
-                  name="Benchmark" 
-                  stroke="#82ca9d" 
-                  strokeWidth={2}
-                  dot={false}
+                <Area
+                  type="monotone"
+                  dataKey="benchmarkValue"
+                  name="Benchmark"
+                  stroke="#10B981"
+                  fill="url(#benchmarkGradient)"
                 />
-              </LineChart>
+              </AreaChart>
             </ResponsiveContainer>
           </div>
         </CardContent>
       </Card>
 
-      {/* Key Risk Metrics */}
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid md:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
-            <CardTitle className="text-sm font-medium">Risk Metrics</CardTitle>
+            <CardTitle>Risk Metrics</CardTitle>
           </CardHeader>
           <CardContent>
-            <dl className="space-y-2">
-              <div className="flex justify-between">
-                <dt className="text-sm text-gray-500">Sharpe Ratio</dt>
-                <dd className="text-sm font-medium">{formatDecimal(sharpeRatio)}</dd>
-              </div>
-              <div className="flex justify-between">
-                <dt className="text-sm text-gray-500">Beta</dt>
-                <dd className="text-sm font-medium">{formatDecimal(beta)}</dd>
-              </div>
-              <div className="flex justify-between">
-                <dt className="text-sm text-gray-500">Alpha</dt>
-                <dd className="text-sm font-medium">{formatPercent(alpha)}</dd>
-              </div>
-              <div className="flex justify-between">
-                <dt className="text-sm text-gray-500">Volatility</dt>
-                <dd className="text-sm font-medium">{formatPercent(volatility)}</dd>
-              </div>
-              <div className="flex justify-between">
-                <dt className="text-sm text-gray-500">Max Drawdown</dt>
-                <dd className="text-sm font-medium">{formatPercent(maxDrawdown)}</dd>
-              </div>
-              <div className="flex justify-between">
-                <dt className="text-sm text-gray-500">Tracking Error</dt>
-                <dd className="text-sm font-medium">{formatPercent(trackingError)}</dd>
-              </div>
-            </dl>
+            <div className="space-y-4">
+              {riskMetrics.map((metric, index) => (
+                <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
+                  <div>
+                    <h3 className="font-medium">{metric.name}</h3>
+                    <p className="text-sm text-gray-500">{metric.description}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-medium">{formatPercent(metric.value)}</p>
+                    <p className={`text-sm ${getChangeColor(metric.change)}`}>
+                      {metric.change > 0 ? '+' : ''}{formatPercent(metric.change)}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
           </CardContent>
         </Card>
 
-        {/* Sector Risk Exposure */}
-        <Card className="md:col-span-2">
+        <Card>
           <CardHeader>
-            <CardTitle className="text-sm font-medium">Sector Risk Exposure</CardTitle>
+            <CardTitle>Sector Risk Analysis</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="h-[200px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={sectorExposure}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="sector" />
-                  <YAxis tickFormatter={(value) => `${value}%`} />
-                  <Tooltip 
-                    formatter={(value: number) => [`${value.toFixed(2)}%`, 'Exposure']}
-                  />
-                  <Legend />
-                  <Area
-                    type="monotone"
-                    dataKey="allocation"
-                    name="Allocation"
-                    stackId="1"
-                    stroke="#8884d8"
-                    fill="#8884d8"
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="risk"
-                    name="Risk"
-                    stackId="2"
-                    stroke="#82ca9d"
-                    fill="#82ca9d"
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
+            <div className="space-y-4">
+              {sectorRisks.map((sector, index) => (
+                <div key={index} className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="font-medium">{sector.sector}</span>
+                    <span className={getChangeColor(sector.return)}>
+                      {formatPercent(sector.return)}
+                    </span>
+                  </div>
+                  <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-blue-600"
+                      style={{ width: `${sector.allocation * 100}%` }}
+                    />
+                  </div>
+                  <div className="flex justify-between text-sm text-gray-500">
+                    <span>Allocation: {formatPercent(sector.allocation)}</span>
+                    <span>Risk: {formatPercent(sector.risk)}</span>
+                  </div>
+                </div>
+              ))}
             </div>
           </CardContent>
         </Card>
       </div>
-
-      {/* Risk Metrics Details */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Risk Analysis</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {riskMetrics.map((metric, index) => (
-              <div key={index} className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">{metric.label}</span>
-                  <span className={`text-sm font-medium ${
-                    metric.change > 0 ? 'text-green-600' : 
-                    metric.change < 0 ? 'text-red-600' : 
-                    'text-gray-600'
-                  }`}>
-                    {metric.change > 0 ? '↑' : metric.change < 0 ? '↓' : '–'} {formatPercent(Math.abs(metric.value))}
-                  </span>
-                </div>
-                <p className="text-xs text-gray-500">{metric.description}</p>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 } 
