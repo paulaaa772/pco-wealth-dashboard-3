@@ -118,7 +118,7 @@ export function PortfolioIncome({
 
         <Card>
           <CardHeader>
-            <CardTitle>Last Year's Income</CardTitle>
+            <CardTitle>Last Year&apos;s Income</CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-2xl font-bold">{formatCurrency(lastYearIncome)}</p>
