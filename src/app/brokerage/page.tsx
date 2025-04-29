@@ -871,10 +871,10 @@ export default function BrokeragePage() {
           </div>
         </div>
 
-        {/* Right sidebar - 1/3 width */}
-        <div className="space-y-4">
-          {/* Order entry */}
-          <div className="bg-white dark:bg-zinc-800 rounded-lg shadow p-4">
+        {/* Right sidebar - 1/3 width - Adjust flex properties for better vertical stacking */}
+        <div className="flex flex-col gap-4"> 
+          {/* Order entry panel - Allow it to take its natural height */}
+          <div className="bg-white dark:bg-zinc-800 rounded-lg shadow p-4 flex-shrink-0"> 
             <OrderEntryPanel
               symbol={symbol}
               currentPrice={currentPrice}
@@ -882,10 +882,10 @@ export default function BrokeragePage() {
             />
           </div>
 
-          {/* Trading tools with tabs */}
-          <div className="bg-white dark:bg-zinc-800 rounded-lg shadow">
-            {/* Tab navigation */}
-            <div className="flex border-b border-gray-200 dark:border-gray-700">
+          {/* Trading tools with tabs - Allow this section to grow and potentially scroll if needed */}
+          <div className="bg-white dark:bg-zinc-800 rounded-lg shadow flex flex-col flex-grow min-h-0"> {/* Added flex flex-col flex-grow min-h-0 */}
+            {/* Tab navigation */} 
+            <div className="flex border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
               <button
                 className={`px-3 py-2 text-sm font-medium ${
                   activeTab === 'ai' 
@@ -917,9 +917,8 @@ export default function BrokeragePage() {
                 Insiders
               </button>
             </div>
-            
-            {/* Tab content */}
-            <div className="p-4">
+            {/* Tab content - Make this scrollable if it overflows */}
+            <div className="p-4 flex-grow overflow-auto"> {/* Added flex-grow overflow-auto */} 
               {activeTab === 'ai' ? (
                 <TradingInterface 
                   currentSymbol={symbol}
