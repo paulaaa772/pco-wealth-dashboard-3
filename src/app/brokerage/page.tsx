@@ -6,6 +6,7 @@ import { PolygonService, PolygonCandle } from '../../lib/market-data/PolygonServ
 import TradingChart from '../../components/dashboard/TradingChart';
 import CongressTradingPanel from '../../components/brokerage/CongressTradingPanel';
 import BusinessInsiderTradingPanel from '../../components/brokerage/BusinessInsiderTradingPanel';
+import TradingInterface from '../../components/dashboard/TradingInterface';
 
 // Create a simple AlertMessage component inline since it's missing
 const AlertMessage = ({ 
@@ -163,127 +164,6 @@ const SymbolSearch = ({
   );
 };
 
-// Simplified inline implementation of AITradingPanel
-const AITradingPanel = ({ 
-  symbol, 
-  positions,
-  onEnableAI
-}: { 
-  symbol: string; 
-  positions: AIPosition[];
-  onEnableAI: (enabled: boolean, riskLevel: 'low' | 'medium' | 'high') => void;
-}) => {
-  const [isEnabled, setIsEnabled] = useState(false);
-  const [riskLevel, setRiskLevel] = useState<'low' | 'medium' | 'high'>('low');
-  
-  // Toggle AI trading and notify parent component
-  const toggleAITrading = () => {
-    const newState = !isEnabled;
-    setIsEnabled(newState);
-    onEnableAI(newState, riskLevel);
-  };
-  
-  // Change risk level and notify parent if AI is enabled
-  const changeRiskLevel = (level: 'low' | 'medium' | 'high') => {
-    setRiskLevel(level);
-    if (isEnabled) {
-      onEnableAI(isEnabled, level);
-    }
-  };
-  
-  return (
-    <div>
-      <h3 className="text-lg font-semibold mb-3 text-gray-900 dark:text-white">AI Trading</h3>
-      
-      <div className="mb-4 flex items-center justify-between">
-        <div className="flex items-center">
-          <div 
-            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors cursor-pointer ${
-              isEnabled ? 'bg-blue-600' : 'bg-gray-200 dark:bg-gray-700'
-            }`}
-            onClick={toggleAITrading}
-          >
-            <span 
-              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                isEnabled ? 'translate-x-6' : 'translate-x-1'
-              }`} 
-            />
-          </div>
-          <span className="ml-2 text-sm font-medium text-gray-700 dark:text-gray-300">
-            {isEnabled ? 'Enabled' : 'Disabled'}
-          </span>
-        </div>
-        
-        {isEnabled && (
-          <div className="flex items-center space-x-2">
-            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Risk:</label>
-            <div className="flex border border-gray-300 dark:border-gray-600 rounded-md overflow-hidden">
-              <button
-                className={`px-2 py-1 text-xs ${
-                  riskLevel === 'low' ? 'bg-blue-600 text-white' : 'bg-gray-100 dark:bg-gray-700'
-                }`}
-                onClick={() => changeRiskLevel('low')}
-              >
-                Low
-              </button>
-              <button
-                className={`px-2 py-1 text-xs ${
-                  riskLevel === 'medium' ? 'bg-blue-600 text-white' : 'bg-gray-100 dark:bg-gray-700'
-                }`}
-                onClick={() => changeRiskLevel('medium')}
-              >
-                Med
-              </button>
-              <button
-                className={`px-2 py-1 text-xs ${
-                  riskLevel === 'high' ? 'bg-blue-600 text-white' : 'bg-gray-100 dark:bg-gray-700'
-                }`}
-                onClick={() => changeRiskLevel('high')}
-              >
-                High
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-      
-      {isEnabled && (
-        <div className="py-2 px-3 mb-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded text-sm text-blue-800 dark:text-blue-300">
-          AI Trading is analyzing {symbol} with {riskLevel} risk profile
-        </div>
-      )}
-      
-      <div className="mb-4">
-        <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Active Positions</h4>
-        
-        {positions.length === 0 ? (
-          <div className="text-center py-4 bg-gray-50 dark:bg-gray-800 rounded text-sm text-gray-500 dark:text-gray-400">
-            No active positions
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {positions.filter(p => p.status === 'open').map(position => (
-              <div key={position.id} className="p-3 bg-gray-50 dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700">
-                <div className="flex justify-between items-center">
-                  <div>
-                    <div className="font-medium text-gray-900 dark:text-white">{position.symbol}</div>
-                    <div className="text-sm text-gray-500 dark:text-gray-400">{position.strategy} Strategy</div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-sm font-medium">
-                      {position.quantity} shares @ ${position.entryPrice.toFixed(2)}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-};
-
 // Dynamically import remaining components with SSR disabled to avoid hydration issues
 const OrderEntryPanel = dynamic(() => import('../../components/brokerage/OrderEntryPanel'), { ssr: false });
 const OrderBook = dynamic(() => import('../../components/brokerage/OrderBook'), { ssr: false });
@@ -318,15 +198,15 @@ export interface ManualOrder {
 export interface AIPosition {
   id: string;
   symbol: string;
+  type: 'buy' | 'sell';
   entryPrice: number;
   quantity: number;
-  entryTime: number;
+  timestamp: number;
   exitPrice?: number;
-  exitTime?: number;
-  status: 'open' | 'closed';
-  pnl?: number;
-  pnlPercent?: number;
-  strategy: string;
+  closeDate?: Date;
+  status?: 'open' | 'closed';
+  profit?: number;
+  stopLoss?: number;
 }
 
 // Add handling for Congress trades
@@ -403,10 +283,6 @@ export default function BrokeragePage() {
   // Add state for copied insider trades
   const [copiedInsiderTrades, setCopiedInsiderTrades] = useState<InsiderTrade[]>([]);
 
-  // State for AI trading
-  const [aiEnabled, setAiEnabled] = useState(false);
-  const [aiRiskLevel, setAiRiskLevel] = useState<'low' | 'medium' | 'high'>('low');
-
   // Load initial data when page loads
   useEffect(() => {
     console.log('Brokerage page initialized');
@@ -463,11 +339,11 @@ export default function BrokeragePage() {
       {
         id: '1',
         symbol: 'AAPL',
+        type: 'buy',
         entryPrice: 170.45,
         quantity: 15,
-        entryTime: now - 86400000,
+        timestamp: now - 86400000,
         status: 'open',
-        strategy: 'Momentum'
       }
     ]);
   };
@@ -513,11 +389,11 @@ export default function BrokeragePage() {
         existing.push({
           id: `position-${now}`,
           symbol: newSymbol,
+          type: 'buy',
           entryPrice: generateSimulatedPrice(newSymbol),
           quantity: Math.floor(5 + Math.random() * 15),
-          entryTime: now - Math.floor(Math.random() * 604800000), // Random time in the last week
+          timestamp: now - Math.floor(Math.random() * 604800000), // Random time in the last week
           status: 'open',
-          strategy: 'Momentum'
         });
       }
       
@@ -862,42 +738,6 @@ export default function BrokeragePage() {
     handleManualOrder(newOrder);
   };
 
-  // Handle AI trading enable/disable
-  const handleAITradingToggle = (enabled: boolean, riskLevel: 'low' | 'medium' | 'high') => {
-    setAiEnabled(enabled);
-    setAiRiskLevel(riskLevel);
-    console.log(`AI Trading ${enabled ? 'enabled' : 'disabled'} with ${riskLevel} risk level`);
-    
-    // If enabled, simulate AI trade signals
-    if (enabled) {
-      const timeout = setTimeout(() => {
-        if (Math.random() > 0.5) {
-          // Simulate a new AI position
-          const now = Date.now();
-          const newPosition: AIPosition = {
-            id: `ai-position-${now}`,
-            symbol,
-            entryPrice: currentPrice,
-            quantity: Math.floor(10 + Math.random() * 20),
-            entryTime: now,
-            status: 'open',
-            strategy: Math.random() > 0.5 ? 'Momentum' : 'Mean Reversion'
-          };
-          
-          setAiPositions(prev => [...prev, newPosition]);
-          setError(null);
-          
-          // Show a success message
-          const successMessage = `AI Trading opened a new ${newPosition.strategy} position for ${symbol}`;
-          setError(successMessage);
-          setTimeout(() => setError(null), 3000);
-        }
-      }, 3000);
-      
-      return () => clearTimeout(timeout);
-    }
-  };
-
   return (
     <div className="flex flex-col">
       {/* Header section */}
@@ -1081,10 +921,12 @@ export default function BrokeragePage() {
             {/* Tab content */}
             <div className="p-4">
               {activeTab === 'ai' ? (
-                <AITradingPanel
-                  symbol={symbol}
+                <TradingInterface 
+                  currentSymbol={symbol}
+                  onSymbolChange={handleSymbolChange}
                   positions={aiPositions}
-                  onEnableAI={handleAITradingToggle}
+                  onNewAIPosition={(newPos) => setAiPositions(prev => [...prev, newPos])}
+                  onClosePosition={(posId) => setAiPositions(prev => prev.filter(p => p.id !== posId))}
                 />
               ) : activeTab === 'congress' ? (
                 <CongressTradingPanel 
