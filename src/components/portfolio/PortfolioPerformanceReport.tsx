@@ -2,31 +2,12 @@ import { useState, useEffect } from 'react';
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ResponsiveContainer, LineChart, Line, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid, Legend } from 'recharts';
-
-interface PerformanceMetric {
-  date: string;
-  portfolioValue: number;
-  benchmarkValue: number;
-  cumulativeReturn: number;
-  benchmarkReturn: number;
-}
-
-interface RiskMetric {
-  period: string;
-  alpha: number;
-  beta: number;
-  sharpeRatio: number;
-  maxDrawdown: number;
-  volatility: number;
-}
-
-interface SectorAllocation {
-  sector: string;
-  weight: number;
-  return: number;
-}
+import NetWorthChart from '../dashboard/NetWorthChart';
+import { PerformanceMetric, RiskMetric, SectorAllocation } from '@/lib/portfolio/mockPerformanceData';
+import { ArrowTrendingUpIcon, ArrowTrendingDownIcon, ScaleIcon, ChartPieIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 
 interface PortfolioPerformanceProps {
+  totalValue?: number;
   performanceData: PerformanceMetric[];
   riskMetrics: RiskMetric[];
   sectorAllocations: SectorAllocation[];
@@ -35,11 +16,12 @@ interface PortfolioPerformanceProps {
   oneYearReturn: number;
   threeYearReturn: number;
   fiveYearReturn: number;
-  benchmarkName: string;
+  benchmarkName?: string;
   isLoading?: boolean;
 }
 
 export function PortfolioPerformanceReport({
+  totalValue,
   performanceData = [],
   riskMetrics = [],
   sectorAllocations = [],
@@ -85,6 +67,8 @@ export function PortfolioPerformanceReport({
     return value >= 0 ? 'text-green-600' : 'text-red-600';
   };
 
+  const displayTotalValue = totalValue ?? performanceData[performanceData.length - 1]?.value ?? 0;
+
   if (isLoading) {
     return (
       <div className="space-y-6 animate-pulse">
@@ -114,58 +98,31 @@ export function PortfolioPerformanceReport({
 
   return (
     <div className="space-y-6">
-      {/* Performance Summary */}
-      <div className="grid gap-4 md:grid-cols-5">
-        <Card>
-          <CardHeader>
-            <CardTitle>Total Return</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className={getReturnColor(totalReturn)}>
-              {formatPercent(totalReturn)}
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle>YTD Return</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className={getReturnColor(ytdReturn)}>
-              {formatPercent(ytdReturn)}
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle>1Y Return</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className={getReturnColor(oneYearReturn)}>
-              {formatPercent(oneYearReturn)}
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle>3Y Return</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className={getReturnColor(threeYearReturn)}>
-              {formatPercent(threeYearReturn)}
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle>5Y Return</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className={getReturnColor(fiveYearReturn)}>
-              {formatPercent(fiveYearReturn)}
-            </div>
-          </CardContent>
-        </Card>
+      {/* Summary Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Total Value Card */}
+        <div className="bg-[#1E2D4E] rounded-lg p-4">
+          <h4 className="text-sm font-medium text-gray-400 mb-1">Total Portfolio Value</h4>
+          <p className="text-2xl font-semibold text-white">{formatCurrency(displayTotalValue)}</p> 
+        </div>
+        
+        {/* Total Return Card */}
+        <div className="bg-[#1E2D4E] rounded-lg p-4">
+           <h4 className="text-sm font-medium text-gray-400 mb-1">Total Return</h4>
+           <p className={`text-2xl font-semibold ${getReturnColor(totalReturn)}`}>{formatPercent(totalReturn)}</p>
+        </div>
+
+        {/* YTD Return Card */}
+        <div className="bg-[#1E2D4E] rounded-lg p-4">
+           <h4 className="text-sm font-medium text-gray-400 mb-1">YTD Return</h4>
+           <p className={`text-2xl font-semibold ${getReturnColor(ytdReturn)}`}>{formatPercent(ytdReturn)}</p>
+        </div>
+
+        {/* Benchmark placeholder (or dynamically show 1Y return) */}
+        <div className="bg-[#1E2D4E] rounded-lg p-4">
+           <h4 className="text-sm font-medium text-gray-400 mb-1">1-Year Return</h4>
+           <p className={`text-2xl font-semibold ${getReturnColor(oneYearReturn)}`}>{formatPercent(oneYearReturn)}</p>
+        </div>
       </div>
 
       {/* Performance Chart */}
