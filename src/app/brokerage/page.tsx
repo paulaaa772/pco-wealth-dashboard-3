@@ -739,7 +739,7 @@ export default function BrokeragePage() {
   };
 
   return (
-    <div className="flex flex-col">
+    <div className="flex flex-col p-4 md:p-6">
       {/* Header section */}
       <div className="mb-4 flex flex-col md:flex-row justify-between items-end gap-4">
         <div>
@@ -836,56 +836,48 @@ export default function BrokeragePage() {
         </div>
       </div>
 
-      {/* Main content */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {/* Chart area - 2/3 width on larger screens */}
-        <div className="md:col-span-2 bg-white dark:bg-zinc-800 rounded-lg shadow p-4 flex flex-col">
-          <div className="flex-grow h-full w-full min-h-[400px]">
-            {isLoading ? (
-              <div className="h-full flex items-center justify-center">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-              </div>
-            ) : candleData.length > 0 ? (
-              <TradingChart
-                symbol={symbol}
-                data={candleData}
-                currentPrice={currentPrice}
-              />
-            ) : (
-              <div className="h-full flex items-center justify-center">
-                <p className="text-gray-500 dark:text-gray-400">No data available</p>
-              </div>
-            )}
-          </div>
-          
-          {/* Portfolio value - Ensure this doesn't take space away from chart */}
-          <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700 flex-shrink-0">
-            <div className="flex justify-between items-center">
-              <div className="text-sm text-gray-500 dark:text-gray-400">
-                Portfolio Value ({symbol})
-              </div>
-              <div className="text-lg font-semibold">
-                ${calculatePortfolioValue().toFixed(2)}
+      {/* Main Content Area (Chart + AI Interface) - Spans 2 columns on large screens */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        
+        {/* Main Content Area (Chart + AI Interface) - Spans 2 columns on large screens */}
+        <div className="lg:col-span-2 flex flex-col gap-4">
+          {/* Chart Area */}
+          <div className="bg-white dark:bg-zinc-800 rounded-lg shadow p-4">
+            {/* Constrain chart height, e.g., 50% of viewport height */} 
+            <div className="h-[55vh] w-full">
+              {isLoading ? (
+                <div className="h-full flex items-center justify-center">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+                </div>
+              ) : candleData.length > 0 ? (
+                <TradingChart
+                  symbol={symbol}
+                  data={candleData}
+                  currentPrice={currentPrice}
+                />
+              ) : (
+                <div className="h-full flex items-center justify-center">
+                  <p className="text-gray-500 dark:text-gray-400">No data available</p>
+                </div>
+              )}
+            </div>
+            {/* Portfolio value (Optional display under chart) */}
+            <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700 flex-shrink-0">
+              <div className="flex justify-between items-center">
+                <div className="text-sm text-gray-500 dark:text-gray-400">
+                  Portfolio Value ({symbol})
+                </div>
+                <div className="text-lg font-semibold">
+                  ${calculatePortfolioValue().toFixed(2)}
+                </div>
               </div>
             </div>
           </div>
-        </div>
 
-        {/* Right sidebar - 1/3 width - Adjust flex properties for better vertical stacking */}
-        <div className="flex flex-col gap-4"> 
-          {/* Order entry panel - Allow it to take its natural height */}
-          <div className="bg-white dark:bg-zinc-800 rounded-lg shadow p-4 flex-shrink-0"> 
-            <OrderEntryPanel
-              symbol={symbol}
-              currentPrice={currentPrice}
-              onOrderSubmit={handleManualOrder}
-            />
-          </div>
-
-          {/* Trading tools with tabs - Allow this section to grow and potentially scroll if needed */}
-          <div className="bg-white dark:bg-zinc-800 rounded-lg shadow flex flex-col flex-grow min-h-0"> {/* Added flex flex-col flex-grow min-h-0 */}
-            {/* Tab navigation */} 
-            <div className="flex border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
+          {/* Trading Interface Area (Below Chart) */}
+          <div className="bg-white dark:bg-zinc-800 rounded-lg shadow p-4">
+            {/* Tab navigation for AI/Congress/Insiders */}
+            <div className="flex border-b border-gray-200 dark:border-gray-700 mb-4">
               <button
                 className={`px-3 py-2 text-sm font-medium ${
                   activeTab === 'ai' 
@@ -917,8 +909,8 @@ export default function BrokeragePage() {
                 Insiders
               </button>
             </div>
-            {/* Tab content - Make this scrollable if it overflows */}
-            <div className="p-4 flex-grow overflow-auto"> {/* Added flex-grow overflow-auto */} 
+            {/* Tab content */}
+            <div>
               {activeTab === 'ai' ? (
                 <TradingInterface 
                   currentSymbol={symbol}
@@ -941,18 +933,33 @@ export default function BrokeragePage() {
             </div>
           </div>
         </div>
-      </div>
 
-      {/* Bottom section */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-        {/* Order book */}
-        <div className="bg-white dark:bg-zinc-800 rounded-lg shadow p-4">
-          <OrderBook orders={manualOrders.filter(order => order.status === 'open')} />
-        </div>
+        {/* Right Sidebar (Order Entry, Order Book, Trade History) */}
+        <div className="lg:col-span-1 flex flex-col gap-4">
+          {/* Order entry panel */} 
+          <div className="bg-white dark:bg-zinc-800 rounded-lg shadow p-4 flex-shrink-0"> 
+            <OrderEntryPanel
+              symbol={symbol}
+              currentPrice={currentPrice}
+              onOrderSubmit={handleManualOrder}
+            />
+          </div>
+          
+          {/* Order book */}
+          <div className="bg-white dark:bg-zinc-800 rounded-lg shadow p-4 flex-grow flex flex-col min-h-0"> {/* Adjust flex properties */}
+            <h3 className="text-lg font-semibold mb-3 flex-shrink-0">Order Book</h3>
+            <div className="flex-grow overflow-auto"> {/* Make content scrollable */} 
+              <OrderBook orders={manualOrders.filter(order => order.status === 'open')} />
+            </div>
+          </div>
 
-        {/* Trade history */}
-        <div className="bg-white dark:bg-zinc-800 rounded-lg shadow p-4">
-          <TradeHistory orders={manualOrders.filter(order => order.status === 'filled')} />
+          {/* Trade history */}
+          <div className="bg-white dark:bg-zinc-800 rounded-lg shadow p-4 flex-grow flex flex-col min-h-0"> {/* Adjust flex properties */}
+            <h3 className="text-lg font-semibold mb-3 flex-shrink-0">Trade History</h3>
+            <div className="flex-grow overflow-auto"> {/* Make content scrollable */} 
+              <TradeHistory orders={manualOrders.filter(order => order.status === 'filled')} />
+            </div>
+          </div>
         </div>
       </div>
     </div>
