@@ -76,10 +76,6 @@ export function PortfolioHoldings() {
       return { groups, accountDetails }; // Return both pieces
   }, [manualAccounts]);
 
-  // --- Handlers for Edit/Delete (Add these *after* groupedRows is defined) --- 
-  const handleEditAccount = (accountId: string) => { /* ... */ };
-  const handleDeleteAccount = async (accountId: string, accountName: string) => { /* ... */ };
-
   // Sort holding rows based on current config
   const sortedHoldingRows = useMemo(() => {
     const sortableItems = [...Object.values(groupedRowsGroups).flat()];
@@ -109,6 +105,26 @@ export function PortfolioHoldings() {
   // Combine loading and error states from context
   const isComponentLoading = isLoading || loading;
   const componentError = contextError || error;
+
+  // --- Handlers for Edit/Delete (Ensure they are defined before return) --- 
+  const handleEditAccount = (accountId: string) => {
+      const account = manualAccounts.find(acc => acc.id === accountId);
+      if (account) {
+          console.log("Editing account:", account); 
+          alert("Edit functionality coming soon!");
+      }
+  };
+
+  const handleDeleteAccount = async (accountId: string, accountName: string) => {
+      if (window.confirm(`Are you sure you want to delete the account "${accountName}"?`)) {
+          try {
+              await deleteManualAccount(accountId);
+          } catch (err) {
+              console.error("Error deleting account:", err);
+              alert(`Failed to delete account: ${err instanceof Error ? err.message : 'Unknown error'}`);
+          }
+      }
+  };
 
   if (isComponentLoading) {
     return (
