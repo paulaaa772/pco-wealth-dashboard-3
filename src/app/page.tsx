@@ -1,16 +1,19 @@
 'use client';
 
-import { Metadata } from 'next';
+// import { Metadata } from 'next'; // Metadata might cause issues in client components
 import React, { useState } from 'react';
 import DashboardHeader from '@/components/dashboard/DashboardHeader';
 import PortfolioValue from '@/components/dashboard/PortfolioValue';
 import PortfolioChart from '@/components/dashboard/PortfolioChart';
 import AggregationModal from '@/components/dashboard/AggregationModal';
 
-export const metadata: Metadata = {
-  title: 'Dashboard | Wealth Dashboard',
-  description: 'View and manage your portfolio',
-};
+// Note: Metadata export might need to be handled differently or removed 
+// when converting a page to a Client Component if it causes issues.
+// Commenting out for now.
+// export const metadata: Metadata = {
+//   title: 'Dashboard | Wealth Dashboard',
+//   description: 'View and manage your portfolio',
+// };
 
 export default function DashboardPage() {
   const [showAggregationModal, setShowAggregationModal] = useState(false);
