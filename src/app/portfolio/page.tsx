@@ -9,6 +9,7 @@ import {
   calculateReturns 
 } from '@/lib/portfolio/mockPerformanceData';
 import { IncomeAnalysis } from './income-analysis';
+import { PortfolioHoldings } from './holdings';
 
 export default function PortfolioPage() {
   // Initialize state with mock data
@@ -16,7 +17,7 @@ export default function PortfolioPage() {
   const [riskMetrics] = useState(generateMockRiskMetrics());
   const [sectorAllocations] = useState(generateMockSectorAllocations());
   const returns = calculateReturns(performanceData);
-  const [activeTab, setActiveTab] = useState('performance');
+  const [activeTab, setActiveTab] = useState('holdings'); // Default to holdings tab
 
   // Tab interface styles
   const tabStyle = "px-4 py-2 text-sm font-medium";
@@ -31,6 +32,12 @@ export default function PortfolioPage() {
         {/* Tab Navigation */}
         <div className="border-b border-gray-700">
           <nav className="flex gap-4">
+            <button 
+              className={activeTab === 'holdings' ? activeTabStyle : inactiveTabStyle}
+              onClick={() => setActiveTab('holdings')}
+            >
+              Holdings
+            </button>
             <button 
               className={activeTab === 'performance' ? activeTabStyle : inactiveTabStyle}
               onClick={() => setActiveTab('performance')}
@@ -47,6 +54,8 @@ export default function PortfolioPage() {
         </div>
         
         {/* Tab Content */}
+        {activeTab === 'holdings' && <PortfolioHoldings />}
+        
         {activeTab === 'performance' && (
           <div className="bg-[#2A3C61] rounded-lg p-6">
             <PortfolioPerformanceReport

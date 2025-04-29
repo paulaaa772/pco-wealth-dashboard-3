@@ -10,7 +10,7 @@ export default function DashboardHeader() {
       </h1>
       <div className="flex gap-4">
         <Link 
-          href="/investments"
+          href="/portfolio"
           className="flex items-center gap-2 px-6 py-2 rounded-lg bg-[#2A3C61] hover:bg-[#344571] transition-colors"
         >
           <span className="material-icons">account_balance</span>
