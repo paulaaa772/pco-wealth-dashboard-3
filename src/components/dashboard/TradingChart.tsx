@@ -8,7 +8,9 @@ import {
   ISeriesApi,
   DeepPartial,
   ChartOptions,
-  HistogramSeriesOptions
+  HistogramSeriesOptions,
+  PriceLineOptions,
+  IPriceLine,
 } from 'lightweight-charts';
 
 // The original polygon data format
@@ -42,6 +44,7 @@ const TradingChart: React.FC<TradingChartProps> = ({ symbol, data, currentPrice 
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
   const volumeSeriesRef = useRef<ISeriesApi<"Histogram"> | null>(null);
+  const priceLineRef = useRef<IPriceLine | null>(null);
   const resizeObserverRef = useRef<ResizeObserver | null>(null);
 
   useEffect(() => {
@@ -168,16 +171,26 @@ const TradingChart: React.FC<TradingChartProps> = ({ symbol, data, currentPrice 
     seriesRef.current.setData(formattedCandleData);
     volumeSeriesRef.current.setData(formattedVolumeData);
 
-    // Add a price line for the current price if available
+    // Remove the previous price line if it exists
+    if (priceLineRef.current) {
+      seriesRef.current.removePriceLine(priceLineRef.current);
+      priceLineRef.current = null;
+    }
+
+    // Add a new price line for the current price if available
     if (currentPrice && seriesRef.current) {
-      seriesRef.current.createPriceLine({
+      const newPriceLineOptions: PriceLineOptions = {
         price: currentPrice,
-        color: 'rgba(255, 255, 255, 0.8)',
-        lineWidth: 2,
-        lineStyle: 2, // Dashed
+        color: 'rgba(220, 220, 220, 0.8)',
+        lineWidth: 1,
+        lineStyle: 2,
+        lineVisible: true,
         axisLabelVisible: true,
-        title: 'Current Price',
-      });
+        title: 'Current',
+        axisLabelColor: '#ffffff',
+        axisLabelTextColor: '#000000',
+      };
+      priceLineRef.current = seriesRef.current.createPriceLine(newPriceLineOptions);
     }
 
     // Fit the content to view
