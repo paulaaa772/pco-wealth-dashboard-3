@@ -308,29 +308,41 @@ export default function TradingInterface({
               <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
             </div>
           ) : lastSignal ? (
-            <div className={`p-2 rounded-md text-sm ${
-              lastSignal.direction === 'buy' ? 'bg-green-900/30 border border-green-700' : 'bg-red-900/30 border border-red-700'
-            }`}>
-              <div className="flex justify-between">
-                <span className="text-gray-400">Symbol:</span>
-                <span className="font-semibold text-white">{lastSignal.symbol}</span>
+            <div className="flex flex-col gap-2">
+              <div className={`p-2 rounded-md text-sm ${
+                lastSignal.direction === 'buy' ? 'bg-green-900/30 border border-green-700' : 'bg-red-900/30 border border-red-700'
+              }`}>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Symbol:</span>
+                  <span className="font-semibold text-white">{lastSignal.symbol}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Position:</span>
+                  <span className={`font-semibold ${
+                    lastSignal.direction === 'buy' ? 'text-green-400' : 'text-red-400'
+                  }`}>
+                    {lastSignal.direction.toUpperCase()}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Entry:</span>
+                  <span className="font-semibold text-white">${lastSignal.price.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Strategy:</span>
+                  <span className="font-semibold text-blue-400 text-xs">{lastSignal.strategy}</span>
+                </div>
               </div>
-              <div className="flex justify-between">
-                <span className="text-gray-400">Position:</span>
-                <span className={`font-semibold ${
-                  lastSignal.direction === 'buy' ? 'text-green-400' : 'text-red-400'
-                }`}>
-                  {lastSignal.direction.toUpperCase()}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-400">Entry:</span>
-                <span className="font-semibold text-white">${lastSignal.price.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-400">Strategy:</span>
-                <span className="font-semibold text-blue-400 text-xs">{lastSignal.strategy}</span>
-              </div>
+              <button 
+                onClick={() => executeTradeSignal(lastSignal)}
+                className={`w-full text-sm px-3 py-1 rounded-md transition-colors ${ 
+                  lastSignal.direction === 'buy' 
+                    ? 'bg-green-600 hover:bg-green-700' 
+                    : 'bg-red-600 hover:bg-red-700' 
+                } text-white`}
+              >
+                Execute {lastSignal.direction.toUpperCase()} Signal
+              </button>
             </div>
           ) : (
             <div className="flex items-center justify-center h-16 text-gray-500 text-sm">
