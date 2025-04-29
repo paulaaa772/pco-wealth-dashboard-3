@@ -30,6 +30,8 @@ interface ManualAccountsContextType {
   isLoading: boolean;
   error: string | null;
   addManualAccount: (account: Omit<ManualAccount, 'id' | 'totalValue'>) => Promise<void>;
+  updateManualAccount: (id: string, accountData: Partial<Omit<ManualAccount, 'id' | 'totalValue'>>) => Promise<void>;
+  deleteManualAccount: (id: string) => Promise<void>;
   refetchAccounts: () => void;
   isModalOpen: boolean;
   openModal: () => void;
@@ -111,6 +113,58 @@ export const ManualAccountsProvider: React.FC<ManualAccountsProviderProps> = ({ 
     }
   };
 
+  const updateManualAccount = async (id: string, accountData: Partial<Omit<ManualAccount, 'id' | 'totalValue'>>) => {
+    console.log(`[Context] Attempting to update account ${id} via API:`, accountData);
+    setError(null);
+    try {
+      let dataToSend = { ...accountData };
+      if (accountData.assets) {
+        dataToSend.totalValue = accountData.assets.reduce((sum, asset) => sum + asset.value, 0);
+      }
+
+      const response = await fetch(`/api/manual-accounts/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(dataToSend),
+      });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `Failed to update account: ${response.statusText}`);
+      }
+      const updatedAccount = await response.json();
+      const formattedUpdatedAccount = { ...updatedAccount, id: updatedAccount._id || updatedAccount.id };
+      
+      setManualAccounts(prev => 
+        prev.map(acc => acc.id === id ? formattedUpdatedAccount : acc)
+      );
+      console.log('[Context] Account updated successfully:', formattedUpdatedAccount);
+    } catch (err: any) {
+      console.error(`[Context] Error updating account ${id}:`, err);
+      setError(err.message || 'Failed to update account');
+      throw err;
+    }
+  };
+
+  const deleteManualAccount = async (id: string) => {
+    console.log(`[Context] Attempting to delete account ${id} via API`);
+    setError(null);
+    try {
+      const response = await fetch(`/api/manual-accounts/${id}`, {
+        method: 'DELETE',
+      });
+       if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `Failed to delete account: ${response.statusText}`);
+      }
+      setManualAccounts(prev => prev.filter(acc => acc.id !== id));
+      console.log(`[Context] Account ${id} deleted successfully.`);
+    } catch (err: any) {
+       console.error(`[Context] Error deleting account ${id}:`, err);
+       setError(err.message || 'Failed to delete account');
+       throw err;
+    }
+  };
+
   const openModal = () => setIsModalOpen(true);
   const closeModal = () => setIsModalOpen(false);
 
@@ -120,6 +174,8 @@ export const ManualAccountsProvider: React.FC<ManualAccountsProviderProps> = ({ 
         isLoading, 
         error, 
         addManualAccount, 
+        updateManualAccount,
+        deleteManualAccount,
         refetchAccounts: fetchAccounts,
         isModalOpen,
         openModal,
