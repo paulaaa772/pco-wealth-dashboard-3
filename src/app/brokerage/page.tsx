@@ -709,17 +709,43 @@ export default function BrokeragePage() {
   
   // Helper to estimate quantity based on amount range
   const calculateQuantityFromAmount = (amountRange: string): number => {
-    // Parse amount range like "1,000,000-5,000,000"
-    const amounts = amountRange.split('-').map(a => 
-      parseInt(a.replace(/[^0-9]/g, ''))
-    );
+    console.log(`[QTY CALC] Input range: ${amountRange}`);
+    let estimatedAmount = 1001; // Lower default amount
+
+    try {
+      const amounts = amountRange.split('-').map(a =>
+        parseInt(a.replace(/[^\d.-]/g, '')) // Keep decimal point if present, remove others
+      );
+      
+      // Check if the first amount is a valid number
+      if (!isNaN(amounts[0])) {
+        estimatedAmount = amounts[0];
+        console.log(`[QTY CALC] Using lower bound: ${estimatedAmount}`);
+      } else {
+        // Optional: Try parsing the second part if the first failed (e.g., for ranges like "< $1000")
+        if (amounts.length > 1 && !isNaN(amounts[1])) {
+           estimatedAmount = amounts[1]; // Use upper bound as estimate if lower failed
+           console.warn(`[QTY CALC] Lower bound parsing failed for '${amountRange}', using upper bound estimate: ${estimatedAmount}`);
+        } else {
+          console.warn(`[QTY CALC] Failed to parse amount range '${amountRange}'. Defaulting to ${estimatedAmount}`);
+        }
+      }
+    } catch (parseError) {
+       console.error(`[QTY CALC] Error parsing amount range '${amountRange}':`, parseError);
+       console.warn(`[QTY CALC] Defaulting to ${estimatedAmount} due to parsing error.`);
+    }
+
+    // Ensure estimated amount is positive
+    estimatedAmount = Math.max(1, estimatedAmount); // Ensure at least $1 is used
     
-    // Use the lower end of the range and divide by current price to get shares
-    const estimatedAmount = amounts[0] || 100000;
     const price = currentPrice || generateSimulatedPrice(symbol);
+    console.log(`[QTY CALC] Using price: ${price}`);
+
+    const calculatedQuantity = price > 0 ? Math.floor(estimatedAmount / price) : 1;
+    const finalQuantity = Math.max(1, calculatedQuantity); // Ensure minimum 1 share
     
-    // Calculate quantity (minimum 1 share)
-    return Math.max(1, Math.floor(estimatedAmount / price));
+    console.log(`[QTY CALC] Final calculated quantity: ${finalQuantity}`);
+    return finalQuantity;
   };
 
   // Handle copying a business insider trade
