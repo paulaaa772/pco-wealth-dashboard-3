@@ -12,6 +12,7 @@ import { IncomeAnalysis } from './income-analysis';
 import { PortfolioHoldings } from './holdings';
 import { useManualAccounts } from '@/context/ManualAccountsContext';
 import AssetAllocation from '@/components/portfolio/AssetAllocation';
+import EnhancedPerformanceAnalytics from '@/components/portfolio/EnhancedPerformanceAnalytics';
 
 export default function PortfolioPage() {
   const { manualAccounts, isLoading: isLoadingAccounts, error: accountsError } = useManualAccounts();
@@ -97,25 +98,7 @@ export default function PortfolioPage() {
         
         {activeTab === 'allocation' && <AssetAllocation />}
         
-        {activeTab === 'performance' && (
-          <div className="bg-[#2A3C61] rounded-lg p-6">
-            <PortfolioPerformanceReport
-              totalValue={totalPortfolioValue > 0 ? totalPortfolioValue : undefined}
-              performanceData={performanceData}
-              riskMetrics={riskMetrics}
-              sectorAllocations={sectorAllocations}
-              totalReturn={returns.totalReturn}
-              ytdReturn={returns.ytdReturn}
-              oneYearReturn={returns.oneYearReturn}
-              threeYearReturn={returns.threeYearReturn}
-              fiveYearReturn={returns.fiveYearReturn}
-              benchmarkName="S&P 500"
-            />
-            <p className="text-xs text-center text-gray-500 mt-4 italic">
-              Note: Chart, returns, risk, and allocation data are currently illustrative placeholders.
-            </p>
-          </div>
-        )}
+        {activeTab === 'performance' && <EnhancedPerformanceAnalytics />}
         
         {/* Income Analysis Tab */}
         {activeTab === 'income' && <IncomeAnalysis />}
