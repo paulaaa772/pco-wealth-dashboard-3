@@ -242,7 +242,7 @@ export function PortfolioHoldings() {
                   <React.Fragment key={accountId}>
                     {/* Account Header Row */}
                     <tr className="bg-[#18233C] border-b border-t border-gray-600">
-                       <td colSpan={5} className="py-2 px-4 font-semibold"> {/* Adjusted colSpan based on current headers */} 
+                       <td colSpan={5} className="py-2 px-4 font-semibold"> 
                           <div className="flex items-center">
                               <span className="h-2.5 w-2.5 rounded-full mr-2" style={{ backgroundColor: groupedRows.accountDetails[accountId]?.color }}></span>
                               <span>{groupedRows.accountDetails[accountId]?.name}</span>
@@ -263,12 +263,8 @@ export function PortfolioHoldings() {
                     </tr>
                     {/* Asset Rows for this account - Use `rows` from the map */}
                     {rows.map((row, index) => (
-                      // Use alternating colors based on asset index within the group
                       <tr key={row.id} className={`${index % 2 === 0 ? 'bg-[#2A3C61]' : 'bg-[#233150]'} hover:bg-[#344571]`}>
-                        {/* Use a placeholder or specific style for the first column in asset rows */}
-                        <td className="py-3 px-4 pl-8 text-sm">{/* Indent asset symbol or leave blank */}
-                            {row.symbol}
-                        </td>
+                        <td className="py-3 px-4 pl-8 text-sm font-medium">{row.symbol}</td> {/* Indented symbol */}
                         <td className="py-3 px-4 text-right text-sm">{row.quantity.toLocaleString()}</td>
                         <td className="py-3 px-4 text-right text-sm">${row.value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                         <td className={`py-3 px-4 text-right text-sm ${row.gain >= 0 ? 'text-green-500' : 'text-red-500'}`}>
@@ -276,7 +272,7 @@ export function PortfolioHoldings() {
                           <span className="text-xs ml-1">({row.gainPercent.toFixed(2)}%)</span>
                         </td>
                         <td className="py-3 px-4 text-right text-sm">{row.allocation.toFixed(2)}%</td>
-                        <td className="py-3 px-4 text-center">{/* Actions per asset? */ }</td>
+                        <td className="py-3 px-4 text-center">{/* Actions per asset? */}</td>
                       </tr>
                     ))}
                   </React.Fragment>
