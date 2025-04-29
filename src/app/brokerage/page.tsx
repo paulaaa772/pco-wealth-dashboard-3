@@ -48,69 +48,78 @@ const SymbolSearch = ({
   defaultSymbol?: string;
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
+  const [searchResults, setSearchResults] = useState<Array<{ symbol: string; name: string }>>([]);
+  const [isSearching, setIsSearching] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const [selectedSymbol, setSelectedSymbol] = useState(defaultSymbol);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const inputTimeout = useRef<NodeJS.Timeout | null>(null);
 
-  // Handle clicks outside the dropdown to close it
+  // Close dropdown on outside click
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setIsOpen(false);
       }
     }
-
     document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const popularSymbols = [
-    { symbol: 'AAPL', name: 'Apple Inc.' },
-    { symbol: 'MSFT', name: 'Microsoft Corporation' },
-    { symbol: 'GOOGL', name: 'Alphabet Inc.' },
-    { symbol: 'AMZN', name: 'Amazon.com Inc.' },
-    { symbol: 'TSLA', name: 'Tesla Inc.' },
-    { symbol: 'NVDA', name: 'NVIDIA Corporation' },
-    { symbol: 'META', name: 'Meta Platforms Inc.' },
-    { symbol: 'JPM', name: 'JPMorgan Chase & Co.' },
-    { symbol: 'V', name: 'Visa Inc.' },
-    { symbol: 'WMT', name: 'Walmart Inc.' },
-  ];
+  // Debounced API search function
+  const fetchSearchResults = useCallback(async (query: string) => {
+    if (!query || query.length < 1) {
+      setSearchResults([]);
+      setIsSearching(false);
+      return;
+    }
+    setIsSearching(true);
+    try {
+      const response = await fetch(`/api/search-tickers?q=${encodeURIComponent(query)}`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch search results');
+      }
+      const results = await response.json();
+      setSearchResults(results || []);
+    } catch (error) {
+      console.error('Error searching symbols:', error);
+      setSearchResults([]); // Clear results on error
+    } finally {
+      setIsSearching(false);
+    }
+  }, []);
 
+  // Handle input change with debounce
   const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchTerm(e.target.value);
+    const query = e.target.value;
+    setSearchTerm(query);
     setIsOpen(true);
     
-    // Debounce search to avoid excessive searching
     if (inputTimeout.current) {
       clearTimeout(inputTimeout.current);
     }
     
-    // If you want to implement API search, you can add it here
-    inputTimeout.current = setTimeout(() => {
-      // This is where you would call an API to search for symbols
-      // For now, we're just using the local popularSymbols list
-      console.log('Searching for:', e.target.value);
-    }, 300);
+    // Only start searching if query is not empty
+    if (query.trim()) {
+       setIsSearching(true); // Show searching indicator immediately
+       inputTimeout.current = setTimeout(() => {
+         fetchSearchResults(query);
+       }, 300); // 300ms debounce
+    } else {
+      setSearchResults([]); // Clear results if query is empty
+      setIsSearching(false);
+    }
   };
 
-  const handleSelect = (symbol: string) => {
+  // Handle selecting a symbol from results
+  const handleSelect = (symbol: string, name: string) => {
     console.log(`Selected symbol: ${symbol}`);
     setSelectedSymbol(symbol);
-    setSearchTerm('');
+    setSearchTerm(''); // Clear search term
+    setSearchResults([]); // Clear results
     setIsOpen(false);
-    onSymbolSelect(symbol);
+    onSymbolSelect(symbol); // Notify parent
   };
-
-  // Filter symbols based on search term
-  const filteredSymbols = popularSymbols.filter(item => 
-    searchTerm === '' || 
-    item.symbol.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    item.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
 
   return (
     <div className="relative w-full" ref={dropdownRef}>
@@ -122,7 +131,7 @@ const SymbolSearch = ({
         </div>
         <input
           type="text"
-          placeholder={`Search (${selectedSymbol})`}
+          placeholder={`Search symbols...`}
           value={searchTerm}
           onChange={handleSearch}
           onFocus={() => setIsOpen(true)}
@@ -134,29 +143,24 @@ const SymbolSearch = ({
       {isOpen && (
         <div className="absolute z-50 mt-1 w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg max-h-60 overflow-auto">
           <div className="p-2">
-            <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
-              {searchTerm ? 'Search Results' : 'Popular Symbols'}
-            </div>
-            <div className="space-y-1">
-              {filteredSymbols.length > 0 ? (
-                filteredSymbols.map(item => (
+            {isSearching ? (
+              <div className="text-center py-2 text-gray-500 dark:text-gray-400">Searching...</div>
+            ) : searchTerm && searchResults.length === 0 ? (
+              <div className="text-center py-2 text-gray-500 dark:text-gray-400">No matching symbols found</div>
+            ) : (
+              <div className="space-y-1">
+                {searchResults.map(item => (
                   <div
                     key={item.symbol}
-                    className={`flex items-center p-2 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer rounded ${
-                      item.symbol === selectedSymbol ? 'bg-blue-50 dark:bg-blue-900/20' : ''
-                    }`}
-                    onClick={() => handleSelect(item.symbol)}
+                    className={`flex items-center p-2 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer rounded`}
+                    onClick={() => handleSelect(item.symbol, item.name)}
                   >
                     <div className="font-medium">{item.symbol}</div>
-                    <div className="ml-2 text-sm text-gray-500 dark:text-gray-400">{item.name}</div>
+                    <div className="ml-2 text-sm text-gray-500 dark:text-gray-400 truncate" title={item.name}>{item.name}</div>
                   </div>
-                ))
-              ) : (
-                <div className="text-center py-2 text-gray-500 dark:text-gray-400">
-                  No matching symbols found
-                </div>
-              )}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -543,7 +547,7 @@ export default function BrokeragePage() {
       // Adjust start date based on timeframe
       switch(timeframe) {
         case '1D':
-          startDate.setDate(endDate.getDate() - 1);
+          startDate.setDate(endDate.getDate() - 2); // Fetch 2 days for 1D view
           break;
         case '1W':
           startDate.setDate(endDate.getDate() - 7);
@@ -555,11 +559,19 @@ export default function BrokeragePage() {
           startDate.setMonth(endDate.getMonth() - 3);
           break;
         case 'YTD':
-          startDate.setMonth(0);
-          startDate.setDate(1);
+          startDate.setFullYear(endDate.getFullYear(), 0, 1); // Start of current year
+          break;
+        case '1Y':
+          startDate.setFullYear(endDate.getFullYear() - 1);
+          break;
+        case '5Y':
+          startDate.setFullYear(endDate.getFullYear() - 5);
+          break;
+        case 'ALL':
+          startDate.setFullYear(endDate.getFullYear() - 20); // Go back 20 years for ALL
           break;
         default:
-          startDate.setMonth(endDate.getMonth() - 3);
+          startDate.setDate(endDate.getDate() - 2);
       }
       
       const formattedStartDate = startDate.toISOString().split('T')[0];
@@ -854,7 +866,7 @@ export default function BrokeragePage() {
               />
             </div>
             <div className="flex gap-2 flex-wrap">
-              {['1D', '1W', '1M', '3M', 'YTD'].map((tf) => (
+              {['1D', '1W', '1M', '3M', 'YTD', '1Y', '5Y', 'ALL'].map((tf) => (
                 <button
                   key={tf}
                   onClick={() => handleTimeframeChange(tf)}
