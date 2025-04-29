@@ -68,6 +68,8 @@ export default function Portfolio() {
   const [activeTab, setActiveTab] = useState('overview');
   const [isLoading, setIsLoading] = useState(true);
   const [netWorthData, setNetWorthData] = useState<DataPoint[]>([]);
+  const [showAllocationModal, setShowAllocationModal] = useState(false);
+  const [showFundsModal, setShowFundsModal] = useState(false);
   
   // Simulate data loading
   useEffect(() => {
@@ -86,6 +88,43 @@ export default function Portfolio() {
     
     loadNetWorthData();
   }, []);
+  
+  // Handle edit allocations
+  const handleEditAllocations = () => {
+    console.log('Edit allocations clicked');
+    setShowAllocationModal(true);
+  };
+
+  // Handle export portfolio data
+  const handleExportData = () => {
+    console.log('Exporting portfolio data');
+    
+    // Create CSV content
+    const headers = ["Date", "Value"];
+    const csvContent = [
+      headers.join(','),
+      ...netWorthData.map(point => 
+        `${point.date.toISOString().split('T')[0]},${point.value}`
+      )
+    ].join('\n');
+    
+    // Create blob and download
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `portfolio-data-${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // Handle add funds
+  const handleAddFunds = () => {
+    console.log('Add funds clicked');
+    setShowFundsModal(true);
+  };
   
   if (isLoading) {
     return (
@@ -119,6 +158,7 @@ export default function Portfolio() {
             <span className="ml-3">
               <button
                 type="button"
+                onClick={handleEditAllocations}
                 className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
               >
                 <Edit2 className="-ml-1 mr-2 h-4 w-4" />
@@ -129,6 +169,7 @@ export default function Portfolio() {
             <span className="ml-3">
               <button
                 type="button"
+                onClick={handleExportData}
                 className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
               >
                 <Download className="-ml-1 mr-2 h-4 w-4" />
@@ -139,6 +180,7 @@ export default function Portfolio() {
             <span className="ml-3">
               <button
                 type="button"
+                onClick={handleAddFunds}
                 className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
               >
                 <Plus className="-ml-1 mr-2 h-4 w-4" />
@@ -267,6 +309,107 @@ export default function Portfolio() {
         
         {/* AI Assistant */}
         <AiAssistantPanel />
+
+        {/* Allocation Modal */}
+        {showAllocationModal && (
+          <div className="fixed inset-0 bg-gray-800 bg-opacity-75 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 max-w-lg w-full">
+              <h3 className="text-xl font-bold mb-4">Edit Portfolio Allocations</h3>
+              <p className="mb-4">Adjust your target allocations for each asset class.</p>
+              
+              <div className="space-y-4 mb-6">
+                <div className="flex justify-between items-center">
+                  <label className="font-medium">Technology</label>
+                  <input type="number" min="0" max="100" 
+                    className="border rounded py-1 px-2 w-20" 
+                    defaultValue="20" />
+                </div>
+                <div className="flex justify-between items-center">
+                  <label className="font-medium">Healthcare</label>
+                  <input type="number" min="0" max="100" 
+                    className="border rounded py-1 px-2 w-20" 
+                    defaultValue="15" />
+                </div>
+                {/* More allocation inputs would go here */}
+              </div>
+              
+              <div className="flex justify-end space-x-3">
+                <button 
+                  onClick={() => setShowAllocationModal(false)}
+                  className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 bg-white hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={() => {
+                    console.log('Saved allocations');
+                    setShowAllocationModal(false);
+                  }}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                >
+                  Save Changes
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Add Funds Modal */}
+        {showFundsModal && (
+          <div className="fixed inset-0 bg-gray-800 bg-opacity-75 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 max-w-md w-full">
+              <h3 className="text-xl font-bold mb-4">Add Funds to Portfolio</h3>
+              
+              <div className="space-y-4 mb-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Amount
+                  </label>
+                  <div className="relative rounded-md shadow-sm">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <span className="text-gray-500 sm:text-sm">$</span>
+                    </div>
+                    <input
+                      type="number"
+                      className="focus:ring-blue-500 focus:border-blue-500 block w-full pl-7 pr-12 sm:text-sm border-gray-300 rounded-md"
+                      placeholder="0.00"
+                      defaultValue="1000"
+                    />
+                  </div>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Funding Method
+                  </label>
+                  <select className="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                    <option>Bank Account (****1234)</option>
+                    <option>Credit Card (****5678)</option>
+                    <option>Wire Transfer</option>
+                  </select>
+                </div>
+              </div>
+              
+              <div className="flex justify-end space-x-3">
+                <button 
+                  onClick={() => setShowFundsModal(false)}
+                  className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 bg-white hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={() => {
+                    console.log('Added funds');
+                    setShowFundsModal(false);
+                  }}
+                  className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+                >
+                  Add Funds
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </ErrorBoundary>
   );

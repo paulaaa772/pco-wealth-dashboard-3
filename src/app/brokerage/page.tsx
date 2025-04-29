@@ -166,13 +166,30 @@ const SymbolSearch = ({
 // Simplified inline implementation of AITradingPanel
 const AITradingPanel = ({ 
   symbol, 
-  positions 
+  positions,
+  onEnableAI
 }: { 
   symbol: string; 
   positions: AIPosition[];
+  onEnableAI: (enabled: boolean, riskLevel: 'low' | 'medium' | 'high') => void;
 }) => {
   const [isEnabled, setIsEnabled] = useState(false);
   const [riskLevel, setRiskLevel] = useState<'low' | 'medium' | 'high'>('low');
+  
+  // Toggle AI trading and notify parent component
+  const toggleAITrading = () => {
+    const newState = !isEnabled;
+    setIsEnabled(newState);
+    onEnableAI(newState, riskLevel);
+  };
+  
+  // Change risk level and notify parent if AI is enabled
+  const changeRiskLevel = (level: 'low' | 'medium' | 'high') => {
+    setRiskLevel(level);
+    if (isEnabled) {
+      onEnableAI(isEnabled, level);
+    }
+  };
   
   return (
     <div>
@@ -184,7 +201,7 @@ const AITradingPanel = ({
             className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors cursor-pointer ${
               isEnabled ? 'bg-blue-600' : 'bg-gray-200 dark:bg-gray-700'
             }`}
-            onClick={() => setIsEnabled(!isEnabled)}
+            onClick={toggleAITrading}
           >
             <span 
               className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
@@ -205,7 +222,7 @@ const AITradingPanel = ({
                 className={`px-2 py-1 text-xs ${
                   riskLevel === 'low' ? 'bg-blue-600 text-white' : 'bg-gray-100 dark:bg-gray-700'
                 }`}
-                onClick={() => setRiskLevel('low')}
+                onClick={() => changeRiskLevel('low')}
               >
                 Low
               </button>
@@ -213,7 +230,7 @@ const AITradingPanel = ({
                 className={`px-2 py-1 text-xs ${
                   riskLevel === 'medium' ? 'bg-blue-600 text-white' : 'bg-gray-100 dark:bg-gray-700'
                 }`}
-                onClick={() => setRiskLevel('medium')}
+                onClick={() => changeRiskLevel('medium')}
               >
                 Med
               </button>
@@ -221,7 +238,7 @@ const AITradingPanel = ({
                 className={`px-2 py-1 text-xs ${
                   riskLevel === 'high' ? 'bg-blue-600 text-white' : 'bg-gray-100 dark:bg-gray-700'
                 }`}
-                onClick={() => setRiskLevel('high')}
+                onClick={() => changeRiskLevel('high')}
               >
                 High
               </button>
@@ -386,6 +403,10 @@ export default function BrokeragePage() {
   // Add state for copied insider trades
   const [copiedInsiderTrades, setCopiedInsiderTrades] = useState<InsiderTrade[]>([]);
 
+  // State for AI trading
+  const [aiEnabled, setAiEnabled] = useState(false);
+  const [aiRiskLevel, setAiRiskLevel] = useState<'low' | 'medium' | 'high'>('low');
+
   // Load initial data when page loads
   useEffect(() => {
     console.log('Brokerage page initialized');
@@ -522,8 +543,18 @@ export default function BrokeragePage() {
   const handleManualRefresh = () => {
     console.log('Manual refresh requested');
     setIsLoading(true);
-    loadMarketData(symbol, timeframe);
-    setLastUpdateTime(new Date());
+    
+    // Clear any existing errors
+    setError(null);
+    
+    // Reload market data
+    loadMarketData(symbol, timeframe, false).then(() => {
+      setLastUpdateTime(new Date());
+      console.log('Manual refresh completed');
+    }).catch((err) => {
+      console.error('Error during manual refresh:', err);
+      setError('Failed to refresh data. Please try again.');
+    });
   };
 
   // Load market data from API or generate demo data
@@ -812,6 +843,42 @@ export default function BrokeragePage() {
     handleManualOrder(newOrder);
   };
 
+  // Handle AI trading enable/disable
+  const handleAITradingToggle = (enabled: boolean, riskLevel: 'low' | 'medium' | 'high') => {
+    setAiEnabled(enabled);
+    setAiRiskLevel(riskLevel);
+    console.log(`AI Trading ${enabled ? 'enabled' : 'disabled'} with ${riskLevel} risk level`);
+    
+    // If enabled, simulate AI trade signals
+    if (enabled) {
+      const timeout = setTimeout(() => {
+        if (Math.random() > 0.5) {
+          // Simulate a new AI position
+          const now = Date.now();
+          const newPosition: AIPosition = {
+            id: `ai-position-${now}`,
+            symbol,
+            entryPrice: currentPrice,
+            quantity: Math.floor(10 + Math.random() * 20),
+            entryTime: now,
+            status: 'open',
+            strategy: Math.random() > 0.5 ? 'Momentum' : 'Mean Reversion'
+          };
+          
+          setAiPositions(prev => [...prev, newPosition]);
+          setError(null);
+          
+          // Show a success message
+          const successMessage = `AI Trading opened a new ${newPosition.strategy} position for ${symbol}`;
+          setError(successMessage);
+          setTimeout(() => setError(null), 3000);
+        }
+      }, 3000);
+      
+      return () => clearTimeout(timeout);
+    }
+  };
+
   return (
     <div className="flex flex-col">
       {/* Header section */}
@@ -873,7 +940,21 @@ export default function BrokeragePage() {
 
       {/* Last updated indicator */}
       <div className="mb-2 text-right text-xs text-gray-500 dark:text-gray-400">
-        Last updated: {formatLastUpdate()} (refreshes every {refreshInterval}s)
+        <div className="flex items-center text-xs text-gray-500 space-x-2">
+          <button
+            onClick={handleManualRefresh}
+            disabled={isLoading}
+            className="p-1 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 rounded flex items-center text-gray-800 dark:text-gray-300 disabled:opacity-50"
+            title="Refresh data"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+          </button>
+          <span>
+            Last updated: {formatLastUpdate()} (refreshes every {refreshInterval}s)
+          </span>
+        </div>
         <div className="inline-flex ml-2">
           <button 
             onClick={() => handleRefreshIntervalChange(30)}
@@ -981,7 +1062,11 @@ export default function BrokeragePage() {
             {/* Tab content */}
             <div className="p-4">
               {activeTab === 'ai' ? (
-                <AITradingPanel symbol={symbol} positions={aiPositions} />
+                <AITradingPanel
+                  symbol={symbol}
+                  positions={aiPositions}
+                  onEnableAI={handleAITradingToggle}
+                />
               ) : activeTab === 'congress' ? (
                 <CongressTradingPanel 
                   symbol={symbol} 
