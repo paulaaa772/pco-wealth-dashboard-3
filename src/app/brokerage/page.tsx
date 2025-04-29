@@ -9,7 +9,7 @@ import BusinessInsiderTradingPanel from '../../components/brokerage/BusinessInsi
 import TradingInterface from '../../components/dashboard/TradingInterface';
 import { Settings } from 'lucide-react'; // Using Settings icon for Indicators button
 import IndicatorModal from '@/components/brokerage/IndicatorModal'; // Import the new modal
-import { calculateSMA, calculateEMA, calculateRSI } from '@/lib/trading-engine/indicators'; // Import SMA, EMA, and RSI calculation
+import { calculateSMA, calculateEMA, calculateRSI, calculateMACD } from '@/lib/trading-engine/indicators'; // Import SMA, EMA, and RSI calculation
 import { LineData, Time } from 'lightweight-charts'; // Import types for chart data
 
 // Create a simple AlertMessage component inline since it's missing
@@ -926,6 +926,7 @@ export default function BrokeragePage() {
       let values: number[] = [];
       let color = '#FFA500'; // Default color
       let alignmentOffset = 0;
+      let labelPeriod = indicator.period; // Default label period
 
       // Calculate based on type
       if (indicator.type === 'SMA' && indicator.period) {
@@ -938,20 +939,26 @@ export default function BrokeragePage() {
         color = '#4169E1'; // Royal Blue
       } else if (indicator.type === 'RSI' && indicator.period) {
         values = calculateRSI(closingPrices, indicator.period);
-        // RSI alignment: length is closingPrices.length - period
         alignmentOffset = candleData.length - values.length;
-        color = '#DA70D6'; // Orchid for RSI
+        color = '#DA70D6'; // Orchid
+      } else if (indicator.type === 'MACD' && indicator.fastPeriod && indicator.slowPeriod && indicator.signalPeriod) {
+        const macdResult = calculateMACD(closingPrices, indicator.fastPeriod, indicator.slowPeriod, indicator.signalPeriod);
+        if (macdResult) {
+           values = macdResult.macdLine; // Use the main MACD line for now
+           // MACD alignment is complex, depends on signalPeriod too. Calculate offset based on final macdLine length.
+           alignmentOffset = candleData.length - values.length;
+           color = '#FF6347'; // Tomato Red for MACD line
+           // We don't have a single 'period' for MACD label, could construct one or omit
+           labelPeriod = undefined; // Or construct like `${indicator.fastPeriod},${indicator.slowPeriod},${indicator.signalPeriod}`
+        }
       }
-      // --- Add logic for MACD calculations here later --- 
+      // --- Add logic for other calculations here later --- 
       
       // Format data if values were calculated
       if (values.length > 0) {
          indicatorLineData = values.map((value, index) => {
             const candleIndex = index + alignmentOffset;
-            if (candleIndex < 0 || candleIndex >= candleData.length) {
-              console.warn(`[Indicator Calc] Invalid candleIndex ${candleIndex} for ${indicator.type}-${indicator.period} at index ${index}`);
-              return null; 
-            }
+            if (candleIndex < 0 || candleIndex >= candleData.length) return null; 
             return {
               time: Math.floor(candleData[candleIndex].timestamp / 1000) as Time,
               value: parseFloat(value.toFixed(2))
@@ -966,7 +973,8 @@ export default function BrokeragePage() {
           type: indicator.type,
           data: indicatorLineData,
           color: color,
-          period: indicator.period 
+          period: labelPeriod // Pass label period
+          // Add other relevant params like fastPeriod, slowPeriod for MACD later
         });
       }
     });

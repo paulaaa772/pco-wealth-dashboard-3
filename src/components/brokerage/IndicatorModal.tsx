@@ -11,7 +11,8 @@ interface IndicatorModalProps {
   onChange: (newIndicators: ActiveIndicator[]) => void;
 }
 
-type IndicatorType = 'SMA' | 'EMA' | 'RSI' | 'MACD'; // Add RSI
+// Define IndicatorType including MACD
+type IndicatorType = 'SMA' | 'EMA' | 'RSI' | 'MACD';
 
 interface IndicatorOption {
   type: IndicatorType;
@@ -19,12 +20,12 @@ interface IndicatorOption {
   defaultParams: Omit<ActiveIndicator, 'id' | 'type'>;
 }
 
-// Define available indicators and their default parameters
+// Define available indicators including MACD
 const availableIndicators: IndicatorOption[] = [
   { type: 'SMA', label: 'Simple Moving Average (SMA)', defaultParams: { period: 20 } },
   { type: 'EMA', label: 'Exponential Moving Average (EMA)', defaultParams: { period: 20 } },
   { type: 'RSI', label: 'Relative Strength Index (RSI)', defaultParams: { period: 14 } },
-  // Add MACD, BBands etc. here later
+  { type: 'MACD', label: 'Moving Average Conv/Div (MACD)', defaultParams: { fastPeriod: 12, slowPeriod: 26, signalPeriod: 9 } },
 ];
 
 const IndicatorModal: React.FC<IndicatorModalProps> = ({ 
@@ -128,22 +129,52 @@ const IndicatorModal: React.FC<IndicatorModalProps> = ({
                      <Trash2 size={16} />
                   </button>
                 </div>
-                {/* Parameter Inputs - Customize based on indicator type */}
-                <div className="flex items-center gap-4 text-sm">
-                   {ind.type === 'SMA' || ind.type === 'EMA' || ind.type === 'RSI' ? (
-                      <div className="flex items-center gap-2">
+                {/* Parameter Inputs - Updated */}
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm mt-2">
+                   {/* Period Input (SMA, EMA, RSI) */}
+                   {(ind.type === 'SMA' || ind.type === 'EMA' || ind.type === 'RSI') && ind.period !== undefined && (
+                      <div className="flex items-center gap-1">
                          <label htmlFor={`${ind.id}-period`} className="text-gray-600 dark:text-gray-400">Period:</label>
                          <input 
-                           type="number"
-                           id={`${ind.id}-period`}
-                           min="1"
-                           value={ind.period || ''}
+                           type="number" id={`${ind.id}-period`} min="1"
+                           value={ind.period} 
                            onChange={(e) => handleParamChange(ind.id, 'period', e.target.value)}
                            className="w-16 border border-gray-300 dark:border-zinc-600 rounded px-2 py-1 text-sm text-gray-900 dark:text-white bg-white dark:bg-zinc-700"
                          />
                       </div>
-                   ) : null}
-                   {/* Add inputs for MACD params, BBands params etc. here */}
+                   )}
+                   {/* MACD Inputs */}
+                   {ind.type === 'MACD' && (
+                     <>
+                       <div className="flex items-center gap-1">
+                          <label htmlFor={`${ind.id}-fast`} className="text-gray-600 dark:text-gray-400">Fast:</label>
+                          <input 
+                            type="number" id={`${ind.id}-fast`} min="1"
+                            value={ind.fastPeriod || ''} 
+                            onChange={(e) => handleParamChange(ind.id, 'fastPeriod', e.target.value)}
+                            className="w-16 border border-gray-300 dark:border-zinc-600 rounded px-2 py-1 text-sm text-gray-900 dark:text-white bg-white dark:bg-zinc-700"
+                          />
+                       </div>
+                        <div className="flex items-center gap-1">
+                          <label htmlFor={`${ind.id}-slow`} className="text-gray-600 dark:text-gray-400">Slow:</label>
+                          <input 
+                            type="number" id={`${ind.id}-slow`} min="1"
+                            value={ind.slowPeriod || ''} 
+                            onChange={(e) => handleParamChange(ind.id, 'slowPeriod', e.target.value)}
+                            className="w-16 border border-gray-300 dark:border-zinc-600 rounded px-2 py-1 text-sm text-gray-900 dark:text-white bg-white dark:bg-zinc-700"
+                          />
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <label htmlFor={`${ind.id}-signal`} className="text-gray-600 dark:text-gray-400">Signal:</label>
+                          <input 
+                            type="number" id={`${ind.id}-signal`} min="1"
+                            value={ind.signalPeriod || ''} 
+                            onChange={(e) => handleParamChange(ind.id, 'signalPeriod', e.target.value)}
+                            className="w-16 border border-gray-300 dark:border-zinc-600 rounded px-2 py-1 text-sm text-gray-900 dark:text-white bg-white dark:bg-zinc-700"
+                          />
+                        </div>
+                     </>
+                   )}
                 </div>
               </div>
             ))}
