@@ -17,9 +17,11 @@ export default function DashboardHeader() {
           INVESTMENTS
         </Link>
         <button
-          className="px-6 py-2 rounded-lg bg-[#9DC4D4] hover:bg-[#8BB3C3] text-[#1B2B4B] transition-colors"
+          onClick={() => alert('Aggregate outside accounts feature coming soon!')}
+          className="flex items-center gap-2 px-6 py-2 rounded-lg bg-[#9DC4D4] hover:bg-[#8BB3C3] text-[#1B2B4B] transition-colors"
         >
-          Move money
+          <span className="material-icons">add_circle</span>
+          Aggregate outside accounts
         </button>
       </div>
     </div>

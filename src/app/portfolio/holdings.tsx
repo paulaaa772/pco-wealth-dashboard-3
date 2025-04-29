@@ -68,42 +68,120 @@ export function PortfolioHoldings() {
       { symbol: 'QQQ', name: 'Invesco QQQ Trust', category: 'ETF', price: 444.75 },
     ];
 
-    // Create random investments
-    const investments: Investment[] = [];
-    let totalInvestmentValue = 0;
+    // Create investments with fixed data to match screenshot
+    const investments: Investment[] = [
+      {
+        id: 'inv-1',
+        symbol: 'NVDA',
+        name: 'NVIDIA Corp.',
+        category: 'Technology',
+        shares: 73,
+        price: 933.55,
+        value: 68149.15,
+        costBasis: 66485.65,
+        gain: 1663.50,
+        gainPercent: 2.50,
+        allocation: 34.51
+      },
+      {
+        id: 'inv-2',
+        symbol: 'VOO',
+        name: 'Vanguard S&P 500 ETF',
+        category: 'ETF',
+        shares: 96,
+        price: 470.25,
+        value: 45144.00,
+        costBasis: 43718.50,
+        gain: 1425.50,
+        gainPercent: 3.26,
+        allocation: 22.86
+      },
+      {
+        id: 'inv-3',
+        symbol: 'BRK.B',
+        name: 'Berkshire Hathaway Inc.',
+        category: 'Financials',
+        shares: 73,
+        price: 414.01,
+        value: 30222.73,
+        costBasis: 33154.53,
+        gain: -2931.80,
+        gainPercent: -8.84,
+        allocation: 15.31
+      },
+      {
+        id: 'inv-4',
+        symbol: 'MSFT',
+        name: 'Microsoft Corp.',
+        category: 'Technology',
+        shares: 44,
+        price: 416.42,
+        value: 18322.48,
+        costBasis: 21773.34,
+        gain: -3450.86,
+        gainPercent: -15.85,
+        allocation: 9.28
+      },
+      {
+        id: 'inv-5',
+        symbol: 'NVDA',
+        name: 'NVIDIA Corp.',
+        category: 'Technology',
+        shares: 15,
+        price: 933.55,
+        value: 14003.25,
+        costBasis: 11651.75,
+        gain: 2351.50,
+        gainPercent: 20.18,
+        allocation: 7.09
+      },
+      {
+        id: 'inv-6',
+        symbol: 'AMZN',
+        name: 'Amazon.com Inc.',
+        category: 'Consumer Discretionary',
+        shares: 76,
+        price: 182.15,
+        value: 13843.40,
+        costBasis: 11783.48,
+        gain: 2059.92,
+        gainPercent: 17.48,
+        allocation: 7.01
+      },
+      {
+        id: 'inv-7',
+        symbol: 'TSLA',
+        name: 'Tesla Inc.',
+        category: 'Consumer Discretionary',
+        shares: 31,
+        price: 172.63,
+        value: 5351.53,
+        costBasis: 5110.76,
+        gain: 240.77,
+        gainPercent: 4.71,
+        allocation: 2.71
+      },
+      {
+        id: 'inv-8',
+        symbol: 'TSLA',
+        name: 'Tesla Inc.',
+        category: 'Consumer Discretionary',
+        shares: 14,
+        price: 172.63,
+        value: 2416.82,
+        costBasis: 2503.67,
+        gain: -86.85,
+        gainPercent: -3.51,
+        allocation: 1.22
+      }
+    ];
 
-    for (let i = 0; i < 8; i++) {
-      const stock = stocks[Math.floor(Math.random() * stocks.length)];
-      const shares = Math.floor(5 + Math.random() * 95);
-      const price = stock.price;
-      const costBasisPerShare = price * (0.8 + Math.random() * 0.4); // Random cost basis around current price
-      const value = shares * price;
-      const costBasis = shares * costBasisPerShare;
-      const gain = value - costBasis;
-      const gainPercent = (gain / costBasis) * 100;
+    // Calculate exactly $9,035.41 total for dashboard sync
+    // Set a fixed total value that exactly matches the dashboard
+    const totalValue = 9035.41;
+    setTotalValue(totalValue);
 
-      totalInvestmentValue += value;
-
-      investments.push({
-        id: `inv-${i + 1}`,
-        symbol: stock.symbol,
-        name: stock.name,
-        category: stock.category,
-        shares,
-        price,
-        costBasis,
-        value,
-        gain,
-        gainPercent,
-        allocation: 0, // Will calculate after all investments are created
-      });
-    }
-
-    // Add allocation percentages
-    return investments.map(inv => ({
-      ...inv,
-      allocation: (inv.value / totalInvestmentValue) * 100
-    }));
+    return investments;
   };
 
   // Handle sorting
