@@ -751,20 +751,39 @@ export default function BrokeragePage() {
   const handleManualOrder = (order: Omit<ManualOrder, 'id' | 'timestamp' | 'status' | 'price'>) => {
     console.log('Submitting manual order:', order);
     
-    // Generate a new order with timestamp and ID
+    const newOrderId = `order-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const now = Date.now();
+    
+    // Generate a new order with timestamp and ID, initially 'open'
     const newOrder: ManualOrder = {
       ...order,
-      id: `order-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      timestamp: Date.now(),
+      id: newOrderId,
+      timestamp: now,
       status: 'open',
-      price: currentPrice,
+      price: currentPrice, // Use current market price for simulation
     };
 
+    // Add the 'open' order immediately to state
     setManualOrders(prevOrders => [...prevOrders, newOrder]);
     
-    // Show a toast or notification here
+    // Simulate order filling after a delay
+    const fillDelay = 1500; // 1.5 seconds
+    setTimeout(() => {
+      setManualOrders(prevOrders => 
+        prevOrders.map(ord => 
+          ord.id === newOrderId 
+            ? { ...ord, status: 'filled', timestamp: Date.now() } // Update status and timestamp
+            : ord
+        )
+      );
+      console.log(`Simulated filling order: ${newOrderId}`);
+      // Optionally trigger a notification for filled order here
+    }, fillDelay);
     
-    return newOrder;
+    // Show a toast or notification for submission here (optional)
+    console.log(`Order ${newOrderId} submitted with status 'open'.`);
+    
+    return newOrder; // Return the initially submitted order object
   };
 
   // Calculate the total value of owned shares
