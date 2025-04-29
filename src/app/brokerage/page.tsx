@@ -264,6 +264,8 @@ export default function BrokeragePage() {
   const [timeframe, setTimeframe] = useState('1D');
   const [candleData, setCandleData] = useState<CandleData[]>([]);
   const [currentPrice, setCurrentPrice] = useState<number>(0);
+  const ws = useRef<WebSocket | null>(null);
+  const apiKey = process.env.NEXT_PUBLIC_POLYGON_API_KEY; // Get API key
   
   // Orders and positions
   const [manualOrders, setManualOrders] = useState<ManualOrder[]>([]);
@@ -282,6 +284,80 @@ export default function BrokeragePage() {
   
   // Add state for copied insider trades
   const [copiedInsiderTrades, setCopiedInsiderTrades] = useState<InsiderTrade[]>([]);
+
+  // WebSocket Connection Logic
+  useEffect(() => {
+    // Don't connect if API key is invalid or missing
+    if (!isApiKeyValid || !apiKey) {
+      console.warn('[WS] Skipping WebSocket connection due to invalid/missing API key.');
+      return;
+    }
+    
+    // Close existing connection if symbol changes or component unmounts
+    if (ws.current) {
+        console.log(`[WS] Closing previous connection for symbol change or unmount.`);
+        ws.current.close();
+    }
+
+    // Create new WebSocket connection
+    ws.current = new WebSocket('wss://socket.polygon.io/stocks');
+    console.log(`[WS] Attempting to connect for symbol: ${symbol}`);
+
+    ws.current.onopen = () => {
+      console.log('[WS] Connection opened.');
+      // Authenticate
+      ws.current?.send(JSON.stringify({ action: 'auth', params: apiKey }));
+      console.log('[WS] Authentication message sent.');
+      // Subscribe to trades for the current symbol
+      ws.current?.send(JSON.stringify({ action: 'subscribe', params: `T.${symbol}` }));
+      console.log(`[WS] Subscribed to trades for ${symbol}`);
+    };
+
+    ws.current.onmessage = (event) => {
+      try {
+        const messages = JSON.parse(event.data);
+        // Polygon sends messages in an array
+        if (Array.isArray(messages)) {
+          messages.forEach(message => {
+            // Check if it's a trade event ('T')
+            if (message.ev === 'T') {
+              console.log(`[WS] Trade received for ${message.sym}: $${message.p}`);
+              // Update current price state if the symbol matches
+              if (message.sym === symbol) {
+                setCurrentPrice(message.p);
+              }
+            }
+             // Handle other message types if needed (e.g., status messages)
+             else if (message.ev === 'status') {
+                 console.log(`[WS] Status message: ${message.message}`);
+             }
+          });
+        }
+      } catch (error) {
+        console.error('[WS] Error parsing message:', error);
+      }
+    };
+
+    ws.current.onerror = (error) => {
+      console.error('[WS] WebSocket error:', error);
+      setError('WebSocket connection error.'); // Optionally update UI error state
+    };
+
+    ws.current.onclose = (event) => {
+      console.log(`[WS] Connection closed. Code: ${event.code}, Reason: ${event.reason}`);
+      // Optionally implement reconnection logic here
+    };
+
+    // Cleanup function: close the connection when the component unmounts or symbol changes
+    return () => {
+      if (ws.current) {
+        console.log('[WS] Closing connection on cleanup.');
+        ws.current.close();
+        ws.current = null;
+      }
+    };
+
+  }, [symbol, isApiKeyValid, apiKey]); // Re-run effect if symbol or API key validity changes
 
   // Load initial data when page loads
   useEffect(() => {
