@@ -16,6 +16,12 @@ interface AllocationItem {
   balance: number;
 }
 
+// Define asset class mappings type
+interface AssetClassConfig {
+  default: string;
+  mappings?: Record<string, string>;
+}
+
 export default function AssetAllocation() {
   const { manualAccounts, isLoading } = useManualAccounts();
   const [view, setView] = useState<AllocationView>('symbol');
@@ -46,7 +52,7 @@ export default function AssetAllocation() {
 
   // Map account types to asset classes
   const getAssetClass = (accountType: string, symbol: string): string => {
-    const assetClasses = {
+    const assetClasses: Record<string, AssetClassConfig> = {
       'Brokerage': {
         default: 'Large Cap Funds',
         mappings: {
@@ -72,7 +78,7 @@ export default function AssetAllocation() {
       'Other': { default: 'Other' }
     };
 
-    const accountClass = assetClasses[accountType as keyof typeof assetClasses] || { default: 'Other' };
+    const accountClass = assetClasses[accountType] || { default: 'Other' };
     return accountClass.mappings?.[symbol] || accountClass.default;
   };
 
