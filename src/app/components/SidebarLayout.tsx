@@ -7,7 +7,6 @@ const tabs = [
   { name: 'Dashboard', href: '/' },
   { name: 'Portfolio', href: '/portfolio' },
   { name: 'Brokerage', href: '/brokerage' },
-  { name: 'Transfers', href: '/transfers' },
   { name: 'Tax Center', href: '/tax' },
   { name: 'Congress', href: '/congress' },
   { name: 'News', href: '/news' },
