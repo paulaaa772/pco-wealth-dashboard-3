@@ -80,8 +80,8 @@ export function IncomeAnalysis() {
   ];
 
   return (
-    <div className="bg-[#2A3C61] rounded-lg p-6">
-      <h2 className="text-2xl font-bold mb-4">Income Analysis</h2>
+    <div className="bg-[#1E2D4E] rounded-lg p-6">
+      <h2 className="text-2xl font-bold mb-6">Income Analysis</h2>
       <PortfolioIncome
         projectedAnnualIncome={72000}
         ytdIncome={23250}

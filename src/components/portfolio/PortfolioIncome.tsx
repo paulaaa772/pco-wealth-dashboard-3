@@ -78,62 +78,44 @@ export function PortfolioIncome({
     }
   };
 
-  const yearOverYearGrowth = ((projectedAnnualIncome - lastYearIncome) / lastYearIncome) * 100;
-  const progressToTarget = (ytdIncome / annualTarget) * 100;
+  const yoyGrowth = ((projectedAnnualIncome - lastYearIncome) / lastYearIncome) * 100;
+  const targetProgress = (ytdIncome / annualTarget) * 100;
 
   return (
     <div className="space-y-6">
-      <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Projected Annual Income</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              <p className="text-2xl font-bold">{formatCurrency(projectedAnnualIncome)}</p>
-              <p className={`text-sm ${yearOverYearGrowth >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                {yearOverYearGrowth >= 0 ? '↑' : '↓'} {formatPercent(Math.abs(yearOverYearGrowth / 100))} YoY
-              </p>
+      <div className="grid grid-cols-4 gap-6">
+        <div className="space-y-2">
+          <h3 className="text-lg font-medium">Projected Annual Income</h3>
+          <div className="text-3xl font-bold">{formatCurrency(projectedAnnualIncome)}</div>
+          <div className={`text-sm ${yoyGrowth >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+            ↑ {yoyGrowth.toFixed(2)}% YoY
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <h3 className="text-lg font-medium">YTD Income</h3>
+          <div className="text-3xl font-bold">{formatCurrency(ytdIncome)}</div>
+          <div className="flex items-center gap-2">
+            <div className="h-2 w-full bg-gray-700 rounded-full">
+              <div 
+                className="h-2 bg-blue-500 rounded-full" 
+                style={{ width: `${targetProgress}%` }}
+              ></div>
             </div>
-          </CardContent>
-        </Card>
+            <span className="text-sm text-gray-400">{targetProgress.toFixed(2)}% of target</span>
+          </div>
+        </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>YTD Income</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              <p className="text-2xl font-bold">{formatCurrency(ytdIncome)}</p>
-              <div className="w-full bg-gray-200 rounded-full h-2">
-                <div
-                  className="bg-blue-600 h-2 rounded-full"
-                  style={{ width: `${Math.min(progressToTarget, 100)}%` }}
-                />
-              </div>
-              <p className="text-sm text-gray-500">{formatPercent(progressToTarget / 100)} of target</p>
-            </div>
-          </CardContent>
-        </Card>
+        <div className="space-y-2">
+          <h3 className="text-lg font-medium">Last Year's Income</h3>
+          <div className="text-3xl font-bold">{formatCurrency(lastYearIncome)}</div>
+        </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Last Year&apos;s Income</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold">{formatCurrency(lastYearIncome)}</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Income Sources</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold">{incomeSources.length}</p>
-            <p className="text-sm text-gray-500">Active sources</p>
-          </CardContent>
-        </Card>
+        <div className="space-y-2">
+          <h3 className="text-lg font-medium">Income Sources</h3>
+          <div className="text-3xl font-bold">{incomeSources.length}</div>
+          <div className="text-sm text-gray-400">Active sources</div>
+        </div>
       </div>
 
       <Card>
