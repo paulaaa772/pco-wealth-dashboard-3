@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Legend } from 'recharts';
 import { ResponsiveContainer as SparklineContainer, LineChart, Line } from 'recharts';
 
-interface IncomeSource {
+export interface IncomeSource {
   name: string;
   type: 'dividend' | 'interest' | 'distribution';
   frequency: 'monthly' | 'quarterly' | 'annual';
@@ -16,7 +16,7 @@ interface IncomeSource {
   }>;
 }
 
-interface MonthlyIncome {
+export interface MonthlyIncome {
   month: string;
   dividends: number;
   interest: number;
