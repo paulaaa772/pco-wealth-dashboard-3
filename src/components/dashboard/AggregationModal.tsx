@@ -2,13 +2,14 @@
 
 import React, { useState } from 'react';
 import { X, Link as LinkIcon, Edit3 } from 'lucide-react';
+import { useManualAccounts, ManualAsset } from '@/context/ManualAccountsContext';
 
 interface AggregationModalProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
-interface ManualAsset {
+interface ManualAssetFormRow {
   id: string;
   symbol: string;
   quantity: string;
@@ -16,10 +17,11 @@ interface ManualAsset {
 }
 
 const AggregationModal: React.FC<AggregationModalProps> = ({ isOpen, onClose }) => {
+  const { addManualAccount } = useManualAccounts();
   const [view, setView] = useState<'options' | 'manual'>('options');
   const [accountName, setAccountName] = useState('');
   const [accountType, setAccountType] = useState('Brokerage');
-  const [assets, setAssets] = useState<ManualAsset[]>([{ id: Date.now().toString(), symbol: '', quantity: '', value: '' }]);
+  const [assets, setAssets] = useState<ManualAssetFormRow[]>([{ id: Date.now().toString(), symbol: '', quantity: '', value: '' }]);
 
   if (!isOpen) return null;
 
@@ -27,7 +29,7 @@ const AggregationModal: React.FC<AggregationModalProps> = ({ isOpen, onClose }) 
     setAssets([...assets, { id: Date.now().toString(), symbol: '', quantity: '', value: '' }]);
   };
 
-  const handleAssetChange = (id: string, field: keyof Omit<ManualAsset, 'id'>, value: string) => {
+  const handleAssetChange = (id: string, field: keyof Omit<ManualAssetFormRow, 'id'>, value: string) => {
     setAssets(assets.map(asset => asset.id === id ? { ...asset, [field]: value } : asset));
   };
 
@@ -36,9 +38,33 @@ const AggregationModal: React.FC<AggregationModalProps> = ({ isOpen, onClose }) 
   };
 
   const handleSaveManualAccount = () => {
-    // TODO: Implement saving logic (e.g., update global state, call API)
-    console.log('Saving Manual Account:', { accountName, accountType, assets });
-    onClose(); // Close modal after saving
+    const processedAssets: ManualAsset[] = assets.map(asset => ({
+        id: asset.id,
+        symbol: asset.symbol.trim() || 'Unknown Asset',
+        quantity: parseFloat(asset.quantity) || 0,
+        value: parseFloat(asset.value) || 0,
+    })).filter(asset => asset.value > 0);
+
+    if (!accountName.trim()) {
+        alert('Please enter an account name.');
+        return;
+    }
+    if (processedAssets.length === 0) {
+        alert('Please add at least one asset with a valid value.');
+        return;
+    }
+
+    addManualAccount({
+      accountName: accountName.trim(),
+      accountType: accountType,
+      assets: processedAssets,
+    });
+
+    setAccountName('');
+    setAccountType('Brokerage');
+    setAssets([{ id: Date.now().toString(), symbol: '', quantity: '', value: '' }]);
+    setView('options');
+    onClose();
   };
 
   const renderOptionsView = () => (
@@ -76,6 +102,7 @@ const AggregationModal: React.FC<AggregationModalProps> = ({ isOpen, onClose }) 
             onChange={(e) => setAccountName(e.target.value)}
             className="w-full border border-gray-300 rounded-md px-3 py-2 text-gray-900"
             placeholder="e.g., Fidelity Brokerage, Chase Savings"
+            required
           />
         </div>
         <div>
