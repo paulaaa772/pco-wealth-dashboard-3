@@ -1,3 +1,5 @@
+'use client';
+
 import { Metadata } from 'next';
 import React, { useState } from 'react';
 import DashboardHeader from '@/components/dashboard/DashboardHeader';
