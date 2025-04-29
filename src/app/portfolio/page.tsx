@@ -13,6 +13,7 @@ import { PortfolioHoldings } from './holdings';
 import { useManualAccounts } from '@/context/ManualAccountsContext';
 import AssetAllocation from '@/components/portfolio/AssetAllocation';
 import EnhancedPerformanceAnalytics from '@/components/portfolio/EnhancedPerformanceAnalytics';
+import GoalTrackingDashboard from '@/components/portfolio/GoalTrackingDashboard';
 
 export default function PortfolioPage() {
   const { manualAccounts, isLoading: isLoadingAccounts, error: accountsError } = useManualAccounts();
@@ -85,6 +86,12 @@ export default function PortfolioPage() {
               Performance
             </button>
             <button 
+              className={activeTab === 'goals' ? activeTabStyle : inactiveTabStyle}
+              onClick={() => setActiveTab('goals')}
+            >
+              Goals
+            </button>
+            <button 
               className={activeTab === 'income' ? activeTabStyle : inactiveTabStyle}
               onClick={() => setActiveTab('income')}
             >
@@ -99,6 +106,9 @@ export default function PortfolioPage() {
         {activeTab === 'allocation' && <AssetAllocation />}
         
         {activeTab === 'performance' && <EnhancedPerformanceAnalytics />}
+        
+        {/* Goals Tab */}
+        {activeTab === 'goals' && <GoalTrackingDashboard />}
         
         {/* Income Analysis Tab */}
         {activeTab === 'income' && <IncomeAnalysis />}
