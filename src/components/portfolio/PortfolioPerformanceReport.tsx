@@ -67,7 +67,7 @@ export function PortfolioPerformanceReport({
     return value >= 0 ? 'text-green-600' : 'text-red-600';
   };
 
-  const displayTotalValue = totalValue ?? performanceData[performanceData.length - 1]?.value ?? 0;
+  const displayTotalValue = totalValue ?? performanceData[performanceData.length - 1]?.portfolioValue ?? 0;
 
   if (isLoading) {
     return (
