@@ -95,7 +95,7 @@ const MarketSummary: React.FC<MarketSummaryProps> = ({ symbol }) => {
     <div className="w-full grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
       <BasicIndicator 
         label="Current Price" 
-        value={price || 0} 
+        value={price !== null ? price : 0} 
         format="currency" 
         showIcon={false}
         tooltipContent="The most recent trading price for this stock"
