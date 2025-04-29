@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useState, useContext, ReactNode } from 'react';
+import React, { createContext, useState, useContext, ReactNode, useEffect } from 'react';
 
 // --- Interfaces --- 
 
@@ -27,8 +27,10 @@ export interface ManualAccount {
 
 interface ManualAccountsContextType {
   manualAccounts: ManualAccount[];
-  addManualAccount: (account: Omit<ManualAccount, 'id' | 'totalValue'>) => void;
-  // TODO: Add functions for updating/deleting accounts if needed later
+  isLoading: boolean;
+  error: string | null;
+  addManualAccount: (account: Omit<ManualAccount, 'id' | 'totalValue'>) => Promise<void>;
+  refetchAccounts: () => void;
 }
 
 const ManualAccountsContext = createContext<ManualAccountsContextType | undefined>(undefined);
@@ -41,20 +43,71 @@ interface ManualAccountsProviderProps {
 
 export const ManualAccountsProvider: React.FC<ManualAccountsProviderProps> = ({ children }) => {
   const [manualAccounts, setManualAccounts] = useState<ManualAccount[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const addManualAccount = (accountData: Omit<ManualAccount, 'id' | 'totalValue'>) => {
-    const totalValue = accountData.assets.reduce((sum, asset) => sum + asset.value, 0);
-    const newAccount: ManualAccount = {
-      ...accountData,
-      id: `manual-${Date.now()}`,
-      totalValue,
-    };
-    setManualAccounts(prevAccounts => [...prevAccounts, newAccount]);
-    console.log('[Context] Added Manual Account:', newAccount);
+  useEffect(() => {
+    fetchAccounts();
+  }, []);
+
+  const fetchAccounts = async () => {
+    console.log('[Context] Fetching manual accounts...');
+    setIsLoading(true);
+    setError(null);
+    try {
+      const response = await fetch('/api/manual-accounts');
+      if (!response.ok) {
+        throw new Error(`Failed to fetch accounts: ${response.statusText}`);
+      }
+      const data = await response.json();
+      const formattedData = data.map((acc: any) => ({ ...acc, id: acc._id || acc.id }));
+      setManualAccounts(formattedData || []);
+      console.log('[Context] Manual accounts loaded:', formattedData.length);
+    } catch (err: any) {
+      console.error('[Context] Error fetching accounts:', err);
+      setError(err.message || 'Failed to load accounts');
+      setManualAccounts([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const addManualAccount = async (accountData: Omit<ManualAccount, 'id' | 'totalValue'>) => {
+    console.log('[Context] Attempting to add manual account via API:', accountData);
+    setError(null);
+    try {
+      const response = await fetch('/api/manual-accounts', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(accountData),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `Failed to save account: ${response.statusText}`);
+      }
+
+      const newAccount = await response.json();
+      const formattedNewAccount = { ...newAccount, id: newAccount._id || newAccount.id };
+      setManualAccounts(prevAccounts => [...prevAccounts, formattedNewAccount]);
+      console.log('[Context] Manual account added successfully:', formattedNewAccount);
+    } catch (err: any) {
+      console.error('[Context] Error adding account:', err);
+      setError(err.message || 'Failed to save account');
+      throw err;
+    }
   };
 
   return (
-    <ManualAccountsContext.Provider value={{ manualAccounts, addManualAccount }}>
+    <ManualAccountsContext.Provider value={{ 
+        manualAccounts, 
+        isLoading, 
+        error, 
+        addManualAccount, 
+        refetchAccounts: fetchAccounts
+    }}>
       {children}
     </ManualAccountsContext.Provider>
   );
