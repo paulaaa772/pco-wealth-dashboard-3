@@ -266,6 +266,7 @@ export default function BrokeragePage() {
   // State for stock data
   const [symbol, setSymbol] = useState('AAPL');
   const [timeframe, setTimeframe] = useState('1D');
+  const [candleInterval, setCandleInterval] = useState('day'); // State for candle interval (day, minute, etc.)
   const [candleData, setCandleData] = useState<CandleData[]>([]);
   const [currentPrice, setCurrentPrice] = useState<number>(0);
   const ws = useRef<WebSocket | null>(null);
@@ -372,7 +373,7 @@ export default function BrokeragePage() {
     
     // Initial load
     if (symbol) {
-      loadMarketData(symbol, timeframe);
+      loadMarketData(symbol, timeframe, candleInterval);
     }
 
     // Add sample orders for demo
@@ -382,7 +383,7 @@ export default function BrokeragePage() {
     const interval = setInterval(() => {
       if (symbol) {
         console.log(`Auto-refreshing data for ${symbol}`);
-        loadMarketData(symbol, timeframe, true);
+        loadMarketData(symbol, timeframe, candleInterval, true);
         setLastUpdateTime(new Date());
       }
     }, refreshInterval * 1000);
@@ -456,7 +457,7 @@ export default function BrokeragePage() {
     setSymbol(newSymbol);
     setIsLoading(true);
     setError(null);
-    loadMarketData(newSymbol, timeframe);
+    loadMarketData(newSymbol, timeframe, candleInterval);
     
     // Update positions for the new symbol
     const now = Date.now();
@@ -479,15 +480,25 @@ export default function BrokeragePage() {
       
       return existing;
     });
-  }, [timeframe]);
+  }, [timeframe, candleInterval]);
 
   // Handle timeframe changes
   const handleTimeframeChange = useCallback((newTimeframe: string) => {
     console.log('Timeframe changed to:', newTimeframe);
     setTimeframe(newTimeframe);
     setIsLoading(true);
-    loadMarketData(symbol, newTimeframe);
-  }, [symbol]);
+    // Pass current interval when changing timeframe
+    loadMarketData(symbol, newTimeframe, candleInterval);
+  }, [symbol, candleInterval]); // Add candleInterval dependency
+
+  // Handle interval changes
+  const handleIntervalChange = useCallback((newInterval: string) => {
+    console.log('Interval changed to:', newInterval);
+    setCandleInterval(newInterval);
+    setIsLoading(true);
+    // Pass current timeframe when changing interval
+    loadMarketData(symbol, timeframe, newInterval);
+  }, [symbol, timeframe]); // Add timeframe dependency
 
   // Set the refresh interval
   const handleRefreshIntervalChange = (seconds: number) => {
@@ -504,7 +515,7 @@ export default function BrokeragePage() {
     setError(null);
     
     // Reload market data
-    loadMarketData(symbol, timeframe, false).then(() => {
+    loadMarketData(symbol, timeframe, candleInterval, false).then(() => {
       setLastUpdateTime(new Date());
       console.log('Manual refresh completed');
     }).catch((err) => {
@@ -514,74 +525,86 @@ export default function BrokeragePage() {
   };
 
   // Load market data from API or generate demo data
-  const loadMarketData = async (symbol: string, timeframe: string = '1D', isAutoRefresh = false) => {
+  const loadMarketData = async (symbol: string, timeframe: string = '1D', candleInterval: string = 'day', isAutoRefresh = false) => {
     if (!isAutoRefresh) {
       setError(null);
     }
     setIsLoading(true);
     
     try {
-      console.log(`[BROKERAGE] Loading market data for ${symbol} (${timeframe})`);
+      console.log(`[BROKERAGE] Loading market data for ${symbol} (${timeframe}, ${candleInterval})`);
       const polygonService = PolygonService.getInstance();
       
-      // Get latest price
-      console.log(`[BROKERAGE] Calling polygonService.getLatestPrice for ${symbol}`);
-      const price = await polygonService.getLatestPrice(symbol);
-      console.log(`[BROKERAGE] Received latest price for ${symbol}:`, price);
-      
-      if (price !== null) {
-        setCurrentPrice(price);
-        console.log(`[BROKERAGE] State updated with latest price: ${price}`);
-      } else {
-        console.error('[BROKERAGE] Failed to get latest price, using simulated data');
-        if (!isAutoRefresh) {
-          setError('Failed to get latest price. Using demo data.');
+      // Get latest price (WebSocket handles this mostly, but good for initial load)
+      if (!ws.current || ws.current.readyState !== WebSocket.OPEN) {
+        console.log(`[BROKERAGE] Fetching initial latest price for ${symbol}`);
+        const price = await polygonService.getLatestPrice(symbol);
+        console.log(`[BROKERAGE] Received latest price for ${symbol}:`, price);
+        if (price !== null) {
+          setCurrentPrice(price);
+        } else {
+           console.error('[BROKERAGE] Failed to get initial latest price');
+           // Don't set error here if WS will connect
         }
-        setCurrentPrice(generateSimulatedPrice(symbol));
       }
       
-      // Get candle data
-      const endDate = new Date();
-      const startDate = new Date();
+      // Determine API timespan and multiplier
+      let apiTimespan = candleInterval; // minute, hour, day, week, month, quarter, year
+      let apiMultiplier = 1;
       
-      // Adjust start date based on timeframe
+      // Map common intervals to Polygon API params (adjust as needed)
+      // Note: Polygon free tier might only support 'day' effectively
+      // For minute data, multiplier is the number of minutes (e.g., 5 for 5m)
+      if (candleInterval === 'minute') { 
+          // We need to decide the multiplier based on UI selection (1m, 5m, 15m)
+          // For now, let's assume '1m' selection means multiplier=1, 5m->5 etc.
+          // This logic needs refinement based on how interval buttons pass values.
+          // Let's default to 1 minute for now if candleInterval is 'minute'
+          apiMultiplier = 1; // Example: fetch 1-minute bars
+      } else if (candleInterval === 'hour') {
+          apiMultiplier = 1; // Fetch 1-hour bars
+      } // else defaults to day/week etc. with multiplier 1
+
+
+      // Calculate start/end dates based on BOTH timeframe and interval
+      const endDate = new Date();
+      let startDate = new Date();
+      
+      // Adjust lookback based on interval first
+      let lookbackDays = 90; // Default lookback
+      if (apiTimespan === 'minute') {
+          lookbackDays = timeframe === '1D' ? 2 : 7; // Shorter lookback for minute bars
+      } else if (apiTimespan === 'hour') {
+          lookbackDays = timeframe === '1D' ? 7 : timeframe === '5D' ? 14 : 30;
+      }
+      
+      // Apply timeframe modifier
       switch(timeframe) {
-        case '1D':
-          startDate.setDate(endDate.getDate() - 2); // Fetch 2 days for 1D view
-          break;
-        case '1W':
-          startDate.setDate(endDate.getDate() - 7);
-          break;
-        case '1M':
-          startDate.setMonth(endDate.getMonth() - 1);
-          break;
-        case '3M':
-          startDate.setMonth(endDate.getMonth() - 3);
-          break;
-        case 'YTD':
-          startDate.setFullYear(endDate.getFullYear(), 0, 1); // Start of current year
-          break;
-        case '1Y':
-          startDate.setFullYear(endDate.getFullYear() - 1);
-          break;
-        case '5Y':
-          startDate.setFullYear(endDate.getFullYear() - 5);
-          break;
-        case 'ALL':
-          startDate.setFullYear(endDate.getFullYear() - 20); // Go back 20 years for ALL
-          break;
-        default:
-          startDate.setDate(endDate.getDate() - 2);
+        case '1D': lookbackDays = apiTimespan === 'minute' ? 2 : apiTimespan === 'hour' ? 5 : 3; break;
+        case '5D': lookbackDays = apiTimespan === 'minute' ? 7 : apiTimespan === 'hour' ? 10 : 7; break;
+        case '1M': lookbackDays = 35; break;
+        case '3M': lookbackDays = 95; break;
+        case 'YTD': startDate = new Date(endDate.getFullYear(), 0, 1); lookbackDays = 0; break; // Special case
+        case '1Y': lookbackDays = 370; break;
+        case '5Y': lookbackDays = 365 * 5 + 5; break;
+        case 'ALL': lookbackDays = 365 * 20 + 20; break; // Max 20 years
+        default: lookbackDays = 90;
+      }
+
+      if (lookbackDays > 0) {
+        startDate.setDate(endDate.getDate() - lookbackDays);
       }
       
       const formattedStartDate = startDate.toISOString().split('T')[0];
       const formattedEndDate = endDate.toISOString().split('T')[0];
       
-      console.log(`Fetching candles from ${formattedStartDate} to ${formattedEndDate}`);
+      console.log(`Fetching candles: ${symbol}, ${apiMultiplier} ${apiTimespan} from ${formattedStartDate} to ${formattedEndDate}`);
       const rawCandleData = await polygonService.getStockCandles(
         symbol,
         formattedStartDate,
-        formattedEndDate
+        formattedEndDate,
+        apiTimespan, // Pass the selected timespan
+        apiMultiplier // Pass the calculated multiplier
       );
       
       if (rawCandleData && rawCandleData.length > 0) {
@@ -855,48 +878,78 @@ export default function BrokeragePage() {
   return (
     <div className="flex flex-col p-4 md:p-6">
       {/* Header section */}
-      <div className="mb-4 flex flex-col md:flex-row justify-between items-end gap-4">
-        <div>
+      <div className="mb-4 flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
+        {/* Left Side: Title & Search */}
+        <div className="w-full md:w-auto">
           <h1 className="text-2xl font-bold mb-2">Trade Center</h1>
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-            <div className="w-full sm:w-64">
-              <SymbolSearch
+          <div className="w-full sm:w-64">
+             <SymbolSearch
                 onSymbolSelect={handleSymbolChange}
                 defaultSymbol={symbol}
               />
-            </div>
-            <div className="flex gap-2 flex-wrap">
-              {['1D', '1W', '1M', '3M', 'YTD', '1Y', '5Y', 'ALL'].map((tf) => (
-                <button
-                  key={tf}
-                  onClick={() => handleTimeframeChange(tf)}
-                  className={`px-3 py-1 text-sm rounded ${
-                    timeframe === tf
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200'
-                  }`}
-                >
-                  {tf}
-                </button>
-              ))}
-            </div>
           </div>
         </div>
-        <div className="flex items-center gap-4">
-          {currentPrice > 0 && (
-            <div className="text-xl font-semibold bg-gray-100 dark:bg-gray-800 px-3 py-2 rounded-lg">
-              ${currentPrice.toFixed(2)}
-            </div>
-          )}
-          <button 
-            onClick={handleManualRefresh}
-            className="p-2 rounded-full bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200"
-            disabled={isLoading}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 ${isLoading ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
-          </button>
+        {/* Right Side: Controls */}
+        <div className="w-full md:w-auto flex flex-col items-end gap-2">
+           {/* Top Row: Timeframe / Interval / Price / Refresh */}
+           <div className="flex flex-wrap items-center justify-end gap-2 w-full">
+              {/* Interval Buttons */}
+              <div className="flex border border-gray-300 dark:border-gray-600 rounded-md overflow-hidden">
+                 {['1m', '5m', '15m', '1h', '1D'].map((intv) => {
+                   const intervalMap: {[key: string]: string} = { '1m': 'minute', '5m': 'minute', '15m': 'minute', '1h': 'hour', '1D': 'day' };
+                   const apiIntervalValue = intervalMap[intv];
+                   const isActive = candleInterval === apiIntervalValue;
+                   return (
+                      <button
+                        key={intv}
+                        onClick={() => handleIntervalChange(apiIntervalValue)}
+                        className={`px-2 py-1 text-xs font-medium ${
+                          isActive ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200'
+                        }`}
+                        title={`Interval: ${intv}`}
+                      >
+                        {intv}
+                      </button>
+                   );
+                 })}
+               </div>
+               {/* Spacer */}
+               <div className="flex-grow"></div> 
+               {/* Price Display */}
+               {currentPrice > 0 && (
+                 <div className="text-lg font-semibold bg-gray-100 dark:bg-gray-800 px-3 py-1 rounded-lg">
+                   ${currentPrice.toFixed(2)}
+                 </div>
+               )}
+               {/* Refresh Button */}
+               <button 
+                 onClick={handleManualRefresh}
+                 className="p-2 rounded-full bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200"
+                 disabled={isLoading}
+                 title="Refresh Data"
+               >
+                 <svg xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 ${isLoading ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                 </svg>
+               </button>
+           </div>
+           {/* Bottom Row: Date Range Buttons */}
+           <div className="flex gap-1 flex-wrap justify-end">
+             {/* Replace 1W with 5D, keep others */}
+             {['1D', '5D', '1M', '3M', 'YTD', '1Y', '5Y', 'ALL'].map((tf) => (
+               <button
+                 key={tf}
+                 onClick={() => handleTimeframeChange(tf)}
+                 className={`px-2 py-1 text-xs rounded ${
+                   timeframe === tf
+                     ? 'bg-blue-600 text-white'
+                     : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200'
+                 }`}
+               >
+                 {tf}
+               </button>
+             ))}
+           </div>
         </div>
       </div>
 

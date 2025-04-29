@@ -163,10 +163,16 @@ export class PolygonService {
     return this.instance;
   }
 
-  async getStockCandles(symbol: string, from: string, to: string, timespan = 'day'): Promise<PolygonCandle[] | null> {
+  async getStockCandles(
+      symbol: string, 
+      from: string, 
+      to: string, 
+      timespan = 'day', 
+      multiplier = 1 // Add multiplier with default
+    ): Promise<PolygonCandle[] | null> {
     if (this.useMockData) {
       // Use mock data only if explicitly configured (no API key)
-      console.log(`[MOCK] Fetching ${timespan} candles for ${symbol} (No API Key)`);
+      console.log(`[MOCK] Fetching ${multiplier} ${timespan} candles for ${symbol} (No API Key)`);
       await new Promise(resolve => setTimeout(resolve, 500));
       const mockData = generateMockCandles(symbol, from, to);
       console.log(`[MOCK] Generated ${mockData.length} candles for ${symbol}`);
@@ -174,10 +180,11 @@ export class PolygonService {
     }
     
     try {
-      console.log(`[POLYGON] Fetching ${timespan} candles for ${symbol} from ${from} to ${to}`);
+      console.log(`[POLYGON] Fetching ${multiplier} ${timespan} candles for ${symbol} from ${from} to ${to}`);
       if (!this.client) throw new Error('API client not initialized');
       
-      const endpoint = `/v2/aggs/ticker/${symbol}/range/1/${timespan}/${from}/${to}`;
+      // Include multiplier in the endpoint path
+      const endpoint = `/v2/aggs/ticker/${symbol}/range/${multiplier}/${timespan}/${from}/${to}`;
       const apiKeyPreview = this.apiKey ? `${this.apiKey.substring(0, 4)}...` : 'null';
       console.log(`[POLYGON] Calling endpoint: ${endpoint} with key ${apiKeyPreview}`);
       
