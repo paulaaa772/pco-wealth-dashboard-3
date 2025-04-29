@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { CreditCard, PlusCircle, AlignJustify, Repeat, Calendar, DollarSign, TrendingUp, ArrowRight } from 'lucide-react';
+import { CreditCard, PlusCircle, AlignJustify, Repeat, Calendar, DollarSign, TrendingUp, ArrowRight, RefreshCw } from 'lucide-react';
 
 // Bank account interface
 interface BankAccount {
@@ -50,8 +50,20 @@ interface FundingMethod {
   icon: string;
 }
 
+// State type for In-Kind Transfer form
+interface InKindTransferFormState {
+  fromBrokerage: string;
+  accountNumber: string;
+  assetSymbol: string;
+  shares: string;
+  costBasis: string;
+}
+
+// Possible active tabs including the new one
+type ActiveFundingTab = 'deposit' | 'withdraw' | 'recurring' | 'inKind' | 'accounts' | 'history';
+
 const FundingContent: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'deposit' | 'withdraw' | 'recurring' | 'accounts' | 'history'>('deposit');
+  const [activeTab, setActiveTab] = useState<ActiveFundingTab>('deposit');
   
   // Form states
   const [amount, setAmount] = useState<string>('');
@@ -62,6 +74,15 @@ const FundingContent: React.FC = () => {
   const [recurringFrequency, setRecurringFrequency] = useState<string>('monthly');
   const [processing, setProcessing] = useState<boolean>(false);
   const [success, setSuccess] = useState<boolean>(false);
+  
+  // State for In-Kind Transfer form
+  const [inKindForm, setInKindForm] = useState<InKindTransferFormState>({ 
+    fromBrokerage: '', 
+    accountNumber: '', 
+    assetSymbol: '', 
+    shares: '', 
+    costBasis: '' 
+  });
   
   // Mock bank accounts data
   const [bankAccounts] = useState<BankAccount[]>([
@@ -381,469 +402,604 @@ const FundingContent: React.FC = () => {
     </div>
   );
   
-  return (
-    <div className="bg-[#172033] text-white p-6 space-y-8">
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-semibold">Funding & Transfers</h2>
-        <div>
-          <button className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm">
-            <PlusCircle className="h-4 w-4 inline mr-1" />
-            Link New Account
-          </button>
+  // Handle submission for In-Kind Transfer
+  const handleInKindSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setProcessing(true);
+    console.log('Submitting In-Kind Transfer:', inKindForm);
+    
+    // Simulate API call
+    setTimeout(() => {
+      setProcessing(false);
+      setSuccess(true);
+      // Reset form
+      setInKindForm({ fromBrokerage: '', accountNumber: '', assetSymbol: '', shares: '', costBasis: '' });
+      // Hide success message after a delay
+      setTimeout(() => setSuccess(false), 3000);
+    }, 1500);
+  };
+
+  // Update In-Kind form state
+  const handleInKindChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    setInKindForm(prev => ({ ...prev, [name]: value }));
+  };
+  
+  // Render In-Kind Transfer form
+  const renderInKindTransferForm = () => (
+    <div className="bg-[#2A3C61] rounded-lg p-6">
+      <h3 className="text-xl font-semibold mb-4">In-Kind Asset Transfer</h3>
+      <p className="text-gray-400 mb-6">
+        Transfer assets directly from another brokerage without selling them. This preserves your cost basis.
+      </p>
+
+      {success && (
+        <div className="bg-green-900/30 border border-green-700 text-green-400 px-4 py-3 rounded mb-6">
+          <p>In-Kind transfer request submitted successfully! We will contact you with further instructions.</p>
         </div>
-      </div>
-      
-      {/* Funding Tabs */}
-      <div className="bg-[#1D2939] rounded-lg overflow-hidden">
-        <div className="border-b border-gray-700">
-          <div className="flex">
+      )}
+
+      {!success && (
+        <form onSubmit={handleInKindSubmit} className="space-y-5">
+          <div>
+            <label htmlFor="fromBrokerage" className="block text-sm font-medium text-gray-300 mb-1">
+              Transferring Brokerage
+            </label>
+            <input
+              type="text"
+              name="fromBrokerage"
+              id="fromBrokerage"
+              value={inKindForm.fromBrokerage}
+              onChange={handleInKindChange}
+              className="w-full bg-[#313e57] text-white border border-gray-700 rounded-md px-3 py-2"
+              placeholder="e.g., Fidelity, Charles Schwab"
+              required
+            />
+          </div>
+
+          <div>
+            <label htmlFor="accountNumber" className="block text-sm font-medium text-gray-300 mb-1">
+              Account Number at Transferring Brokerage
+            </label>
+            <input
+              type="text"
+              name="accountNumber"
+              id="accountNumber"
+              value={inKindForm.accountNumber}
+              onChange={handleInKindChange}
+              className="w-full bg-[#313e57] text-white border border-gray-700 rounded-md px-3 py-2"
+              placeholder="Your account number"
+              required
+            />
+          </div>
+
+          <div>
+            <label htmlFor="assetSymbol" className="block text-sm font-medium text-gray-300 mb-1">
+              Asset Symbol to Transfer
+            </label>
+            <input
+              type="text"
+              name="assetSymbol"
+              id="assetSymbol"
+              value={inKindForm.assetSymbol}
+              onChange={handleInKindChange}
+              className="w-full bg-[#313e57] text-white border border-gray-700 rounded-md px-3 py-2"
+              placeholder="e.g., AAPL, VOO"
+              required
+            />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label htmlFor="shares" className="block text-sm font-medium text-gray-300 mb-1">
+                Number of Shares
+              </label>
+              <input
+                type="number"
+                name="shares"
+                id="shares"
+                min="0.001"
+                step="0.001"
+                value={inKindForm.shares}
+                onChange={handleInKindChange}
+                className="w-full bg-[#313e57] text-white border border-gray-700 rounded-md px-3 py-2"
+                placeholder="e.g., 100"
+                required
+              />
+            </div>
+            <div>
+              <label htmlFor="costBasis" className="block text-sm font-medium text-gray-300 mb-1">
+                Total Cost Basis (Optional)
+              </label>
+              <input
+                type="number"
+                name="costBasis"
+                id="costBasis"
+                min="0"
+                step="0.01"
+                value={inKindForm.costBasis}
+                onChange={handleInKindChange}
+                className="w-full bg-[#313e57] text-white border border-gray-700 rounded-md px-3 py-2"
+                placeholder="e.g., 5000.00"
+              />
+            </div>
+          </div>
+
+          <div className="pt-2">
             <button
-              onClick={() => setActiveTab('deposit')}
-              className={`flex items-center px-6 py-4 ${
-                activeTab === 'deposit'
-                  ? 'bg-[#2D3748] text-white border-b-2 border-blue-500'
-                  : 'text-gray-400 hover:text-gray-300'
+              type="submit"
+              disabled={processing}
+              className={`w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 ${
+                processing ? 'opacity-70 cursor-not-allowed' : 'hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500'
               }`}
             >
-              <DollarSign className="h-4 w-4 mr-2" />
-              Deposit
-            </button>
-            <button
-              onClick={() => setActiveTab('withdraw')}
-              className={`flex items-center px-6 py-4 ${
-                activeTab === 'withdraw'
-                  ? 'bg-[#2D3748] text-white border-b-2 border-blue-500'
-                  : 'text-gray-400 hover:text-gray-300'
-              }`}
-            >
-              <TrendingUp className="h-4 w-4 mr-2" />
-              Withdraw
-            </button>
-            <button
-              onClick={() => setActiveTab('recurring')}
-              className={`flex items-center px-6 py-4 ${
-                activeTab === 'recurring'
-                  ? 'bg-[#2D3748] text-white border-b-2 border-blue-500'
-                  : 'text-gray-400 hover:text-gray-300'
-              }`}
-            >
-              <Repeat className="h-4 w-4 mr-2" />
-              Recurring
-            </button>
-            <button
-              onClick={() => setActiveTab('accounts')}
-              className={`flex items-center px-6 py-4 ${
-                activeTab === 'accounts'
-                  ? 'bg-[#2D3748] text-white border-b-2 border-blue-500'
-                  : 'text-gray-400 hover:text-gray-300'
-              }`}
-            >
-              <CreditCard className="h-4 w-4 mr-2" />
-              Accounts
-            </button>
-            <button
-              onClick={() => setActiveTab('history')}
-              className={`flex items-center px-6 py-4 ${
-                activeTab === 'history'
-                  ? 'bg-[#2D3748] text-white border-b-2 border-blue-500'
-                  : 'text-gray-400 hover:text-gray-300'
-              }`}
-            >
-              <AlignJustify className="h-4 w-4 mr-2" />
-              History
+              {processing ? 'Submitting...' : 'Submit In-Kind Transfer Request'}
             </button>
           </div>
-        </div>
+        </form>
+      )}
+
+      <div className="mt-6 border-t border-gray-700 pt-4 text-sm text-gray-400">
+        <h4 className="font-medium text-gray-300 mb-2">Important Notes:</h4>
+        <ul className="list-disc pl-5 space-y-1">
+          <li>In-kind transfers can take 5-10 business days to complete.</li>
+          <li>Ensure the account registration at both brokerages match.</li>
+          <li>We will contact you to complete the Transfer Initiation Form (TIF).</li>
+          <li>Providing cost basis information is helpful but optional.</li>
+        </ul>
+      </div>
+    </div>
+  );
+  
+  // Tab styling from Portfolio page
+  const tabStyle = "px-4 py-2 text-sm font-medium";
+  const activeTabStyle = `${tabStyle} bg-[#2A3C61] rounded-t-lg text-white`;
+  const inactiveTabStyle = `${tabStyle} text-gray-400 hover:text-white`;
+
+  return (
+    <div className="space-y-8">
+      {/* Remove the old header with the Link New Account button */}
+      {/* <div className="flex justify-between items-center">
+        <h2 className="text-2xl font-semibold">Funding & Transfers</h2>
+        ...
+      </div> */}
+      
+      {/* Funding Tabs using Portfolio styling */}
+      <div className="border-b border-gray-700">
+        <nav className="flex gap-4">
+          <button
+            onClick={() => setActiveTab('deposit')}
+            className={activeTab === 'deposit' ? activeTabStyle : inactiveTabStyle}
+          >
+            Deposit
+          </button>
+          <button
+            onClick={() => setActiveTab('withdraw')}
+            className={activeTab === 'withdraw' ? activeTabStyle : inactiveTabStyle}
+          >
+            Withdraw
+          </button>
+          <button
+            onClick={() => setActiveTab('recurring')}
+            className={activeTab === 'recurring' ? activeTabStyle : inactiveTabStyle}
+          >
+            Recurring
+          </button>
+          <button
+            onClick={() => setActiveTab('inKind')}
+            className={activeTab === 'inKind' ? activeTabStyle : inactiveTabStyle}
+          >
+            In-Kind Transfer
+          </button>
+          <button
+            onClick={() => setActiveTab('accounts')}
+            className={activeTab === 'accounts' ? activeTabStyle : inactiveTabStyle}
+          >
+            Accounts
+          </button>
+          <button
+            onClick={() => setActiveTab('history')}
+            className={activeTab === 'history' ? activeTabStyle : inactiveTabStyle}
+          >
+            History
+          </button>
+        </nav>
+      </div>
         
-        <div className="p-6">
-          {/* Deposit Form */}
-          {activeTab === 'deposit' && (
-            <div>
-              <h3 className="text-lg font-semibold mb-4">Deposit Funds</h3>
-              <p className="text-gray-400 mb-6">
-                Transfer money from your bank account to your brokerage account to invest in securities.
-              </p>
-              
-              {success && (
-                <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-6">
-                  <p>Funding request submitted successfully! Your account will be updated once the transaction is processed.</p>
-                  <button 
-                    onClick={() => setSuccess(false)}
-                    className="underline text-sm mt-2"
-                  >
-                    Add more funds
-                  </button>
-                </div>
-              )}
-              
-              {!success && (
-                <div className="bg-white p-6 rounded-lg shadow-md">
-                  <form onSubmit={handleSubmit}>
-                    <div className="mb-6">
-                      <label htmlFor="amount" className="block text-sm font-medium text-gray-700 mb-2">
-                        Amount to Fund
-                      </label>
-                      <div className="relative">
-                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                          <span className="text-gray-500 sm:text-sm">$</span>
-                        </div>
-                        <input
-                          type="text"
-                          id="amount"
-                          value={amount}
-                          onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ''))}
-                          className="focus:ring-indigo-500 focus:border-indigo-500 block w-full pl-7 pr-12 sm:text-sm border-gray-300 rounded-md"
-                          placeholder="0.00"
-                          required
-                        />
-                        <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                          <span className="text-gray-500 sm:text-sm">USD</span>
-                        </div>
+      {/* Use bg-[#2A3C61] for tab content background like Portfolio */}
+      <div className="bg-[#2A3C61] rounded-b-lg p-6">
+        {/* Deposit Form */}
+        {activeTab === 'deposit' && (
+          <div>
+            <h3 className="text-xl font-semibold mb-4">Deposit Funds</h3>
+            <p className="text-gray-400 mb-6">
+              Transfer money from your bank account to your brokerage account to invest in securities.
+            </p>
+            
+            {success && (
+              <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-6">
+                <p>Funding request submitted successfully! Your account will be updated once the transaction is processed.</p>
+                <button 
+                  onClick={() => setSuccess(false)}
+                  className="underline text-sm mt-2"
+                >
+                  Add more funds
+                </button>
+              </div>
+            )}
+            
+            {!success && (
+              <div className="bg-[#1E2D4E] p-6 rounded-lg shadow-md">
+                <form onSubmit={handleSubmit}>
+                  <div className="mb-6">
+                    <label htmlFor="amount" className="block text-sm font-medium text-gray-700 mb-2">
+                      Amount to Fund
+                    </label>
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <span className="text-gray-500 sm:text-sm">$</span>
+                      </div>
+                      <input
+                        type="text"
+                        id="amount"
+                        value={amount}
+                        onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ''))}
+                        className="focus:ring-indigo-500 focus:border-indigo-500 block w-full pl-7 pr-12 sm:text-sm border-gray-300 rounded-md"
+                        placeholder="0.00"
+                        required
+                      />
+                      <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                        <span className="text-gray-500 sm:text-sm">USD</span>
                       </div>
                     </div>
-                    
-                    <div className="mb-6">
-                      <label htmlFor="method" className="block text-sm font-medium text-gray-700 mb-2">
-                        Funding Method
-                      </label>
-                      <select
-                        id="method"
-                        value={selectedMethod}
-                        onChange={(e) => setSelectedMethod(e.target.value)}
-                        className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
-                      >
-                        <option value="">Select a funding method</option>
-                        <option value="bank">Bank Transfer (ACH)</option>
-                        <option value="wire">Wire Transfer</option>
-                        <option value="card">Debit Card</option>
-                      </select>
-                    </div>
-                    
-                    <div className="mt-8">
-                      <button
-                        type="submit"
-                        disabled={processing || !amount}
-                        className={`w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 ${
-                          processing || !amount ? 'opacity-70 cursor-not-allowed' : 'hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500'
-                        }`}
-                      >
-                        {processing ? 'Processing...' : 'Submit Funding Request'}
-                      </button>
-                    </div>
-                  </form>
+                  </div>
                   
-                  <div className="mt-6 border-t border-gray-200 pt-4">
-                    <h3 className="text-lg font-medium text-gray-900 mb-3">Funding Information</h3>
-                    <ul className="list-disc pl-5 text-sm text-gray-600">
-                      <li className="mb-2">Bank transfers (ACH) typically take 1-3 business days to process</li>
-                      <li className="mb-2">Wire transfers are usually completed within 24 hours</li>
-                      <li className="mb-2">Debit card transfers are processed immediately but may have lower limits</li>
-                      <li className="mb-2">Minimum funding amount: $100</li>
-                    </ul>
+                  <div className="mb-6">
+                    <label htmlFor="method" className="block text-sm font-medium text-gray-700 mb-2">
+                      Funding Method
+                    </label>
+                    <select
+                      id="method"
+                      value={selectedMethod}
+                      onChange={(e) => setSelectedMethod(e.target.value)}
+                      className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
+                    >
+                      <option value="">Select a funding method</option>
+                      <option value="bank">Bank Transfer (ACH)</option>
+                      <option value="wire">Wire Transfer</option>
+                      <option value="card">Debit Card</option>
+                    </select>
                   </div>
-                </div>
-              )}
-            </div>
-          )}
-          
-          {/* Withdraw Form */}
-          {activeTab === 'withdraw' && (
-            <div>
-              <h3 className="text-lg font-semibold mb-4">Withdraw Funds</h3>
-              <p className="text-gray-400 mb-6">
-                Transfer money from your brokerage account to your bank account.
-              </p>
-              
-              {renderDepositWithdrawForm()}
-            </div>
-          )}
-          
-          {/* Recurring Transfers */}
-          {activeTab === 'recurring' && (
-            <div>
-              <h3 className="text-lg font-semibold mb-4">Recurring Transfers</h3>
-              <p className="text-gray-400 mb-6">
-                Set up automatic recurring transfers to regularly fund your investment account.
-              </p>
-              
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                <div className="bg-[#2D3748] rounded-lg p-4">
-                  <div className="flex items-center mb-4">
-                    <Calendar className="h-5 w-5 text-blue-400 mr-2" />
-                    <h4 className="text-md font-medium">Active Schedules</h4>
+                  
+                  <div className="mt-8">
+                    <button
+                      type="submit"
+                      disabled={processing || !amount}
+                      className={`w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 ${
+                        processing || !amount ? 'opacity-70 cursor-not-allowed' : 'hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500'
+                      }`}
+                    >
+                      {processing ? 'Processing...' : 'Submit Funding Request'}
+                    </button>
                   </div>
-                  <div className="text-3xl font-bold text-white mb-1">
-                    {recurringTransfers.filter(t => t.active).length}
-                  </div>
-                  <div className="text-sm text-gray-400">Recurring transfers</div>
-                </div>
+                </form>
                 
-                <div className="bg-[#2D3748] rounded-lg p-4">
-                  <div className="flex items-center mb-4">
-                    <DollarSign className="h-5 w-5 text-green-400 mr-2" />
-                    <h4 className="text-md font-medium">Monthly Total</h4>
-                  </div>
-                  <div className="text-3xl font-bold text-white mb-1">
-                    ${recurringTransfers
-                      .filter(t => t.active && t.type === 'deposit')
-                      .reduce((sum, t) => {
-                        if (t.frequency === 'weekly') return sum + (t.amount * 4);
-                        if (t.frequency === 'biweekly') return sum + (t.amount * 2);
-                        if (t.frequency === 'monthly') return sum + t.amount;
-                        if (t.frequency === 'quarterly') return sum + (t.amount / 3);
-                        return sum;
-                      }, 0)
-                      .toFixed(2)}
-                  </div>
-                  <div className="text-sm text-gray-400">Total monthly investment</div>
-                </div>
-                
-                <div className="bg-[#2D3748] rounded-lg p-4">
-                  <div className="flex items-center mb-4">
-                    <Repeat className="h-5 w-5 text-purple-400 mr-2" />
-                    <h4 className="text-md font-medium">Next Transfer</h4>
-                  </div>
-                  <div className="text-xl font-bold text-white mb-1">
-                    {recurringTransfers
-                      .filter(t => t.active)
-                      .sort((a, b) => new Date(a.nextDate).getTime() - new Date(b.nextDate).getTime())[0]?.nextDate 
-                      ? formatDate(recurringTransfers
-                          .filter(t => t.active)
-                          .sort((a, b) => new Date(a.nextDate).getTime() - new Date(b.nextDate).getTime())[0].nextDate)
-                      : 'None scheduled'}
-                  </div>
-                  <div className="text-sm text-gray-400">Next automatic transfer</div>
+                <div className="mt-6 border-t border-gray-200 pt-4">
+                  <h3 className="text-lg font-medium text-gray-900 mb-3">Funding Information</h3>
+                  <ul className="list-disc pl-5 text-sm text-gray-600">
+                    <li className="mb-2">Bank transfers (ACH) typically take 1-3 business days to process</li>
+                    <li className="mb-2">Wire transfers are usually completed within 24 hours</li>
+                    <li className="mb-2">Debit card transfers are processed immediately but may have lower limits</li>
+                    <li className="mb-2">Minimum funding amount: $100</li>
+                  </ul>
                 </div>
               </div>
+            )}
+          </div>
+        )}
+        
+        {/* Withdraw Form */}
+        {activeTab === 'withdraw' && (
+          <div>
+            <h3 className="text-xl font-semibold mb-4">Withdraw Funds</h3>
+            <p className="text-gray-400 mb-6">
+              Transfer money from your brokerage account to your bank account.
+            </p>
+            
+            <div className="bg-[#1E2D4E] p-6 rounded-lg shadow-md">
+              {renderDepositWithdrawForm()}
+            </div>
+          </div>
+        )}
+
+        {/* Recurring Transfers */} 
+        {activeTab === 'recurring' && (
+          <div>
+            <h3 className="text-xl font-semibold mb-4">Recurring Transfers</h3>
+            <p className="text-gray-400 mb-6">
+              Set up automatic recurring transfers to regularly fund your investment account.
+            </p>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+              <div className="bg-[#2D3748] rounded-lg p-4">
+                <div className="flex items-center mb-4">
+                  <Calendar className="h-5 w-5 text-blue-400 mr-2" />
+                  <h4 className="text-md font-medium">Active Schedules</h4>
+                </div>
+                <div className="text-3xl font-bold text-white mb-1">
+                  {recurringTransfers.filter(t => t.active).length}
+                </div>
+                <div className="text-sm text-gray-400">Recurring transfers</div>
+              </div>
               
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                {/* New Recurring Transfer Form */}
-                <div className="bg-[#2D3748] rounded-lg p-5">
-                  <h4 className="text-lg font-medium mb-4">Create New Recurring Transfer</h4>
-                  
-                  <form onSubmit={handleSubmit} className="space-y-4">
-                    <div>
-                      <label className="block text-sm text-gray-400 mb-2">Transfer Type</label>
-                      <div className="flex space-x-4">
-                        <label className="inline-flex items-center">
-                          <input 
-                            type="radio" 
-                            name="transferType" 
-                            value="deposit" 
-                            className="text-blue-600 focus:ring-blue-500 h-4 w-4 border-gray-700 bg-[#2D3748]"
-                            defaultChecked 
-                          />
-                          <span className="ml-2 text-gray-300">Deposit</span>
-                        </label>
-                        <label className="inline-flex items-center">
-                          <input 
-                            type="radio" 
-                            name="transferType" 
-                            value="withdraw" 
-                            className="text-blue-600 focus:ring-blue-500 h-4 w-4 border-gray-700 bg-[#2D3748]" 
-                          />
-                          <span className="ml-2 text-gray-300">Withdraw</span>
-                        </label>
-                      </div>
-                    </div>
-                    
-                    <div>
-                      <label className="block text-sm text-gray-400 mb-2">From Account</label>
-                      <select className="w-full bg-[#313e57] text-white border border-gray-700 rounded-md px-3 py-2">
-                        {bankAccounts.map(account => (
-                          <option key={account.id} value={account.id}>
-                            {account.bankName} - {account.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    
-                    <div>
-                      <label className="block text-sm text-gray-400 mb-2">To Account</label>
-                      <select className="w-full bg-[#313e57] text-white border border-gray-700 rounded-md px-3 py-2">
-                        <option>Brokerage Account</option>
-                      </select>
-                    </div>
-                    
-                    <div>
-                      <label className="block text-sm text-gray-400 mb-2">Amount</label>
-                      <div className="relative">
-                        <span className="absolute left-3 top-2 text-gray-400">$</span>
-                        <input
-                          type="number"
-                          min="1"
-                          step="0.01"
-                          placeholder="0.00"
-                          className="w-full bg-[#313e57] text-white border border-gray-700 rounded-md px-3 py-2 pl-7"
-                          value={recurringAmount}
-                          onChange={(e) => setRecurringAmount(e.target.value)}
-                          required
+              <div className="bg-[#2D3748] rounded-lg p-4">
+                <div className="flex items-center mb-4">
+                  <DollarSign className="h-5 w-5 text-green-400 mr-2" />
+                  <h4 className="text-md font-medium">Monthly Total</h4>
+                </div>
+                <div className="text-3xl font-bold text-white mb-1">
+                  ${recurringTransfers
+                    .filter(t => t.active && t.type === 'deposit')
+                    .reduce((sum, t) => {
+                      if (t.frequency === 'weekly') return sum + (t.amount * 4);
+                      if (t.frequency === 'biweekly') return sum + (t.amount * 2);
+                      if (t.frequency === 'monthly') return sum + t.amount;
+                      if (t.frequency === 'quarterly') return sum + (t.amount / 3);
+                      return sum;
+                    }, 0)
+                    .toFixed(2)}
+                </div>
+                <div className="text-sm text-gray-400">Total monthly investment</div>
+              </div>
+              
+              <div className="bg-[#2D3748] rounded-lg p-4">
+                <div className="flex items-center mb-4">
+                  <Repeat className="h-5 w-5 text-purple-400 mr-2" />
+                  <h4 className="text-md font-medium">Next Transfer</h4>
+                </div>
+                <div className="text-xl font-bold text-white mb-1">
+                  {recurringTransfers
+                    .filter(t => t.active)
+                    .sort((a, b) => new Date(a.nextDate).getTime() - new Date(b.nextDate).getTime())[0]?.nextDate 
+                    ? formatDate(recurringTransfers
+                        .filter(t => t.active)
+                        .sort((a, b) => new Date(a.nextDate).getTime() - new Date(b.nextDate).getTime())[0].nextDate)
+                    : 'None scheduled'}
+                </div>
+                <div className="text-sm text-gray-400">Next automatic transfer</div>
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              {/* New Recurring Transfer Form */}
+              <div className="bg-[#2D3748] rounded-lg p-5">
+                <h4 className="text-lg font-medium mb-4">Create New Recurring Transfer</h4>
+                
+                <form onSubmit={handleSubmit} className="space-y-4">
+                  <div>
+                    <label className="block text-sm text-gray-400 mb-2">Transfer Type</label>
+                    <div className="flex space-x-4">
+                      <label className="inline-flex items-center">
+                        <input 
+                          type="radio" 
+                          name="transferType" 
+                          value="deposit" 
+                          className="text-blue-600 focus:ring-blue-500 h-4 w-4 border-gray-700 bg-[#2D3748]"
+                          defaultChecked 
                         />
-                      </div>
+                        <span className="ml-2 text-gray-300">Deposit</span>
+                      </label>
+                      <label className="inline-flex items-center">
+                        <input 
+                          type="radio" 
+                          name="transferType" 
+                          value="withdraw" 
+                          className="text-blue-600 focus:ring-blue-500 h-4 w-4 border-gray-700 bg-[#2D3748]" 
+                        />
+                        <span className="ml-2 text-gray-300">Withdraw</span>
+                      </label>
                     </div>
-                    
-                    <div>
-                      <label className="block text-sm text-gray-400 mb-2">Frequency</label>
-                      <select 
-                        className="w-full bg-[#313e57] text-white border border-gray-700 rounded-md px-3 py-2"
-                        value={recurringFrequency}
-                        onChange={(e) => setRecurringFrequency(e.target.value)}
-                      >
-                        <option value="weekly">Weekly</option>
-                        <option value="biweekly">Bi-Weekly</option>
-                        <option value="monthly">Monthly</option>
-                        <option value="quarterly">Quarterly</option>
-                      </select>
-                    </div>
-                    
-                    <div>
-                      <label className="block text-sm text-gray-400 mb-2">Starting Date</label>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm text-gray-400 mb-2">From Account</label>
+                    <select className="w-full bg-[#313e57] text-white border border-gray-700 rounded-md px-3 py-2">
+                      {bankAccounts.map(account => (
+                        <option key={account.id} value={account.id}>
+                          {account.bankName} - {account.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm text-gray-400 mb-2">To Account</label>
+                    <select className="w-full bg-[#313e57] text-white border border-gray-700 rounded-md px-3 py-2">
+                      <option>Brokerage Account</option>
+                    </select>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm text-gray-400 mb-2">Amount</label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-2 text-gray-400">$</span>
                       <input
-                        type="date"
-                        className="w-full bg-[#313e57] text-white border border-gray-700 rounded-md px-3 py-2"
-                        min={new Date().toISOString().split('T')[0]}
+                        type="number"
+                        min="1"
+                        step="0.01"
+                        placeholder="0.00"
+                        className="w-full bg-[#313e57] text-white border border-gray-700 rounded-md px-3 py-2 pl-7"
+                        value={recurringAmount}
+                        onChange={(e) => setRecurringAmount(e.target.value)}
                         required
                       />
                     </div>
-                    
-                    <div className="pt-2">
-                      <button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white py-2 px-6 rounded-md">
-                        Create Recurring Transfer
-                      </button>
-                    </div>
-                  </form>
-                </div>
-                
-                {/* Active Recurring Transfers */}
-                <div>
-                  <h4 className="text-lg font-medium mb-4">Active Recurring Transfers</h4>
+                  </div>
                   
-                  <div className="space-y-4">
-                    {recurringTransfers.filter(transfer => transfer.active).map(transfer => (
-                      <div key={transfer.id} className="bg-[#2D3748] rounded-lg p-4">
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <h5 className="font-medium text-white">${transfer.amount.toFixed(2)} {transfer.frequency}</h5>
-                            <div className="text-sm text-gray-400 mt-1">
-                              Next: {formatDate(transfer.nextDate)}
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                              transfer.type === 'deposit' ? 'bg-green-900/30 text-green-400' : 'bg-red-900/30 text-red-400'
-                            }`}>
-                              {transfer.type === 'deposit' ? 'Deposit' : 'Withdrawal'}
-                            </span>
-                          </div>
-                        </div>
-                        
-                        <div className="mt-3 text-sm">
-                          <div className="flex items-center">
-                            <ArrowRight className="h-3 w-3 text-gray-400 mr-1" />
-                            <span className="text-gray-300">
-                              {transfer.fromAccount} to {transfer.toAccount}
-                            </span>
-                          </div>
-                        </div>
-                        
-                        <div className="mt-3 flex space-x-2">
-                          <button className="text-xs border border-gray-600 text-gray-300 hover:bg-gray-700 px-2 py-1 rounded">
-                            Edit
-                          </button>
-                          <button className="text-xs border border-red-900 text-red-400 hover:bg-red-900/20 px-2 py-1 rounded">
-                            Pause
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                    
-                    {recurringTransfers.filter(transfer => transfer.active).length === 0 && (
-                      <div className="bg-[#2D3748] rounded-lg p-4 text-center text-gray-400">
-                        No active recurring transfers
-                      </div>
-                    )}
+                  <div>
+                    <label className="block text-sm text-gray-400 mb-2">Frequency</label>
+                    <select 
+                      className="w-full bg-[#313e57] text-white border border-gray-700 rounded-md px-3 py-2"
+                      value={recurringFrequency}
+                      onChange={(e) => setRecurringFrequency(e.target.value)}
+                    >
+                      <option value="weekly">Weekly</option>
+                      <option value="biweekly">Bi-Weekly</option>
+                      <option value="monthly">Monthly</option>
+                      <option value="quarterly">Quarterly</option>
+                    </select>
                   </div>
+                  
+                  <div>
+                    <label className="block text-sm text-gray-400 mb-2">Starting Date</label>
+                    <input
+                      type="date"
+                      className="w-full bg-[#313e57] text-white border border-gray-700 rounded-md px-3 py-2"
+                      min={new Date().toISOString().split('T')[0]}
+                      required
+                    />
+                  </div>
+                  
+                  <div className="pt-2">
+                    <button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white py-2 px-6 rounded-md">
+                      Create Recurring Transfer
+                    </button>
+                  </div>
+                </form>
+              </div>
+              
+              {/* Active Recurring Transfers */}
+              <div>
+                <h4 className="text-lg font-medium mb-4">Active Recurring Transfers</h4>
+                
+                <div className="space-y-4">
+                  {recurringTransfers.filter(transfer => transfer.active).map(transfer => (
+                    <div key={transfer.id} className="bg-[#2D3748] rounded-lg p-4">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <h5 className="font-medium text-white">${transfer.amount.toFixed(2)} {transfer.frequency}</h5>
+                          <div className="text-sm text-gray-400 mt-1">
+                            Next: {formatDate(transfer.nextDate)}
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                            transfer.type === 'deposit' ? 'bg-green-900/30 text-green-400' : 'bg-red-900/30 text-red-400'
+                          }`}>
+                            {transfer.type === 'deposit' ? 'Deposit' : 'Withdrawal'}
+                          </span>
+                        </div>
+                      </div>
+                      
+                      <div className="mt-3 text-sm">
+                        <div className="flex items-center">
+                          <ArrowRight className="h-3 w-3 text-gray-400 mr-1" />
+                          <span className="text-gray-300">
+                            {transfer.fromAccount} to {transfer.toAccount}
+                          </span>
+                        </div>
+                      </div>
+                      
+                      <div className="mt-3 flex space-x-2">
+                        <button className="text-xs border border-gray-600 text-gray-300 hover:bg-gray-700 px-2 py-1 rounded">
+                          Edit
+                        </button>
+                        <button className="text-xs border border-red-900 text-red-400 hover:bg-red-900/20 px-2 py-1 rounded">
+                          Pause
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                  
+                  {recurringTransfers.filter(transfer => transfer.active).length === 0 && (
+                    <div className="bg-[#2D3748] rounded-lg p-4 text-center text-gray-400">
+                      No active recurring transfers
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
-          )}
-          
-          {/* Linked Accounts */}
-          {activeTab === 'accounts' && (
-            <div>
-              <h3 className="text-lg font-semibold mb-4">Linked Bank Accounts</h3>
-              <p className="text-gray-400 mb-6">
-                Manage your linked bank accounts for deposits and withdrawals.
-              </p>
-              
-              <div className="space-y-4">
-                {bankAccounts.map(account => (
-                  <div key={account.id} className="bg-[#2D3748] rounded-lg p-5">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <h4 className="font-medium text-white flex items-center">
-                          {account.bankName} - {account.name}
-                          {account.primary && (
-                            <span className="ml-2 px-2 py-0.5 bg-blue-900/30 text-blue-400 text-xs rounded-full">Primary</span>
-                          )}
-                        </h4>
-                        <div className="text-sm text-gray-400 mt-1">
-                          Account: {account.accountNumber}
-                        </div>
-                        <div className="text-sm text-gray-400">
-                          Routing: {account.routingNumber}
-                        </div>
+          </div>
+        )}
+
+        {/* In-Kind Transfer Tab Content */}
+        {activeTab === 'inKind' && renderInKindTransferForm()}
+
+        {/* Linked Accounts */}
+        {activeTab === 'accounts' && (
+          <div>
+            <h3 className="text-xl font-semibold mb-4">Linked Accounts</h3>
+            <p className="text-gray-400 mb-6">
+              Manage your linked bank accounts for deposits and withdrawals.
+            </p>
+            
+            <div className="space-y-4">
+              {bankAccounts.map(account => (
+                <div key={account.id} className="bg-[#2D3748] rounded-lg p-5">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <h4 className="font-medium text-white flex items-center">
+                        {account.bankName} - {account.name}
+                        {account.primary && (
+                          <span className="ml-2 px-2 py-0.5 bg-blue-900/30 text-blue-400 text-xs rounded-full">Primary</span>
+                        )}
+                      </h4>
+                      <div className="text-sm text-gray-400 mt-1">
+                        Account: {account.accountNumber}
                       </div>
-                      <div className="text-right">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                          account.verified ? 'bg-green-900/30 text-green-400' : 'bg-yellow-900/30 text-yellow-400'
-                        }`}>
-                          {account.verified ? 'Verified' : 'Pending Verification'}
-                        </span>
-                        <div className="text-sm text-gray-400 mt-1 capitalize">
-                          {account.type} Account
-                        </div>
+                      <div className="text-sm text-gray-400">
+                        Routing: {account.routingNumber}
                       </div>
                     </div>
-                    
-                    <div className="mt-4 flex space-x-3">
-                      {!account.primary && (
-                        <button className="text-xs border border-blue-600 text-blue-400 hover:bg-blue-900/20 px-3 py-1.5 rounded">
-                          Set as Primary
-                        </button>
-                      )}
-                      <button className="text-xs border border-gray-600 text-gray-300 hover:bg-gray-700 px-3 py-1.5 rounded">
-                        Edit
-                      </button>
-                      <button className="text-xs border border-red-600 text-red-400 hover:bg-red-900/20 px-3 py-1.5 rounded">
-                        Remove
-                      </button>
+                    <div className="text-right">
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                        account.verified ? 'bg-green-900/30 text-green-400' : 'bg-yellow-900/30 text-yellow-400'
+                      }`}>
+                        {account.verified ? 'Verified' : 'Pending Verification'}
+                      </span>
+                      <div className="text-sm text-gray-400 mt-1 capitalize">
+                        {account.type} Account
+                      </div>
                     </div>
                   </div>
-                ))}
-              </div>
-              
-              <div className="mt-6">
-                <button className="flex items-center bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md">
-                  <PlusCircle className="h-4 w-4 mr-2" />
-                  Link New Bank Account
-                </button>
-              </div>
+                  
+                  <div className="mt-4 flex space-x-3">
+                    {!account.primary && (
+                      <button className="text-xs border border-blue-600 text-blue-400 hover:bg-blue-900/20 px-3 py-1.5 rounded">
+                        Set as Primary
+                      </button>
+                    )}
+                    <button className="text-xs border border-gray-600 text-gray-300 hover:bg-gray-700 px-3 py-1.5 rounded">
+                      Edit
+                    </button>
+                    <button className="text-xs border border-red-600 text-red-400 hover:bg-red-900/20 px-3 py-1.5 rounded">
+                      Remove
+                    </button>
+                  </div>
+                </div>
+              ))}
             </div>
-          )}
-          
-          {/* Transaction History */}
-          {activeTab === 'history' && (
-            <div>
-              <h3 className="text-lg font-semibold mb-4">Transaction History</h3>
-              <p className="text-gray-400 mb-6">
-                View your transaction history.
-              </p>
-              
-              {renderTransactionHistory()}
+            
+            <div className="mt-6">
+              <button className="flex items-center bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md">
+                <PlusCircle className="h-4 w-4 mr-2" />
+                Link New Bank Account
+              </button>
             </div>
-          )}
-        </div>
+          </div>
+        )}
+        
+        {/* Transaction History */}
+        {activeTab === 'history' && (
+          <div>
+            <h3 className="text-xl font-semibold mb-4">Transaction History</h3>
+            <p className="text-gray-400 mb-6">
+              View your transaction history.
+            </p>
+            
+            {renderTransactionHistory()}
+          </div>
+        )}
       </div>
     </div>
   );
