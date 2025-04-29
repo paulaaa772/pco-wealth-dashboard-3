@@ -31,6 +31,9 @@ interface ManualAccountsContextType {
   error: string | null;
   addManualAccount: (account: Omit<ManualAccount, 'id' | 'totalValue'>) => Promise<void>;
   refetchAccounts: () => void;
+  isModalOpen: boolean;
+  openModal: () => void;
+  closeModal: () => void;
 }
 
 const ManualAccountsContext = createContext<ManualAccountsContextType | undefined>(undefined);
@@ -45,6 +48,7 @@ export const ManualAccountsProvider: React.FC<ManualAccountsProviderProps> = ({ 
   const [manualAccounts, setManualAccounts] = useState<ManualAccount[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   useEffect(() => {
     fetchAccounts();
@@ -56,13 +60,20 @@ export const ManualAccountsProvider: React.FC<ManualAccountsProviderProps> = ({ 
     setError(null);
     try {
       const response = await fetch('/api/manual-accounts');
+      console.log(`[Context] Fetch response status: ${response.status}`);
       if (!response.ok) {
-        throw new Error(`Failed to fetch accounts: ${response.statusText}`);
+        let errorMsg = `Failed to fetch accounts: ${response.statusText}`;
+        try {
+          const errorBody = await response.json();
+          errorMsg += ` - ${errorBody.error || 'Unknown API error'}`;
+        } catch (_) {}
+        throw new Error(errorMsg);
       }
       const data = await response.json();
+      console.log('[Context] Raw data received from API:', data);
       const formattedData = data.map((acc: any) => ({ ...acc, id: acc._id || acc.id }));
       setManualAccounts(formattedData || []);
-      console.log('[Context] Manual accounts loaded:', formattedData.length);
+      console.log('[Context] Manual accounts loaded into state:', formattedData.length);
     } catch (err: any) {
       console.error('[Context] Error fetching accounts:', err);
       setError(err.message || 'Failed to load accounts');
@@ -100,13 +111,19 @@ export const ManualAccountsProvider: React.FC<ManualAccountsProviderProps> = ({ 
     }
   };
 
+  const openModal = () => setIsModalOpen(true);
+  const closeModal = () => setIsModalOpen(false);
+
   return (
     <ManualAccountsContext.Provider value={{ 
         manualAccounts, 
         isLoading, 
         error, 
         addManualAccount, 
-        refetchAccounts: fetchAccounts
+        refetchAccounts: fetchAccounts,
+        isModalOpen,
+        openModal,
+        closeModal
     }}>
       {children}
     </ManualAccountsContext.Provider>

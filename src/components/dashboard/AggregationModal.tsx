@@ -4,11 +4,6 @@ import React, { useState } from 'react';
 import { X, Link as LinkIcon, Edit3 } from 'lucide-react';
 import { useManualAccounts, ManualAsset } from '@/context/ManualAccountsContext';
 
-interface AggregationModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-}
-
 interface ManualAssetFormRow {
   id: string;
   symbol: string;
@@ -16,14 +11,16 @@ interface ManualAssetFormRow {
   value: string;
 }
 
-const AggregationModal: React.FC<AggregationModalProps> = ({ isOpen, onClose }) => {
-  const { addManualAccount } = useManualAccounts();
+const AggregationModal: React.FC = () => {
+  const { addManualAccount, isModalOpen, closeModal } = useManualAccounts();
   const [view, setView] = useState<'options' | 'manual'>('options');
   const [accountName, setAccountName] = useState('');
   const [accountType, setAccountType] = useState('Brokerage');
   const [assets, setAssets] = useState<ManualAssetFormRow[]>([{ id: Date.now().toString(), symbol: '', quantity: '', value: '' }]);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
-  if (!isOpen) return null;
+  if (!isModalOpen) return null;
 
   const handleAddAssetRow = () => {
     setAssets([...assets, { id: Date.now().toString(), symbol: '', quantity: '', value: '' }]);
@@ -37,7 +34,7 @@ const AggregationModal: React.FC<AggregationModalProps> = ({ isOpen, onClose }) 
     setAssets(assets.filter(asset => asset.id !== id));
   };
 
-  const handleSaveManualAccount = () => {
+  const handleSaveManualAccount = async () => {
     const processedAssets: ManualAsset[] = assets.map(asset => ({
         id: asset.id,
         symbol: asset.symbol.trim() || 'Unknown Asset',
@@ -54,17 +51,32 @@ const AggregationModal: React.FC<AggregationModalProps> = ({ isOpen, onClose }) 
         return;
     }
 
-    addManualAccount({
-      accountName: accountName.trim(),
-      accountType: accountType,
-      assets: processedAssets,
-    });
+    setIsSaving(true);
+    setSaveError(null);
+    try {
+      await addManualAccount({
+        accountName: accountName.trim(),
+        accountType: accountType,
+        assets: processedAssets,
+      });
+      setAccountName('');
+      setAccountType('Brokerage');
+      setAssets([{ id: Date.now().toString(), symbol: '', quantity: '', value: '' }]);
+      setView('options');
+      closeModal();
+    } catch (err: any) {
+      console.error("Failed to save account:", err);
+      setSaveError(err.message || "Could not save account. Please try again.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
-    setAccountName('');
-    setAccountType('Brokerage');
-    setAssets([{ id: Date.now().toString(), symbol: '', quantity: '', value: '' }]);
-    setView('options');
-    onClose();
+  const handleClose = () => {
+      setView('options');
+      setSaveError(null);
+      setIsSaving(false);
+      closeModal();
   };
 
   const renderOptionsView = () => (
@@ -165,13 +177,17 @@ const AggregationModal: React.FC<AggregationModalProps> = ({ isOpen, onClose }) 
            </button>
         </div>
       </div>
+      {saveError && (
+          <div className="text-sm text-red-600 mt-2 p-2 bg-red-50 rounded">Error: {saveError}</div>
+      )}
       <div className="flex justify-between items-center pt-4 border-t">
-        <button onClick={() => setView('options')} className="text-sm text-gray-600 hover:text-gray-800">Back</button>
+        <button onClick={() => setView('options')} className="text-sm text-gray-600 hover:text-gray-800" disabled={isSaving}>Back</button>
         <button 
           onClick={handleSaveManualAccount}
-          className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
+          className={`px-4 py-2 bg-indigo-600 text-white rounded-md ${isSaving ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-700'}`}
+          disabled={isSaving}
         >
-          Save Manual Account
+          {isSaving ? 'Saving...' : 'Save Manual Account'}
         </button>
       </div>
     </>
@@ -180,7 +196,7 @@ const AggregationModal: React.FC<AggregationModalProps> = ({ isOpen, onClose }) 
   return (
     <div className="fixed inset-0 bg-gray-600 bg-opacity-75 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-lg shadow-xl p-6 max-w-lg w-full relative">
-        <button onClick={onClose} className="absolute top-3 right-3 text-gray-400 hover:text-gray-600">
+        <button onClick={handleClose} className="absolute top-3 right-3 text-gray-400 hover:text-gray-600">
           <X size={20} />
         </button>
         {view === 'options' ? renderOptionsView() : renderManualEntryView()}

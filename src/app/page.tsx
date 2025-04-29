@@ -1,7 +1,7 @@
 'use client';
 
 // import { Metadata } from 'next'; // Metadata might cause issues in client components
-import React, { useState, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import DashboardHeader from '@/components/dashboard/DashboardHeader';
 import PortfolioValue from '@/components/dashboard/PortfolioValue';
 import PortfolioChart from '@/components/dashboard/PortfolioChart';
@@ -17,8 +17,7 @@ import { useManualAccounts } from '@/context/ManualAccountsContext';
 // };
 
 export default function DashboardPage() {
-  const [showAggregationModal, setShowAggregationModal] = useState(false);
-  const { manualAccounts } = useManualAccounts();
+  const { manualAccounts, isModalOpen, openModal, closeModal } = useManualAccounts();
 
   const totalPortfolioValue = useMemo(() => {
     return manualAccounts.reduce((sum, account) => sum + account.totalValue, 0);
@@ -26,26 +25,18 @@ export default function DashboardPage() {
   
   const displayValue = totalPortfolioValue > 0 ? totalPortfolioValue : 9035.41;
 
-  const handleOpenAggregationModal = () => {
-    setShowAggregationModal(true);
-  };
-
-  const handleCloseAggregationModal = () => {
-    setShowAggregationModal(false);
-  };
-
   return (
     <main className="min-h-screen bg-[#1B2B4B] text-white p-6">
       <div className="max-w-7xl mx-auto space-y-8">
-        <DashboardHeader onAggregateClick={handleOpenAggregationModal} />
+        <DashboardHeader onAggregateClick={openModal} />
         <div className="space-y-6">
           <PortfolioValue value={displayValue} />
           <PortfolioChart totalValue={displayValue} />
         </div>
       </div>
       <AggregationModal 
-        isOpen={showAggregationModal} 
-        onClose={handleCloseAggregationModal} 
+        isOpen={isModalOpen} 
+        onClose={closeModal} 
       />
     </main>
   );

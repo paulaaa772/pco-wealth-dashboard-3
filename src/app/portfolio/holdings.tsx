@@ -28,11 +28,10 @@ const getAccountColor = (accountId: string): string => {
 };
 
 export function PortfolioHoldings() {
-  const { manualAccounts } = useManualAccounts(); // Get accounts from context
-  const [loading, setLoading] = useState(false); // No initial loading needed unless fetching more data
+  // Use context hook to get accounts AND modal controls
+  const { manualAccounts, isLoading, error: contextError, openModal } = useManualAccounts(); 
+  const [loading, setLoading] = useState(false); 
   const [error, setError] = useState<string | null>(null);
-  // const [investments, setInvestments] = useState<Investment[]>([]); // Remove old state
-  // const [totalValue, setTotalValue] = useState(0); // Remove old state
 
   const [sortConfig, setSortConfig] = useState<{
     key: keyof HoldingRow;
@@ -106,7 +105,11 @@ export function PortfolioHoldings() {
     return sortableItems;
   }, [holdingRows, sortConfig]);
 
-  if (loading) {
+  // Combine loading and error states from context
+  const isComponentLoading = isLoading || loading;
+  const componentError = contextError || error;
+
+  if (isComponentLoading) {
     return (
       <div className="bg-[#1E2D4E] rounded-lg p-6">
         <div className="flex justify-center items-center h-64">
@@ -116,12 +119,12 @@ export function PortfolioHoldings() {
     );
   }
 
-  if (error) {
+  if (componentError) {
     return (
       <div className="bg-[#1E2D4E] rounded-lg p-6">
         <div className="text-red-500 p-4 rounded-lg">
           <h3 className="text-xl font-bold mb-2">Error</h3>
-          <p>{error}</p>
+          <p>{componentError}</p>
         </div>
       </div>
     );
@@ -129,9 +132,19 @@ export function PortfolioHoldings() {
 
   return (
     <div className="bg-[#1E2D4E] rounded-lg p-6">
-      <h2 className="text-2xl font-bold mb-6">Investment Holdings</h2>
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-2xl font-bold">Investment Holdings</h2>
+        {/* Add the button here */}
+        <button
+          onClick={openModal} // Use openModal from context
+          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[#9DC4D4] hover:bg-[#8BB3C3] text-[#1B2B4B] transition-colors text-sm"
+        >
+          <span className="material-icons" style={{ fontSize: '1.2em' }}>add_circle</span>
+          Aggregate Account
+        </button>
+      </div>
       
-      {/* Portfolio Summary */}
+      {/* Portfolio Summary - Conditionally render based on manualAccounts from context */}
       {manualAccounts.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
             <div className="bg-[#2A3C61] rounded-lg p-4">
@@ -157,11 +170,11 @@ export function PortfolioHoldings() {
           </div>
       ) : (
          <div className="text-center py-6 text-gray-400 bg-[#2A3C61] rounded-lg mb-6">
-             No manual accounts added yet. Use the 'Aggregate outside accounts' button on the Dashboard.
+             No manual accounts added yet. Click 'Aggregate Account' to add one.
          </div>
       )}
       
-      {/* Holdings Table - Only show if there are rows */}
+      {/* Holdings Table - Conditionally render */}
       {holdingRows.length > 0 && (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
