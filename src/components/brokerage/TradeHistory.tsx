@@ -17,7 +17,10 @@ interface TradeHistoryProps {
 }
 
 const TradeHistory: React.FC<TradeHistoryProps> = ({ orders }) => {
-  const sortedOrders = [...orders].sort((a, b) => b.timestamp - a.timestamp);
+  // Filter for filled orders first
+  const filledOrders = orders.filter(order => order.status === 'filled');
+  // Sort the filled orders by timestamp descending
+  const sortedOrders = [...filledOrders].sort((a, b) => b.timestamp - a.timestamp);
 
   return (
     <div>
@@ -25,7 +28,7 @@ const TradeHistory: React.FC<TradeHistoryProps> = ({ orders }) => {
       
       {sortedOrders.length === 0 ? (
         <div className="text-center py-6 text-gray-500 dark:text-gray-400">
-          No trade history
+          No trade history available yet.
         </div>
       ) : (
         <div className="overflow-x-auto">
@@ -41,8 +44,8 @@ const TradeHistory: React.FC<TradeHistoryProps> = ({ orders }) => {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-              {sortedOrders.map(order => (
-                <tr key={order.id}>
+              {sortedOrders.map((order, index) => (
+                <tr key={order.id} className={`${index % 2 === 0 ? 'bg-white dark:bg-gray-900' : 'bg-gray-50 dark:bg-gray-800'} hover:bg-gray-100 dark:hover:bg-gray-700`}>
                   <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
                     {order.symbol}
                   </td>
