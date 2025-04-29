@@ -1,15 +1,51 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { connectDB, MockDB } from '@/lib/mongo';
-import Income from '@/models/Income';
+import Income, { IncomeSourceDocument } from '@/models/Income';
 import Portfolio from '@/models/Portfolio';
 import { PolygonService } from '@/lib/market-data/PolygonService';
 
+// Type for mock income source
+interface MockIncomeSource {
+  name: string;
+  symbol?: string;
+  type: 'dividend' | 'interest' | 'distribution';
+  frequency: 'monthly' | 'quarterly' | 'annual';
+  amount: number;
+  nextPayment: string;
+  yield: number;
+  paymentHistory: Array<{
+    date: string;
+    amount: number;
+  }>;
+}
+
+// Type for mock monthly income
+interface MockMonthlyIncome {
+  month: string;
+  dividends: number;
+  interest: number;
+  distributions: number;
+}
+
+// Type for the response data
+interface IncomeResponseData {
+  portfolioId: string;
+  projectedAnnualIncome: number;
+  ytdIncome: number;
+  lastYearIncome: number;
+  annualTarget: number;
+  yoyGrowth: number;
+  incomeSources: MockIncomeSource[];
+  monthlyIncome: MockMonthlyIncome[];
+  lastUpdated: string;
+}
+
 // Mock data generators for when MongoDB is not available
-function generateMockIncomeData(portfolioId: string) {
+function generateMockIncomeData(portfolioId: string): IncomeResponseData {
   console.log('[MOCK] Generating mock income data');
   
   // Sample income sources
-  const incomeSources = [
+  const incomeSources: MockIncomeSource[] = [
     {
       name: "Apple Inc.",
       symbol: "AAPL",
@@ -73,7 +109,7 @@ function generateMockIncomeData(portfolioId: string) {
   
   // Generate monthly income data
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  const monthlyIncome = months.map((month, i) => {
+  const monthlyIncome: MockMonthlyIncome[] = months.map((month, i) => {
     // Simulate quarterly dividend payments
     const isDividendMonth = i % 3 === 0;
     const dividends = isDividendMonth ? 5500 : 0;
@@ -278,14 +314,14 @@ export async function GET(req: NextRequest) {
     }
     
     // Convert to format expected by the client
-    const responseData = {
-      portfolioId: incomeData.portfolioId,
+    const responseData: IncomeResponseData = {
+      portfolioId: incomeData.portfolioId.toString(),
       projectedAnnualIncome: incomeData.projectedAnnualIncome,
       ytdIncome: incomeData.ytdIncome,
       lastYearIncome: incomeData.lastYearIncome,
       annualTarget: incomeData.annualTarget,
       yoyGrowth: incomeData.yoyGrowth,
-      incomeSources: incomeData.incomeSources.map(source => ({
+      incomeSources: incomeData.incomeSources.map((source: IncomeSourceDocument) => ({
         name: source.name,
         type: source.type,
         frequency: source.frequency,
@@ -303,7 +339,7 @@ export async function GET(req: NextRequest) {
         interest: month.interest,
         distributions: month.distributions
       })),
-      lastUpdated: incomeData.lastUpdated
+      lastUpdated: incomeData.lastUpdated.toISOString()
     };
     
     return NextResponse.json(responseData);
