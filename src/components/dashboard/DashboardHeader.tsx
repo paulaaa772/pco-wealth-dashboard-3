@@ -2,7 +2,12 @@
 
 import Link from 'next/link';
 
-export default function DashboardHeader() {
+// Define props interface
+interface DashboardHeaderProps {
+  onAggregateClick: () => void; // Function to open the modal
+}
+
+export default function DashboardHeader({ onAggregateClick }: DashboardHeaderProps) {
   return (
     <div className="flex justify-between items-center">
       <h1 className="text-3xl font-light">
@@ -17,7 +22,7 @@ export default function DashboardHeader() {
           INVESTMENTS
         </Link>
         <button
-          onClick={() => alert('Aggregate outside accounts feature coming soon!')}
+          onClick={onAggregateClick} // Use the passed handler
           className="flex items-center gap-2 px-6 py-2 rounded-lg bg-[#9DC4D4] hover:bg-[#8BB3C3] text-[#1B2B4B] transition-colors"
         >
           <span className="material-icons">add_circle</span>

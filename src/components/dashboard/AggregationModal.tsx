@@ -1,0 +1,165 @@
+'use client';
+
+import React, { useState } from 'react';
+import { X, Link as LinkIcon, Edit3 } from 'lucide-react';
+
+interface AggregationModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+}
+
+interface ManualAsset {
+  id: string;
+  symbol: string;
+  quantity: string;
+  value: string;
+}
+
+const AggregationModal: React.FC<AggregationModalProps> = ({ isOpen, onClose }) => {
+  const [view, setView] = useState<'options' | 'manual'>('options');
+  const [accountName, setAccountName] = useState('');
+  const [accountType, setAccountType] = useState('Brokerage');
+  const [assets, setAssets] = useState<ManualAsset[]>([{ id: Date.now().toString(), symbol: '', quantity: '', value: '' }]);
+
+  if (!isOpen) return null;
+
+  const handleAddAssetRow = () => {
+    setAssets([...assets, { id: Date.now().toString(), symbol: '', quantity: '', value: '' }]);
+  };
+
+  const handleAssetChange = (id: string, field: keyof Omit<ManualAsset, 'id'>, value: string) => {
+    setAssets(assets.map(asset => asset.id === id ? { ...asset, [field]: value } : asset));
+  };
+
+  const handleRemoveAssetRow = (id: string) => {
+    setAssets(assets.filter(asset => asset.id !== id));
+  };
+
+  const handleSaveManualAccount = () => {
+    // TODO: Implement saving logic (e.g., update global state, call API)
+    console.log('Saving Manual Account:', { accountName, accountType, assets });
+    onClose(); // Close modal after saving
+  };
+
+  const renderOptionsView = () => (
+    <>
+      <h3 className="text-xl font-semibold mb-6 text-gray-800">Aggregate Outside Accounts</h3>
+      <div className="space-y-4">
+        <button
+          onClick={() => alert('Account linking via Plaid coming soon!')}
+          className="w-full flex items-center justify-center gap-3 px-4 py-3 border border-transparent rounded-md shadow-sm text-base font-medium text-white bg-indigo-600 hover:bg-indigo-700"
+        >
+          <LinkIcon className="h-5 w-5" />
+          Link Account (Plaid - Coming Soon)
+        </button>
+        <button
+          onClick={() => setView('manual')}
+          className="w-full flex items-center justify-center gap-3 px-4 py-3 border border-gray-300 rounded-md shadow-sm text-base font-medium text-gray-700 bg-white hover:bg-gray-50"
+        >
+          <Edit3 className="h-5 w-5" />
+          Add Account Manually
+        </button>
+      </div>
+    </>
+  );
+
+  const renderManualEntryView = () => (
+    <>
+      <h3 className="text-xl font-semibold mb-4 text-gray-800">Add Manual Account</h3>
+      <div className="space-y-4 mb-6">
+        <div>
+          <label htmlFor="accountName" className="block text-sm font-medium text-gray-700 mb-1">Account Name</label>
+          <input
+            type="text"
+            id="accountName"
+            value={accountName}
+            onChange={(e) => setAccountName(e.target.value)}
+            className="w-full border border-gray-300 rounded-md px-3 py-2 text-gray-900"
+            placeholder="e.g., Fidelity Brokerage, Chase Savings"
+          />
+        </div>
+        <div>
+          <label htmlFor="accountType" className="block text-sm font-medium text-gray-700 mb-1">Account Type</label>
+          <select
+            id="accountType"
+            value={accountType}
+            onChange={(e) => setAccountType(e.target.value)}
+            className="w-full border border-gray-300 rounded-md px-3 py-2 text-gray-900 bg-white"
+          >
+            <option>Brokerage</option>
+            <option>Bank Account</option>
+            <option>Crypto Wallet</option>
+            <option>Other</option>
+          </select>
+        </div>
+        
+        <div className="border-t pt-4 mt-4">
+           <h4 className="text-md font-medium text-gray-800 mb-2">Assets / Holdings</h4>
+           {assets.map((asset, index) => (
+             <div key={asset.id} className="grid grid-cols-12 gap-2 mb-2 items-center">
+               <input 
+                 type="text" 
+                 placeholder="Symbol/Name" 
+                 value={asset.symbol}
+                 onChange={(e) => handleAssetChange(asset.id, 'symbol', e.target.value)}
+                 className="col-span-4 border border-gray-300 rounded px-2 py-1 text-sm text-gray-900"
+               />
+               <input 
+                 type="text" 
+                 placeholder="Quantity" 
+                 value={asset.quantity}
+                 onChange={(e) => handleAssetChange(asset.id, 'quantity', e.target.value)}
+                 className="col-span-3 border border-gray-300 rounded px-2 py-1 text-sm text-gray-900"
+               />
+               <div className="col-span-4 relative rounded-md shadow-sm">
+                 <div className="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none">
+                   <span className="text-gray-500 sm:text-sm">$</span>
+                 </div>
+                 <input 
+                   type="text" 
+                   placeholder="Value" 
+                   value={asset.value}
+                   onChange={(e) => handleAssetChange(asset.id, 'value', e.target.value)}
+                   className="w-full border border-gray-300 rounded pl-6 pr-2 py-1 text-sm text-gray-900"
+                 />
+               </div>
+               <button 
+                 onClick={() => handleRemoveAssetRow(asset.id)} 
+                 className="col-span-1 text-red-500 hover:text-red-700 disabled:opacity-50"
+                 disabled={assets.length <= 1}
+                 title="Remove row"
+               >
+                 <X size={16} />
+               </button>
+             </div>
+           ))}
+           <button onClick={handleAddAssetRow} className="text-sm text-indigo-600 hover:text-indigo-800 mt-2">
+             + Add another asset
+           </button>
+        </div>
+      </div>
+      <div className="flex justify-between items-center pt-4 border-t">
+        <button onClick={() => setView('options')} className="text-sm text-gray-600 hover:text-gray-800">Back</button>
+        <button 
+          onClick={handleSaveManualAccount}
+          className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
+        >
+          Save Manual Account
+        </button>
+      </div>
+    </>
+  );
+
+  return (
+    <div className="fixed inset-0 bg-gray-600 bg-opacity-75 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg shadow-xl p-6 max-w-lg w-full relative">
+        <button onClick={onClose} className="absolute top-3 right-3 text-gray-400 hover:text-gray-600">
+          <X size={20} />
+        </button>
+        {view === 'options' ? renderOptionsView() : renderManualEntryView()}
+      </div>
+    </div>
+  );
+};
+
+export default AggregationModal; 
