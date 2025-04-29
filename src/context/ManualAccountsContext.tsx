@@ -117,9 +117,10 @@ export const ManualAccountsProvider: React.FC<ManualAccountsProviderProps> = ({ 
     console.log(`[Context] Attempting to update account ${id} via API:`, accountData);
     setError(null);
     try {
-      let dataToSend = { ...accountData };
+      let dataToSend: Partial<ManualAccount> = { ...accountData };
+      
       if (accountData.assets) {
-        dataToSend.totalValue = accountData.assets.reduce((sum, asset) => sum + asset.value, 0);
+        dataToSend.totalValue = accountData.assets.reduce((sum, asset) => sum + (asset.value || 0), 0);
       }
 
       const response = await fetch(`/api/manual-accounts/${id}`, {
