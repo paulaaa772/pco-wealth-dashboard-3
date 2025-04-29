@@ -75,28 +75,35 @@ const IndicatorModal: React.FC<IndicatorModalProps> = ({
   const handleParamChange = (
       id: string, 
       param: keyof Omit<ActiveIndicator, 'id' | 'type'>, 
-      value: string | boolean // Accept boolean for checkboxes
+      value: string | boolean // Value from input (string or boolean)
     ) => {
     setIndicators(indicators.map(ind => {
       if (ind.id === id) {
-        let processedValue: number | boolean | undefined = value;
-        // Try parsing number only if it's not already a boolean
-        if (typeof value === 'string') {
-           const numValue = parseInt(value, 10);
-           // Update only if it's a valid positive number
-           if (!isNaN(numValue) && numValue > 0) {
-               processedValue = numValue;
-           } else if (value === '') { // Allow clearing numeric input
-               processedValue = undefined;
-           } else {
-               // If not a valid number and not empty string, don't update numeric fields
-               if (param === 'period' || param === 'fastPeriod' || param === 'slowPeriod' || param === 'signalPeriod') {
-                   return ind; // Keep existing value
-               }
-           }
+        let updatedValue: number | boolean | undefined;
+
+        if (typeof value === 'boolean') {
+          // Directly assign if it's a boolean (from checkbox)
+          updatedValue = value;
+        } else {
+          // It's a string from a number input
+          if (value.trim() === '') {
+            // Allow clearing the input (set param to undefined)
+            updatedValue = undefined;
+          } else {
+            const numValue = parseInt(value, 10);
+            // Only assign if it's a valid positive number
+            if (!isNaN(numValue) && numValue > 0) {
+              updatedValue = numValue;
+            } else {
+              // If invalid number string, keep the existing value (don't update)
+              return ind; 
+            }
+          }
         }
-        return { ...ind, [param]: processedValue };
+        // Return the updated indicator object
+        return { ...ind, [param]: updatedValue };
       }
+      // If ID doesn't match, return the original indicator
       return ind;
     }));
   };
