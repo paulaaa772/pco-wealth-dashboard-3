@@ -1,95 +1,184 @@
 'use client'
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { PortfolioIncome, IncomeSource, MonthlyIncome } from '@/components/portfolio/PortfolioIncome';
+import axios from 'axios';
 
 export function IncomeAnalysis() {
-  // Mock data for the PortfolioIncome component
-  const mockIncomeSources: IncomeSource[] = [
-    {
-      name: "Apple Inc.",
-      type: "dividend",
-      frequency: "quarterly",
-      amount: 2500,
-      nextPayment: "2024-06-15",
-      yield: 0.0235,
-      paymentHistory: [
-        { date: "2024-03-15", amount: 2500 },
-        { date: "2023-12-15", amount: 2300 },
-        { date: "2023-09-15", amount: 2300 },
-        { date: "2023-06-15", amount: 2200 },
-      ]
-    },
-    {
-      name: "Microsoft Corp",
-      type: "dividend",
-      frequency: "quarterly",
-      amount: 3200,
-      nextPayment: "2024-06-08",
-      yield: 0.0185,
-      paymentHistory: [
-        { date: "2024-03-08", amount: 3200 },
-        { date: "2023-12-08", amount: 3000 },
-        { date: "2023-09-08", amount: 3000 },
-        { date: "2023-06-08", amount: 2800 },
-      ]
-    },
-    {
-      name: "US Treasury Bonds",
-      type: "interest",
-      frequency: "monthly",
-      amount: 1800,
-      nextPayment: "2024-05-28",
-      yield: 0.0435,
-      paymentHistory: [
-        { date: "2024-04-28", amount: 1800 },
-        { date: "2024-03-28", amount: 1800 },
-        { date: "2024-02-28", amount: 1800 },
-        { date: "2024-01-28", amount: 1750 },
-      ]
-    },
-    {
-      name: "Vanguard Real Estate ETF",
-      type: "distribution",
-      frequency: "quarterly",
-      amount: 2800,
-      nextPayment: "2024-06-25",
-      yield: 0.0385,
-      paymentHistory: [
-        { date: "2024-03-25", amount: 2800 },
-        { date: "2023-12-25", amount: 2750 },
-        { date: "2023-09-25", amount: 2700 },
-        { date: "2023-06-25", amount: 2650 },
-      ]
-    }
-  ];
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [incomeData, setIncomeData] = useState<{
+    projectedAnnualIncome: number;
+    ytdIncome: number;
+    lastYearIncome: number;
+    annualTarget: number;
+    incomeSources: IncomeSource[];
+    monthlyIncome: MonthlyIncome[];
+  } | null>(null);
 
-  const mockMonthlyIncome: MonthlyIncome[] = [
-    { month: "Jan", dividends: 0, interest: 1750, distributions: 0 },
-    { month: "Feb", dividends: 0, interest: 1800, distributions: 0 },
-    { month: "Mar", dividends: 5500, interest: 1800, distributions: 2800 },
-    { month: "Apr", dividends: 0, interest: 1800, distributions: 0 },
-    { month: "May", dividends: 0, interest: 1800, distributions: 0 },
-    { month: "Jun", dividends: 5700, interest: 1800, distributions: 2800 },
-    { month: "Jul", dividends: 0, interest: 1800, distributions: 0 },
-    { month: "Aug", dividends: 0, interest: 1800, distributions: 0 },
-    { month: "Sep", dividends: 5300, interest: 1800, distributions: 2700 },
-    { month: "Oct", dividends: 0, interest: 1800, distributions: 0 },
-    { month: "Nov", dividends: 0, interest: 1800, distributions: 0 },
-    { month: "Dec", dividends: 5300, interest: 1800, distributions: 2750 }
-  ];
+  const [portfolioId, setPortfolioId] = useState<string | null>(null);
+  const [targetAnnualIncome, setTargetAnnualIncome] = useState(0);
+  const [isEditingTarget, setIsEditingTarget] = useState(false);
+
+  // Get sample portfolio if needed
+  useEffect(() => {
+    async function getSamplePortfolio() {
+      try {
+        const response = await axios.get('/api/portfolios/sample');
+        if (response.data && response.data.portfolioId) {
+          setPortfolioId(response.data.portfolioId);
+        }
+      } catch (err) {
+        console.error('Error getting sample portfolio:', err);
+        setError('Failed to get sample portfolio. Please try again later.');
+      }
+    }
+    
+    if (!portfolioId) {
+      getSamplePortfolio();
+    }
+  }, [portfolioId]);
+
+  // Fetch income data when component mounts
+  useEffect(() => {
+    async function fetchIncomeData() {
+      if (!portfolioId) return;
+      
+      try {
+        setLoading(true);
+        setError(null);
+        const response = await axios.get(`/api/income?portfolioId=${portfolioId}`);
+        
+        if (response.data) {
+          setIncomeData({
+            projectedAnnualIncome: response.data.projectedAnnualIncome,
+            ytdIncome: response.data.ytdIncome,
+            lastYearIncome: response.data.lastYearIncome,
+            annualTarget: response.data.annualTarget,
+            incomeSources: response.data.incomeSources,
+            monthlyIncome: response.data.monthlyIncome
+          });
+          setTargetAnnualIncome(response.data.annualTarget);
+        }
+      } catch (err) {
+        console.error('Error fetching income data:', err);
+        setError('Failed to load income data. Please try again later.');
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchIncomeData();
+  }, [portfolioId]);
+
+  // Handle updating target income
+  const updateTargetIncome = async () => {
+    if (!portfolioId) return;
+    
+    try {
+      await axios.put('/api/income', {
+        portfolioId,
+        annualTarget: targetAnnualIncome
+      });
+      
+      // Update local state
+      if (incomeData) {
+        setIncomeData({
+          ...incomeData,
+          annualTarget: targetAnnualIncome
+        });
+      }
+      
+      setIsEditingTarget(false);
+    } catch (err) {
+      console.error('Error updating target income:', err);
+      setError('Failed to update target income. Please try again later.');
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="bg-[#1E2D4E] rounded-lg p-6">
+        <div className="flex justify-center items-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-[#1E2D4E] rounded-lg p-6">
+        <div className="text-red-500 p-4 rounded-lg">
+          <h3 className="text-xl font-bold mb-2">Error</h3>
+          <p>{error}</p>
+          <button 
+            onClick={() => window.location.reload()}
+            className="mt-4 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+          >
+            Try Again
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-[#1E2D4E] rounded-lg p-6">
-      <h2 className="text-2xl font-bold mb-6">Income Analysis</h2>
-      <PortfolioIncome
-        projectedAnnualIncome={72000}
-        ytdIncome={23250}
-        lastYearIncome={65400}
-        annualTarget={75000}
-        incomeSources={mockIncomeSources}
-        monthlyIncome={mockMonthlyIncome}
-      />
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-2xl font-bold">Income Analysis</h2>
+        
+        {/* Target income editor */}
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-gray-400">Annual Target:</span>
+          {isEditingTarget ? (
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                value={targetAnnualIncome}
+                onChange={(e) => setTargetAnnualIncome(Number(e.target.value))}
+                className="bg-gray-800 border border-gray-700 rounded px-2 py-1 w-32 text-white"
+              />
+              <button
+                onClick={updateTargetIncome}
+                className="bg-blue-600 text-white px-2 py-1 rounded hover:bg-blue-700 text-sm"
+              >
+                Save
+              </button>
+              <button
+                onClick={() => {
+                  setTargetAnnualIncome(incomeData?.annualTarget || 0);
+                  setIsEditingTarget(false);
+                }}
+                className="bg-gray-700 text-white px-2 py-1 rounded hover:bg-gray-600 text-sm"
+              >
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <span className="font-medium">${targetAnnualIncome.toLocaleString()}</span>
+              <button
+                onClick={() => setIsEditingTarget(true)}
+                className="text-blue-400 hover:text-blue-300 text-sm"
+              >
+                Edit
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+      
+      {incomeData && (
+        <PortfolioIncome
+          projectedAnnualIncome={incomeData.projectedAnnualIncome}
+          ytdIncome={incomeData.ytdIncome}
+          lastYearIncome={incomeData.lastYearIncome}
+          annualTarget={incomeData.annualTarget}
+          incomeSources={incomeData.incomeSources}
+          monthlyIncome={incomeData.monthlyIncome}
+        />
+      )}
     </div>
   );
 } 
