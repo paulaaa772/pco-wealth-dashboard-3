@@ -229,23 +229,28 @@ export class PolygonService {
     }
     
     try {
-      console.log(`[POLYGON] Fetching latest price for ${symbol}`);
-      if (!this.client) throw new Error('API client not initialized');
+      console.log(`[POLYGON SVC] Attempting to fetch latest price for ${symbol}`);
+      if (!this.client) {
+          console.error('[POLYGON SVC] API client not initialized!');
+          throw new Error('API client not initialized');
+      }
       
       const response = await this.client.get(`/v2/last/trade/${symbol}`);
+      console.log(`[POLYGON SVC] Raw response for ${symbol} latest price:`, JSON.stringify(response.data, null, 2));
       
-      if (response.data.status === 'OK' && response.data.results && typeof response.data.results.p === 'number') {
+      // Check if status is OK or DELAYED and if results exist
+      if ((response.data.status === 'OK' || response.data.status === 'DELAYED') && response.data.results && typeof response.data.results.p === 'number') {
         const price = response.data.results.p;
-        console.log(`[POLYGON] Latest price for ${symbol}: ${price}`);
+        console.log(`[POLYGON SVC] Successfully extracted latest price for ${symbol}: ${price}`);
         return price;
       } else {
-        console.warn(`[POLYGON] API returned no valid latest price data for ${symbol}. Status: ${response.data.status}`);
+        console.warn(`[POLYGON SVC] API returned unexpected status or no valid price data for ${symbol}. Status: ${response.data.status}, Results:`, response.data.results);
         return null;
       }
     } catch (error) {
-      console.error(`[POLYGON] Error fetching latest price for ${symbol}:`, error);
+      console.error(`[POLYGON SVC] Error fetching latest price for ${symbol}:`, error);
        if (axios.isAxiosError(error)) {
-         console.error(`[POLYGON] Axios Error Details: Status=${error.response?.status}, Data=`, error.response?.data);
+         console.error(`[POLYGON SVC] Axios Error Details: Status=${error.response?.status}, Data=`, error.response?.data);
        }
       return null;
     }

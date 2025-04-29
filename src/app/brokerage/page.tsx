@@ -565,22 +565,22 @@ export default function BrokeragePage() {
     setIsLoading(true);
     
     try {
-      console.log(`Loading market data for ${symbol} with timeframe ${timeframe}`);
+      console.log(`[BROKERAGE] Loading market data for ${symbol} (${timeframe})`);
       const polygonService = PolygonService.getInstance();
       
       // Get latest price
+      console.log(`[BROKERAGE] Calling polygonService.getLatestPrice for ${symbol}`);
       const price = await polygonService.getLatestPrice(symbol);
-      console.log(`Latest price data for ${symbol}:`, price);
+      console.log(`[BROKERAGE] Received latest price for ${symbol}:`, price);
       
       if (price !== null) {
         setCurrentPrice(price);
+        console.log(`[BROKERAGE] State updated with latest price: ${price}`);
       } else {
-        console.error('Failed to get latest price, using simulated data');
+        console.error('[BROKERAGE] Failed to get latest price, using simulated data');
         if (!isAutoRefresh) {
           setError('Failed to get latest price. Using demo data.');
         }
-        
-        // Use a simulated price for demo purposes
         setCurrentPrice(generateSimulatedPrice(symbol));
       }
       
@@ -649,7 +649,7 @@ export default function BrokeragePage() {
         setCandleData(generateDemoCandleData(symbol, startDate, endDate));
       }
     } catch (error: any) {
-      console.error('Error loading market data:', error);
+      console.error('[BROKERAGE] Error in loadMarketData:', error);
       if (!isAutoRefresh) {
         setError(`Error: ${error.message || 'Failed to load market data'}. Using demo data.`);
       }
