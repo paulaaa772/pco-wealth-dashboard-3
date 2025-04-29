@@ -839,8 +839,8 @@ export default function BrokeragePage() {
       {/* Main content */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {/* Chart area - 2/3 width on larger screens */}
-        <div className="md:col-span-2 bg-white dark:bg-zinc-800 rounded-lg shadow p-4">
-          <div className="min-h-[400px] w-full">
+        <div className="md:col-span-2 bg-white dark:bg-zinc-800 rounded-lg shadow p-4 flex flex-col">
+          <div className="flex-grow h-full w-full min-h-[400px]">
             {isLoading ? (
               <div className="h-full flex items-center justify-center">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
@@ -858,8 +858,8 @@ export default function BrokeragePage() {
             )}
           </div>
           
-          {/* Portfolio value */}
-          <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+          {/* Portfolio value - Ensure this doesn't take space away from chart */}
+          <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700 flex-shrink-0">
             <div className="flex justify-between items-center">
               <div className="text-sm text-gray-500 dark:text-gray-400">
                 Portfolio Value ({symbol})
