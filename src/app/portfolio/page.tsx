@@ -11,6 +11,7 @@ import {
 import { IncomeAnalysis } from './income-analysis';
 import { PortfolioHoldings } from './holdings';
 import { useManualAccounts } from '@/context/ManualAccountsContext';
+import AssetAllocation from '@/components/portfolio/AssetAllocation';
 
 export default function PortfolioPage() {
   const { manualAccounts, isLoading: isLoadingAccounts, error: accountsError } = useManualAccounts();
@@ -71,6 +72,12 @@ export default function PortfolioPage() {
               Holdings
             </button>
             <button 
+              className={activeTab === 'allocation' ? activeTabStyle : inactiveTabStyle}
+              onClick={() => setActiveTab('allocation')}
+            >
+              Allocation
+            </button>
+            <button 
               className={activeTab === 'performance' ? activeTabStyle : inactiveTabStyle}
               onClick={() => setActiveTab('performance')}
             >
@@ -87,6 +94,8 @@ export default function PortfolioPage() {
         
         {/* Tab Content */}
         {activeTab === 'holdings' && <PortfolioHoldings />}
+        
+        {activeTab === 'allocation' && <AssetAllocation />}
         
         {activeTab === 'performance' && (
           <div className="bg-[#2A3C61] rounded-lg p-6">
