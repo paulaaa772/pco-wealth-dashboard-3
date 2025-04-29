@@ -39,47 +39,6 @@ export function PortfolioHoldings() {
     direction: 'ascending' | 'descending';
   }>({ key: 'value', direction: 'descending' });
 
-  // Process manual accounts into displayable holding rows
-  const holdingRows: HoldingRow[] = useMemo(() => {
-    let grandTotalValue = 0;
-    const rows: HoldingRow[] = [];
-    
-    // Calculate grand total value first for allocation percentages
-    manualAccounts.forEach(account => {
-      grandTotalValue += account.assets.reduce((sum, asset) => sum + asset.value, 0);
-    });
-    
-    if (grandTotalValue === 0) grandTotalValue = 1; // Avoid division by zero
-
-    manualAccounts.forEach(account => {
-      const color = getAccountColor(account.id);
-      account.assets.forEach(asset => {
-        const costBasis = asset.costBasis ?? asset.value; // Use value if cost basis not provided
-        const gain = asset.value - costBasis;
-        const gainPercent = costBasis > 0 ? (gain / costBasis) * 100 : 0;
-        rows.push({
-          ...asset,
-          accountName: account.accountName,
-          accountType: account.accountType,
-          accountColor: color,
-          allocation: (asset.value / grandTotalValue) * 100,
-          gain,
-          gainPercent
-        });
-      });
-    });
-    return rows;
-  }, [manualAccounts]);
-
-  // Calculate overall summary metrics from processed rows
-  const summary = useMemo(() => {
-    const totalValue = holdingRows.reduce((sum, row) => sum + row.value, 0);
-    const totalCost = holdingRows.reduce((sum, row) => sum + (row.costBasis ?? row.value), 0);
-    const totalGain = totalValue - totalCost;
-    const averageGainPercent = totalCost > 0 ? (totalGain / totalCost) * 100 : 0;
-    return { totalValue, totalCost, totalGain, averageGainPercent };
-  }, [holdingRows]);
-
   // Handle sorting
   const requestSort = (key: keyof HoldingRow) => {
     let direction: 'ascending' | 'descending' = 'ascending';
@@ -89,9 +48,41 @@ export function PortfolioHoldings() {
     setSortConfig({ key, direction });
   };
 
+  // --- Process accounts into rows AND Define groupedRows here --- 
+  const { groups: groupedRowsGroups, accountDetails: groupedAccountDetails } = useMemo(() => {
+      const groups: { [accountId: string]: HoldingRow[] } = {};
+      const accountDetails: { [accountId: string]: { name: string; type: string; color: string } } = {};
+      let grandTotalValue = manualAccounts.reduce((sum, acc) => sum + acc.totalValue, 0) || 1;
+
+      manualAccounts.forEach(account => {
+        const color = getAccountColor(account.id);
+        accountDetails[account.id] = { name: account.accountName, type: account.accountType, color };
+        groups[account.id] = [];
+        account.assets.forEach(asset => {
+          const costBasis = asset.costBasis ?? asset.value; 
+          const gain = asset.value - costBasis;
+          const gainPercent = costBasis > 0 ? (gain / costBasis) * 100 : 0;
+          groups[account.id].push({
+            ...asset,
+            accountName: account.accountName,
+            accountType: account.accountType,
+            accountColor: color,
+            allocation: (asset.value / grandTotalValue) * 100,
+            gain,
+            gainPercent
+          });
+        });
+      });
+      return { groups, accountDetails }; // Return both pieces
+  }, [manualAccounts]);
+
+  // --- Handlers for Edit/Delete (Add these *after* groupedRows is defined) --- 
+  const handleEditAccount = (accountId: string) => { /* ... */ };
+  const handleDeleteAccount = async (accountId: string, accountName: string) => { /* ... */ };
+
   // Sort holding rows based on current config
   const sortedHoldingRows = useMemo(() => {
-    const sortableItems = [...holdingRows];
+    const sortableItems = [...Object.values(groupedRowsGroups).flat()];
     if (sortConfig.key) {
       sortableItems.sort((a, b) => {
         // Add checks/defaults for potential undefined values
@@ -104,7 +95,16 @@ export function PortfolioHoldings() {
       });
     }
     return sortableItems;
-  }, [holdingRows, sortConfig]);
+  }, [groupedRowsGroups, sortConfig]);
+
+  // Calculate overall summary metrics from processed rows
+  const summary = useMemo(() => {
+    const totalValue = sortedHoldingRows.reduce((sum, row) => sum + row.value, 0);
+    const totalCost = sortedHoldingRows.reduce((sum, row) => sum + (row.costBasis ?? row.value), 0);
+    const totalGain = totalValue - totalCost;
+    const averageGainPercent = totalCost > 0 ? (totalGain / totalCost) * 100 : 0;
+    return { totalValue, totalCost, totalGain, averageGainPercent };
+  }, [sortedHoldingRows]);
 
   // Combine loading and error states from context
   const isComponentLoading = isLoading || loading;
@@ -175,8 +175,8 @@ export function PortfolioHoldings() {
          </div>
       )}
       
-      {/* Holdings Table - Conditionally render */}
-      {holdingRows.length > 0 && (
+      {/* Holdings Table - Use groupedRowsGroups and groupedAccountDetails */}
+      {manualAccounts.length > 0 ? (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-[#2A3C61] text-gray-300">
@@ -238,30 +238,30 @@ export function PortfolioHoldings() {
             </thead>
             {/* Iterate through accounts first */}
             <tbody>
-              {Object.entries(groupedRows.groups).map(([accountId, rows]) => (
+              {/* Correctly iterate using the defined variable */}
+              {Object.entries(groupedRowsGroups).map(([accountId, rows]) => (
                   <React.Fragment key={accountId}>
-                    {/* Account Header Row */}
+                    {/* Account Header Row - Use groupedAccountDetails */}
                     <tr className="bg-[#18233C] border-b border-t border-gray-600">
                        <td colSpan={5} className="py-2 px-4 font-semibold"> 
                           <div className="flex items-center">
-                              <span className="h-2.5 w-2.5 rounded-full mr-2" style={{ backgroundColor: groupedRows.accountDetails[accountId]?.color }}></span>
-                              <span>{groupedRows.accountDetails[accountId]?.name}</span>
-                              <span className="text-xs text-gray-400 ml-2">({groupedRows.accountDetails[accountId]?.type})</span>
+                              <span className="h-2.5 w-2.5 rounded-full mr-2" style={{ backgroundColor: groupedAccountDetails[accountId]?.color }}></span>
+                              <span>{groupedAccountDetails[accountId]?.name}</span>
+                              <span className="text-xs text-gray-400 ml-2">({groupedAccountDetails[accountId]?.type})</span>
                           </div>
                        </td>
                        <td className="py-2 px-4 text-center">
-                         {/* Action buttons for the whole account */}
                          <div className="flex justify-center gap-2">
                             <button onClick={() => handleEditAccount(accountId)} title="Edit Account" className="text-blue-400 hover:text-blue-300">
                                <Edit size={16} />
                             </button>
-                            <button onClick={() => handleDeleteAccount(accountId, groupedRows.accountDetails[accountId]?.name)} title="Delete Account" className="text-red-400 hover:text-red-300">
+                            <button onClick={() => handleDeleteAccount(accountId, groupedAccountDetails[accountId]?.name)} title="Delete Account" className="text-red-400 hover:text-red-300">
                                <Trash2 size={16} />
                             </button>
                          </div>
                        </td>
                     </tr>
-                    {/* Asset Rows for this account - Use `rows` from the map */}
+                    {/* Asset Rows */}
                     {rows.map((row, index) => (
                       <tr key={row.id} className={`${index % 2 === 0 ? 'bg-[#2A3C61]' : 'bg-[#233150]'} hover:bg-[#344571]`}>
                         <td className="py-3 px-4 pl-8 text-sm font-medium">{row.symbol}</td> {/* Indented symbol */}
