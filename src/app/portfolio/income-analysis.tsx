@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect } from 'react';
 import { PortfolioIncome, IncomeSource, MonthlyIncome } from '@/components/portfolio/PortfolioIncome';
-import axios from 'axios';
 
 export function IncomeAnalysis() {
   const [loading, setLoading] = useState(true);
@@ -16,84 +15,137 @@ export function IncomeAnalysis() {
     monthlyIncome: MonthlyIncome[];
   } | null>(null);
 
-  const [portfolioId, setPortfolioId] = useState<string | null>(null);
+  const [portfolioId, setPortfolioId] = useState<string>('demo-portfolio');
   const [targetAnnualIncome, setTargetAnnualIncome] = useState(0);
   const [isEditingTarget, setIsEditingTarget] = useState(false);
 
-  // Get sample portfolio if needed
+  // Generate mock data client-side
   useEffect(() => {
-    async function getSamplePortfolio() {
-      try {
-        const response = await axios.get('/api/portfolios/sample');
-        if (response.data && response.data.portfolioId) {
-          setPortfolioId(response.data.portfolioId);
+    // Generate mock data
+    function generateMockIncomeData() {
+      // Sample income sources
+      const incomeSources: IncomeSource[] = [
+        {
+          name: "Apple Inc.",
+          type: "dividend",
+          frequency: "quarterly",
+          amount: 2500,
+          nextPayment: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 30 days from now
+          yield: 0.0235,
+          paymentHistory: [
+            { date: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], amount: 2500 },
+            { date: new Date(Date.now() - 180 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], amount: 2300 },
+            { date: new Date(Date.now() - 270 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], amount: 2300 },
+            { date: new Date(Date.now() - 360 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], amount: 2200 },
+          ]
+        },
+        {
+          name: "Microsoft Corp",
+          type: "dividend",
+          frequency: "quarterly",
+          amount: 3200,
+          nextPayment: new Date(Date.now() + 45 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 45 days from now
+          yield: 0.0185,
+          paymentHistory: [
+            { date: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], amount: 3200 },
+            { date: new Date(Date.now() - 180 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], amount: 3000 },
+            { date: new Date(Date.now() - 270 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], amount: 3000 },
+            { date: new Date(Date.now() - 360 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], amount: 2800 },
+          ]
+        },
+        {
+          name: "US Treasury Bonds",
+          type: "interest",
+          frequency: "monthly",
+          amount: 1800,
+          nextPayment: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 15 days from now
+          yield: 0.0435,
+          paymentHistory: [
+            { date: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], amount: 1800 },
+            { date: new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], amount: 1800 },
+            { date: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], amount: 1800 },
+            { date: new Date(Date.now() - 120 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], amount: 1750 },
+          ]
+        },
+        {
+          name: "Vanguard Real Estate ETF",
+          type: "distribution",
+          frequency: "quarterly",
+          amount: 2800,
+          nextPayment: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 60 days from now
+          yield: 0.0385,
+          paymentHistory: [
+            { date: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], amount: 2800 },
+            { date: new Date(Date.now() - 180 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], amount: 2750 },
+            { date: new Date(Date.now() - 270 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], amount: 2700 },
+            { date: new Date(Date.now() - 360 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], amount: 2650 },
+          ]
         }
-      } catch (err) {
-        console.error('Error getting sample portfolio:', err);
-        setError('Failed to get sample portfolio. Please try again later.');
-      }
-    }
-    
-    if (!portfolioId) {
-      getSamplePortfolio();
-    }
-  }, [portfolioId]);
-
-  // Fetch income data when component mounts
-  useEffect(() => {
-    async function fetchIncomeData() {
-      if (!portfolioId) return;
+      ];
       
-      try {
-        setLoading(true);
-        setError(null);
-        const response = await axios.get(`/api/income?portfolioId=${portfolioId}`);
+      // Generate monthly income data
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const monthlyIncome: MonthlyIncome[] = months.map((month, i) => {
+        // Simulate quarterly dividend payments
+        const isDividendMonth = i % 3 === 0;
+        const dividends = isDividendMonth ? 5500 : 0;
         
-        if (response.data) {
-          setIncomeData({
-            projectedAnnualIncome: response.data.projectedAnnualIncome,
-            ytdIncome: response.data.ytdIncome,
-            lastYearIncome: response.data.lastYearIncome,
-            annualTarget: response.data.annualTarget,
-            incomeSources: response.data.incomeSources,
-            monthlyIncome: response.data.monthlyIncome
-          });
-          setTargetAnnualIncome(response.data.annualTarget);
-        }
-      } catch (err) {
-        console.error('Error fetching income data:', err);
-        setError('Failed to load income data. Please try again later.');
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    fetchIncomeData();
-  }, [portfolioId]);
-
-  // Handle updating target income
-  const updateTargetIncome = async () => {
-    if (!portfolioId) return;
-    
-    try {
-      await axios.put('/api/income', {
-        portfolioId,
-        annualTarget: targetAnnualIncome
+        // Interest is monthly
+        const interest = 1800;
+        
+        // Distributions are quarterly
+        const distributions = isDividendMonth ? 2800 : 0;
+        
+        return {
+          month,
+          dividends,
+          interest,
+          distributions
+        };
       });
       
-      // Update local state
-      if (incomeData) {
-        setIncomeData({
-          ...incomeData,
-          annualTarget: targetAnnualIncome
-        });
-      }
+      // Calculate annual projections
+      const projectedAnnualIncome = 72000;
+      const ytdIncome = 23250;
+      const lastYearIncome = 65400;
+      const annualTarget = 75000;
       
-      setIsEditingTarget(false);
-    } catch (err) {
-      console.error('Error updating target income:', err);
-      setError('Failed to update target income. Please try again later.');
+      return {
+        projectedAnnualIncome,
+        ytdIncome,
+        lastYearIncome,
+        annualTarget,
+        incomeSources,
+        monthlyIncome
+      };
     }
+
+    // Set a small timeout to simulate a network request
+    const timer = setTimeout(() => {
+      try {
+        const mockData = generateMockIncomeData();
+        setIncomeData(mockData);
+        setTargetAnnualIncome(mockData.annualTarget);
+        setLoading(false);
+      } catch (err) {
+        console.error('Error generating mock data:', err);
+        setError('Failed to generate income data. Please try again later.');
+        setLoading(false);
+      }
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Handle updating target income
+  const updateTargetIncome = () => {
+    if (incomeData) {
+      setIncomeData({
+        ...incomeData,
+        annualTarget: targetAnnualIncome
+      });
+    }
+    setIsEditingTarget(false);
   };
 
   if (loading) {
