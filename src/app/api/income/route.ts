@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { connectDB, MockDB } from '@/lib/mongo';
-import Income, { IncomeSourceDocument } from '@/models/Income';
+import Income, { IncomeSourceDocument, MonthlyIncomeDocument } from '@/models/Income';
 import Portfolio from '@/models/Portfolio';
 import { PolygonService } from '@/lib/market-data/PolygonService';
 
@@ -333,7 +333,7 @@ export async function GET(req: NextRequest) {
           amount: payment.amount
         }))
       })),
-      monthlyIncome: incomeData.monthlyIncome.map(month => ({
+      monthlyIncome: incomeData.monthlyIncome.map((month: MonthlyIncomeDocument) => ({
         month: month.month,
         dividends: month.dividends,
         interest: month.interest,
