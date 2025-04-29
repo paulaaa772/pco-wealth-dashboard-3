@@ -9,7 +9,7 @@ import BusinessInsiderTradingPanel from '../../components/brokerage/BusinessInsi
 import TradingInterface from '../../components/dashboard/TradingInterface';
 import { Settings } from 'lucide-react'; // Using Settings icon for Indicators button
 import IndicatorModal from '@/components/brokerage/IndicatorModal'; // Import the new modal
-import { calculateSMA, calculateEMA } from '@/lib/trading-engine/indicators'; // Import SMA and EMA calculation
+import { calculateSMA, calculateEMA, calculateRSI } from '@/lib/trading-engine/indicators'; // Import SMA, EMA, and RSI calculation
 import { LineData, Time } from 'lightweight-charts'; // Import types for chart data
 
 // Create a simple AlertMessage component inline since it's missing
@@ -924,35 +924,39 @@ export default function BrokeragePage() {
     activeIndicators.forEach(indicator => {
       let indicatorLineData: LineData[] | null = null;
       let values: number[] = [];
-      let color = '#FFA500'; // Default color (Orange)
+      let color = '#FFA500'; // Default color
       let alignmentOffset = 0;
 
       // Calculate based on type
       if (indicator.type === 'SMA' && indicator.period) {
         values = calculateSMA(closingPrices, indicator.period);
-        alignmentOffset = candleData.length - values.length; // SMA alignment
-        color = '#FFD700'; // Gold for SMA
+        alignmentOffset = candleData.length - values.length; 
+        color = '#FFD700'; // Gold
       } else if (indicator.type === 'EMA' && indicator.period) {
         values = calculateEMA(closingPrices, indicator.period);
-        alignmentOffset = candleData.length - values.length; // EMA alignment
-        color = '#4169E1'; // Royal Blue for EMA
+        alignmentOffset = candleData.length - values.length; 
+        color = '#4169E1'; // Royal Blue
+      } else if (indicator.type === 'RSI' && indicator.period) {
+        values = calculateRSI(closingPrices, indicator.period);
+        // RSI alignment: length is closingPrices.length - period
+        alignmentOffset = candleData.length - values.length;
+        color = '#DA70D6'; // Orchid for RSI
       }
-      // --- Add logic for RSI, MACD calculations here later --- 
+      // --- Add logic for MACD calculations here later --- 
       
       // Format data if values were calculated
       if (values.length > 0) {
          indicatorLineData = values.map((value, index) => {
-           const candleIndex = index + alignmentOffset;
-           // Ensure candleIndex is valid
-           if (candleIndex < 0 || candleIndex >= candleData.length) {
-             console.warn(`[Indicator Calc] Invalid candleIndex ${candleIndex} for ${indicator.type}-${indicator.period} at index ${index}`);
-             return null; // Skip this point if index is out of bounds
-           } 
-           return {
-             time: Math.floor(candleData[candleIndex].timestamp / 1000) as Time,
-             value: parseFloat(value.toFixed(2)) // Format value
-           };
-         }).filter((point): point is LineData => point !== null); // Filter out any null points
+            const candleIndex = index + alignmentOffset;
+            if (candleIndex < 0 || candleIndex >= candleData.length) {
+              console.warn(`[Indicator Calc] Invalid candleIndex ${candleIndex} for ${indicator.type}-${indicator.period} at index ${index}`);
+              return null; 
+            }
+            return {
+              time: Math.floor(candleData[candleIndex].timestamp / 1000) as Time,
+              value: parseFloat(value.toFixed(2))
+            };
+          }).filter((point): point is LineData => point !== null); 
       }
 
       // Add to array if data exists
@@ -963,7 +967,6 @@ export default function BrokeragePage() {
           data: indicatorLineData,
           color: color,
           period: indicator.period 
-          // Add other relevant params like fastPeriod, slowPeriod for MACD later
         });
       }
     });

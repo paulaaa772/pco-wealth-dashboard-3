@@ -11,7 +11,7 @@ interface IndicatorModalProps {
   onChange: (newIndicators: ActiveIndicator[]) => void;
 }
 
-type IndicatorType = 'SMA' | 'EMA' | 'RSI' | 'MACD'; // Expand as needed
+type IndicatorType = 'SMA' | 'EMA' | 'RSI' | 'MACD'; // Add RSI
 
 interface IndicatorOption {
   type: IndicatorType;
@@ -23,7 +23,8 @@ interface IndicatorOption {
 const availableIndicators: IndicatorOption[] = [
   { type: 'SMA', label: 'Simple Moving Average (SMA)', defaultParams: { period: 20 } },
   { type: 'EMA', label: 'Exponential Moving Average (EMA)', defaultParams: { period: 20 } },
-  // Add RSI, MACD, BBands etc. here later
+  { type: 'RSI', label: 'Relative Strength Index (RSI)', defaultParams: { period: 14 } },
+  // Add MACD, BBands etc. here later
 ];
 
 const IndicatorModal: React.FC<IndicatorModalProps> = ({ 
