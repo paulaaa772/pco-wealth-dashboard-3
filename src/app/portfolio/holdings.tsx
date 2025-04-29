@@ -94,9 +94,10 @@ export function PortfolioHoldings() {
     const sortableItems = [...holdingRows];
     if (sortConfig.key) {
       sortableItems.sort((a, b) => {
-        const valA = a[sortConfig.key];
-        const valB = b[sortConfig.key];
-        // Handle potentially undefined/null values if needed
+        // Add checks/defaults for potential undefined values
+        const valA = a[sortConfig.key] ?? (typeof a[sortConfig.key] === 'number' ? 0 : ''); 
+        const valB = b[sortConfig.key] ?? (typeof b[sortConfig.key] === 'number' ? 0 : '');
+        
         if (valA < valB) return sortConfig.direction === 'ascending' ? -1 : 1;
         if (valA > valB) return sortConfig.direction === 'ascending' ? 1 : -1;
         return 0;
