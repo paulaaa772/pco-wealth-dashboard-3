@@ -29,6 +29,11 @@ ChartJS.register(
 const timeRanges = ['1W', '1M', '3M', '6M', 'YTD', '1Y', 'ALL'] as const;
 type TimeRange = typeof timeRanges[number];
 
+// Define props interface
+interface PortfolioChartProps {
+  totalValue: number; // Accept the total value from the parent
+}
+
 // Function to generate mock historical data
 const generateHistoricalData = (days: number, endValue: number) => {
   const data = [];
@@ -55,14 +60,12 @@ const generateHistoricalData = (days: number, endValue: number) => {
   return data.reverse(); // Reverse to have dates in chronological order
 };
 
-export default function PortfolioChart() {
+export default function PortfolioChart({ totalValue }: PortfolioChartProps) { // Use prop
   const [activeRange, setActiveRange] = useState<TimeRange>('1Y');
   const [chartData, setChartData] = useState<ChartData<'line', number[], string>>({
     labels: [],
     datasets: [],
   });
-
-  const finalValue = 9035.41; // Sync with Holdings total value
 
   useEffect(() => {
     let daysToShow;
@@ -81,8 +84,8 @@ export default function PortfolioChart() {
       default: daysToShow = 365;
     }
 
-    // Regenerate data based on selected timeframe
-    const historicalData = generateHistoricalData(daysToShow, finalValue);
+    // Regenerate data based on selected timeframe and the passed totalValue
+    const historicalData = generateHistoricalData(daysToShow, totalValue); // Use totalValue here
 
     setChartData({
       labels: historicalData.map(d => format(d.date, 'MMM dd')), // Format date labels
@@ -99,7 +102,7 @@ export default function PortfolioChart() {
         },
       ],
     });
-  }, [activeRange]); // Re-run effect when activeRange changes
+  }, [activeRange, totalValue]); // Re-run effect when activeRange changes
 
   const options: ChartOptions<'line'> = {
     responsive: true,
