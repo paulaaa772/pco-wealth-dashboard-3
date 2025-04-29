@@ -936,14 +936,47 @@ export default function BrokeragePage() {
               </button>
             </div>
             {/* Tab content */}
-            <div>
+            <div className="p-4 flex-grow overflow-auto">
               {activeTab === 'ai' ? (
                 <TradingInterface 
                   currentSymbol={symbol}
                   onSymbolChange={handleSymbolChange}
                   positions={aiPositions}
                   onNewAIPosition={(newPos) => setAiPositions(prev => [...prev, newPos])}
-                  onClosePosition={(posId) => setAiPositions(prev => prev.filter(p => p.id !== posId))}
+                  onClosePosition={(posId) => {
+                    const positionToClose = aiPositions.find(p => p.id === posId);
+                    if (!positionToClose) return; // Position not found
+                    
+                    // Use the current market price as exit price
+                    // Fetching live price here might be ideal, but for simulation, 
+                    // we use the last known currentPrice state variable.
+                    const exitPrice = currentPrice || positionToClose.entryPrice; // Fallback to entry if no current price
+                    
+                    // Calculate profit/loss (simple calculation for now)
+                    let profit = 0;
+                    if (positionToClose.type === 'buy') {
+                      profit = (exitPrice - positionToClose.entryPrice) * positionToClose.quantity;
+                    } else { // Assuming 'sell' implies short selling for P/L calc
+                      profit = (positionToClose.entryPrice - exitPrice) * positionToClose.quantity;
+                    }
+                    
+                    console.log(`[BROKERAGE] Closing position ${posId} for ${positionToClose.symbol}. Entry: ${positionToClose.entryPrice}, Exit: ${exitPrice}, Profit: ${profit.toFixed(2)}`);
+
+                    // Update the state: mark as closed, add exit details
+                    setAiPositions(prev => 
+                      prev.map(p => 
+                        p.id === posId 
+                          ? { 
+                              ...p, 
+                              status: 'closed', 
+                              exitPrice: exitPrice, 
+                              closeDate: new Date(), 
+                              profit: parseFloat(profit.toFixed(2)) // Store calculated profit
+                            }
+                          : p
+                      )
+                    );
+                  }}
                 />
               ) : activeTab === 'congress' ? (
                 <CongressTradingPanel 
