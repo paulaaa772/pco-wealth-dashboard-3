@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { useManualAccounts, ManualAccount, ManualAsset } from '@/context/ManualAccountsContext'; // Import context hook and types
+import { Edit, Trash2 } from 'lucide-react';
 
 // Define the structure for a displayable row in the holdings table
 interface HoldingRow extends ManualAsset { 
@@ -235,28 +236,50 @@ export function PortfolioHoldings() {
                 </th>
               </tr>
             </thead>
+            {/* Iterate through accounts first */}
             <tbody>
-              {sortedHoldingRows.map((row) => (
-                <tr key={row.id} className="border-b border-gray-700 hover:bg-[#2A3C61]">
-                   {/* Add Account Name cell with color indicator */}
-                   <td className="py-3 px-4">
-                      <div className="flex items-center">
-                          <span className="h-2 w-2 rounded-full mr-2" style={{ backgroundColor: row.accountColor }}></span>
-                          <span>{row.accountName}</span>
-                      </div>
-                      <div className="text-xs text-gray-500 pl-4">{row.accountType}</div>
-                   </td>
-                   <td className="py-3 px-4 font-medium">{row.symbol}</td>
-                   {/* Removed Category cell */}
-                   <td className="py-3 px-4 text-right">{row.quantity.toLocaleString()}</td>
-                   {/* Removed Price cell */}
-                   <td className="py-3 px-4 text-right">${row.value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                   <td className={`py-3 px-4 text-right ${row.gain >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                    ${row.gain.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    <span className="text-xs ml-1">({row.gainPercent.toFixed(2)}%)</span>
-                  </td>
-                  <td className="py-3 px-4 text-right">{row.allocation.toFixed(2)}%</td>
-                </tr>
+              {Object.entries(groupedRows.groups).map(([accountId, rows]) => (
+                  <React.Fragment key={accountId}>
+                    {/* Account Header Row */}
+                    <tr className="bg-[#18233C] border-b border-t border-gray-600">
+                       <td colSpan={5} className="py-2 px-4 font-semibold"> {/* Adjusted colSpan based on current headers */} 
+                          <div className="flex items-center">
+                              <span className="h-2.5 w-2.5 rounded-full mr-2" style={{ backgroundColor: groupedRows.accountDetails[accountId]?.color }}></span>
+                              <span>{groupedRows.accountDetails[accountId]?.name}</span>
+                              <span className="text-xs text-gray-400 ml-2">({groupedRows.accountDetails[accountId]?.type})</span>
+                          </div>
+                       </td>
+                       <td className="py-2 px-4 text-center">
+                         {/* Action buttons for the whole account */}
+                         <div className="flex justify-center gap-2">
+                            <button onClick={() => handleEditAccount(accountId)} title="Edit Account" className="text-blue-400 hover:text-blue-300">
+                               <Edit size={16} />
+                            </button>
+                            <button onClick={() => handleDeleteAccount(accountId, groupedRows.accountDetails[accountId]?.name)} title="Delete Account" className="text-red-400 hover:text-red-300">
+                               <Trash2 size={16} />
+                            </button>
+                         </div>
+                       </td>
+                    </tr>
+                    {/* Asset Rows for this account - Use `rows` from the map */}
+                    {rows.map((row, index) => (
+                      // Use alternating colors based on asset index within the group
+                      <tr key={row.id} className={`${index % 2 === 0 ? 'bg-[#2A3C61]' : 'bg-[#233150]'} hover:bg-[#344571]`}>
+                        {/* Use a placeholder or specific style for the first column in asset rows */}
+                        <td className="py-3 px-4 pl-8 text-sm">{/* Indent asset symbol or leave blank */}
+                            {row.symbol}
+                        </td>
+                        <td className="py-3 px-4 text-right text-sm">{row.quantity.toLocaleString()}</td>
+                        <td className="py-3 px-4 text-right text-sm">${row.value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                        <td className={`py-3 px-4 text-right text-sm ${row.gain >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                          ${row.gain.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          <span className="text-xs ml-1">({row.gainPercent.toFixed(2)}%)</span>
+                        </td>
+                        <td className="py-3 px-4 text-right text-sm">{row.allocation.toFixed(2)}%</td>
+                        <td className="py-3 px-4 text-center">{/* Actions per asset? */ }</td>
+                      </tr>
+                    ))}
+                  </React.Fragment>
               ))}
             </tbody>
           </table>
