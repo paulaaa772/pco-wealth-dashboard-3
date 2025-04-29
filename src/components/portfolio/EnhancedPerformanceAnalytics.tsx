@@ -39,8 +39,20 @@ const TIME_RANGES = [
   { id: 'max', label: 'MAX', days: 365 * 10 }, // Using 10 years as "max" for mock data
 ];
 
+// Define chart data types
+interface HistoricalDataPoint {
+  date: string;
+  value: number;
+}
+
+// Use Record to allow dynamic properties
+interface ChartDataPoint extends Record<string, any> {
+  date: string;
+  portfolio: number;
+}
+
 // Generate sample performance history for portfolio with varying volatility based on time ranges
-function generateHistoricalData(totalDays: number, currentValue: number) {
+function generateHistoricalData(totalDays: number, currentValue: number): HistoricalDataPoint[] {
   const data = [];
   const startDate = subDays(new Date(), totalDays);
   let value = currentValue / (1 + (Math.random() * 0.3 + 0.1)); // Start with lower value
@@ -147,7 +159,7 @@ export default function EnhancedPerformanceAnalytics() {
     
     // Start with portfolio data
     const result = historicalData.map(point => {
-      const chartPoint = { date: point.date, portfolio: point.value };
+      const chartPoint: ChartDataPoint = { date: point.date, portfolio: point.value };
       
       // Add benchmarks
       selectedBenchmarks.forEach(benchmarkId => {
@@ -181,7 +193,7 @@ export default function EnhancedPerformanceAnalytics() {
     const startPortfolioValue = firstPoint.portfolio;
     
     return chartData.map(point => {
-      const result = { date: point.date };
+      const result: ChartDataPoint = { date: point.date, portfolio: 0 };
       
       // Calculate percent change for portfolio
       result.portfolio = ((point.portfolio / startPortfolioValue) - 1) * 100;
@@ -195,7 +207,7 @@ export default function EnhancedPerformanceAnalytics() {
       
       return result;
     });
-  }, [chartData]);
+  }, [chartData, selectedBenchmarks]);
   
   // Handle loading state
   if (isLoading) {
