@@ -124,7 +124,7 @@ export function PortfolioHoldings() {
               alert(`Failed to delete account: ${err instanceof Error ? err.message : 'Unknown error'}`);
           }
       }
-  };
+  }; // <-- Add semicolon here
 
   if (isComponentLoading) {
     return (
