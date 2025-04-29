@@ -857,7 +857,7 @@ export default function BrokeragePage() {
       {/* Header section */}
       <div className="mb-4 flex flex-col md:flex-row justify-between items-end gap-4">
         <div>
-          <h1 className="text-2xl font-bold mb-2">Trading Dashboard</h1>
+          <h1 className="text-2xl font-bold mb-2">Trade Center</h1>
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
             <div className="w-full sm:w-64">
               <SymbolSearch

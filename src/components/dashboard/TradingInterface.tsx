@@ -256,7 +256,7 @@ export default function TradingInterface({
 
   return (
     <div className="bg-gray-900 rounded-lg p-4">
-      <h2 className="text-2xl font-semibold text-white mb-4">Trading Interface</h2>
+      <h2 className="text-2xl font-semibold text-white mb-4">AI Terminal</h2>
       
       <div className="flex flex-wrap md:flex-nowrap gap-4 mb-4">
         <div className="bg-gray-800 rounded-lg p-3 w-full md:w-auto md:min-w-[250px]">
