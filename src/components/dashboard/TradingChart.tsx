@@ -11,7 +11,9 @@ import {
   HistogramSeriesOptions,
   PriceLineOptions,
   IPriceLine,
+  LineData,
 } from 'lightweight-charts';
+import { IndicatorData } from '@/app/brokerage/page';
 
 // The original polygon data format
 interface PolygonCandle {
@@ -37,14 +39,16 @@ interface TradingChartProps {
   symbol: string;
   data: CandleData[] | PolygonCandle[];
   currentPrice?: number;
+  indicatorData?: IndicatorData[];
 }
 
-const TradingChart: React.FC<TradingChartProps> = ({ symbol, data, currentPrice }) => {
+const TradingChart: React.FC<TradingChartProps> = ({ symbol, data, currentPrice, indicatorData = [] }) => {
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
   const volumeSeriesRef = useRef<ISeriesApi<"Histogram"> | null>(null);
   const priceLineRef = useRef<IPriceLine | null>(null);
+  const indicatorSeriesRef = useRef<Map<string, ISeriesApi<"Line">>>(new Map());
   const resizeObserverRef = useRef<ResizeObserver | null>(null);
 
   useEffect(() => {
@@ -125,6 +129,8 @@ const TradingChart: React.FC<TradingChartProps> = ({ symbol, data, currentPrice 
         resizeObserverRef.current.unobserve(chartContainerRef.current);
       }
       if (chartRef.current) {
+        indicatorSeriesRef.current.forEach(series => chartRef.current?.removeSeries(series));
+        indicatorSeriesRef.current.clear();
         chartRef.current.remove();
         chartRef.current = null;
         seriesRef.current = null;
@@ -134,7 +140,7 @@ const TradingChart: React.FC<TradingChartProps> = ({ symbol, data, currentPrice 
   }, []);
 
   useEffect(() => {
-    if (!seriesRef.current || !volumeSeriesRef.current || data.length === 0) return;
+    if (!seriesRef.current || !volumeSeriesRef.current || !chartRef.current || data.length === 0) return;
 
     const isPolygonFormat = 'o' in data[0];
     
@@ -193,10 +199,46 @@ const TradingChart: React.FC<TradingChartProps> = ({ symbol, data, currentPrice 
       priceLineRef.current = seriesRef.current.createPriceLine(newPriceLineOptions);
     }
 
+    const currentIndicatorIds = new Set(indicatorData.map(ind => ind.id));
+
+    // Remove indicator series that are no longer active
+    indicatorSeriesRef.current.forEach((series, id) => {
+      if (!currentIndicatorIds.has(id)) {
+        console.log(`[Chart] Removing indicator series: ${id}`);
+        chartRef.current?.removeSeries(series);
+        indicatorSeriesRef.current.delete(id);
+      }
+    });
+
+    // Add or update active indicator series
+    indicatorData.forEach(indicator => {
+      let indicatorSeries = indicatorSeriesRef.current.get(indicator.id);
+
+      if (!indicatorSeries) {
+        // Create new series if it doesn't exist
+        console.log(`[Chart] Creating indicator series: ${indicator.id} (${indicator.type})`);
+        indicatorSeries = chartRef.current?.addLineSeries({
+          color: indicator.color || '#FFD700', // Use provided color or default
+          lineWidth: 1,
+          priceLineVisible: false, // Hide price line for indicators
+          lastValueVisible: false, // Hide last value label on price scale
+        });
+        if (indicatorSeries) {
+          indicatorSeriesRef.current.set(indicator.id, indicatorSeries);
+        }
+      }
+
+      // Set/update data for the series
+      if (indicatorSeries) {
+        // console.log(`[Chart] Setting data for indicator ${indicator.id}, points: ${indicator.data.length}`);
+        indicatorSeries.setData(indicator.data);
+      }
+    });
+
     // Fit the content to view
     chartRef.current?.timeScale().fitContent();
 
-  }, [data, currentPrice]);
+  }, [data, currentPrice, indicatorData]);
 
   return (
     <div className="relative w-full h-full">

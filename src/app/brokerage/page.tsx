@@ -7,6 +7,10 @@ import TradingChart from '../../components/dashboard/TradingChart';
 import CongressTradingPanel from '../../components/brokerage/CongressTradingPanel';
 import BusinessInsiderTradingPanel from '../../components/brokerage/BusinessInsiderTradingPanel';
 import TradingInterface from '../../components/dashboard/TradingInterface';
+import { Settings } from 'lucide-react'; // Using Settings icon for Indicators button
+import IndicatorModal from '@/components/brokerage/IndicatorModal'; // Import the new modal
+import { calculateSMA } from '@/lib/trading-engine/indicators'; // Import SMA calculation
+import { LineData, Time } from 'lightweight-charts'; // Import types for chart data
 
 // Create a simple AlertMessage component inline since it's missing
 const AlertMessage = ({ 
@@ -262,6 +266,27 @@ export interface InsiderTrade {
   };
 }
 
+// Define structure for active indicator configuration
+interface ActiveIndicator {
+  id: string; // Unique identifier (e.g., SMA-50)
+  type: 'SMA' | 'EMA' | 'RSI' | 'MACD'; // Add more types later
+  // Parameters specific to the indicator type
+  period?: number;
+  fastPeriod?: number;
+  slowPeriod?: number;
+  signalPeriod?: number;
+  stdDevMultiplier?: number;
+}
+
+// Add type for indicator data to be passed to chart
+export interface IndicatorData {
+  id: string;        // Unique ID from ActiveIndicator
+  type: 'SMA' | 'EMA' | 'RSI' | 'MACD';
+  data: LineData[]; // Data formatted for lightweight-charts LineSeries
+  color?: string;    // Optional color for the line
+  period?: number;   // Store period for labeling/tooltip
+}
+
 export default function BrokeragePage() {
   // State for stock data
   const [symbol, setSymbol] = useState('AAPL');
@@ -289,6 +314,11 @@ export default function BrokeragePage() {
   
   // Add state for copied insider trades
   const [copiedInsiderTrades, setCopiedInsiderTrades] = useState<InsiderTrade[]>([]);
+
+  // Add state for showIndicatorModal and activeIndicators
+  const [showIndicatorModal, setShowIndicatorModal] = useState(false);
+  const [activeIndicators, setActiveIndicators] = useState<ActiveIndicator[]>([]); // State for active indicators
+  const [indicatorChartData, setIndicatorChartData] = useState<IndicatorData[]>([]); // State for calculated indicator data
 
   // WebSocket Connection Logic
   useEffect(() => {
@@ -875,6 +905,53 @@ export default function BrokeragePage() {
     handleManualOrder(newOrder);
   };
 
+  // Handler for when indicators are changed in the modal
+  const handleIndicatorsChange = (newIndicators: ActiveIndicator[]) => {
+    console.log('[BROKERAGE] Updating active indicators:', newIndicators);
+    setActiveIndicators(newIndicators);
+  };
+
+  // Recalculate indicator data when candleData or activeIndicators change
+  useEffect(() => {
+    if (candleData.length === 0 || activeIndicators.length === 0) {
+      setIndicatorChartData([]); // Clear indicator data if no candles or no active indicators
+      return;
+    }
+
+    console.log('[BROKERAGE] Recalculating indicator data...');
+    const newIndicatorData: IndicatorData[] = [];
+    const closingPrices = candleData.map(c => c.close);
+
+    activeIndicators.forEach(indicator => {
+      if (indicator.type === 'SMA' && indicator.period) {
+        const smaValues = calculateSMA(closingPrices, indicator.period);
+        // Align SMA data with candle timestamps
+        const smaLineData: LineData[] = smaValues.map((value, index) => {
+          // SMA starts later, so align with corresponding candle timestamp
+          const candleIndex = index + (candleData.length - smaValues.length);
+          return {
+            time: Math.floor(candleData[candleIndex].timestamp / 1000) as Time,
+            value: parseFloat(value.toFixed(2)) // Format value
+          };
+        });
+        if (smaLineData.length > 0) {
+          newIndicatorData.push({
+            id: indicator.id,
+            type: indicator.type,
+            data: smaLineData,
+            color: '#FFD700', // Example: Gold color for SMA
+            period: indicator.period
+          });
+        }
+      }
+      // --- Add logic for EMA, RSI, MACD calculations here later --- 
+    });
+
+    console.log(`[BROKERAGE] Setting ${newIndicatorData.length} indicator data sets.`);
+    setIndicatorChartData(newIndicatorData);
+
+  }, [candleData, activeIndicators]); // Dependencies
+
   return (
     <div className="flex flex-col p-4 md:p-6">
       {/* Header section */}
@@ -891,7 +968,7 @@ export default function BrokeragePage() {
         </div>
         {/* Right Side: Controls */}
         <div className="w-full md:w-auto flex flex-col items-end gap-2">
-           {/* Top Row: Timeframe / Interval / Price / Refresh */}
+           {/* Top Row: Interval / Price / Refresh / Indicators Button */}
            <div className="flex flex-wrap items-center justify-end gap-2 w-full">
               {/* Interval Buttons */}
               <div className="flex border border-gray-300 dark:border-gray-600 rounded-md overflow-hidden">
@@ -915,6 +992,14 @@ export default function BrokeragePage() {
                </div>
                {/* Spacer */}
                <div className="flex-grow"></div> 
+               {/* Indicators Button */}
+               <button
+                 onClick={() => setShowIndicatorModal(true)}
+                 className="p-2 rounded-md bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200"
+                 title="Indicators"
+               >
+                   <Settings size={20} />
+               </button>
                {/* Price Display */}
                {currentPrice > 0 && (
                  <div className="text-lg font-semibold bg-gray-100 dark:bg-gray-800 px-3 py-1 rounded-lg">
@@ -1021,6 +1106,7 @@ export default function BrokeragePage() {
                   symbol={symbol}
                   data={candleData}
                   currentPrice={currentPrice}
+                  indicatorData={indicatorChartData}
                 />
               ) : (
                 <div className="h-full flex items-center justify-center">
@@ -1162,6 +1248,14 @@ export default function BrokeragePage() {
           </div>
         </div>
       </div>
+
+      {/* Render IndicatorModal conditionally */}
+      <IndicatorModal 
+        isOpen={showIndicatorModal} 
+        onClose={() => setShowIndicatorModal(false)} 
+        currentIndicators={activeIndicators} 
+        onChange={handleIndicatorsChange} 
+      />
     </div>
   );
 }
