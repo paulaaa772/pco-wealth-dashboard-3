@@ -840,7 +840,7 @@ export default function BrokeragePage() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {/* Chart area - 2/3 width on larger screens */}
         <div className="md:col-span-2 bg-white dark:bg-zinc-800 rounded-lg shadow p-4">
-          <div className="h-[500px] w-full">
+          <div className="min-h-[400px] w-full">
             {isLoading ? (
               <div className="h-full flex items-center justify-center">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
