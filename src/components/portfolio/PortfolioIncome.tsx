@@ -107,7 +107,7 @@ export function PortfolioIncome({
         </div>
 
         <div className="space-y-2">
-          <h3 className="text-lg font-medium">Last Year's Income</h3>
+          <h3 className="text-lg font-medium">Last Year&apos;s Income</h3>
           <div className="text-3xl font-bold">{formatCurrency(lastYearIncome)}</div>
         </div>
 
