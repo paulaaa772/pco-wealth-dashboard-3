@@ -266,11 +266,10 @@ export interface InsiderTrade {
   };
 }
 
-// Define structure for active indicator configuration
-interface ActiveIndicator {
-  id: string; // Unique identifier (e.g., SMA-50)
-  type: 'SMA' | 'EMA' | 'RSI' | 'MACD'; // Add more types later
-  // Parameters specific to the indicator type
+// Define structure for active indicator configuration (MOVED OUTSIDE and EXPORTED)
+export interface ActiveIndicator {
+  id: string; 
+  type: 'SMA' | 'EMA' | 'RSI' | 'MACD'; 
   period?: number;
   fastPeriod?: number;
   slowPeriod?: number;
