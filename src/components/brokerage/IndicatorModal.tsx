@@ -25,7 +25,17 @@ const availableIndicators: IndicatorOption[] = [
   { type: 'SMA', label: 'Simple Moving Average (SMA)', defaultParams: { period: 20 } },
   { type: 'EMA', label: 'Exponential Moving Average (EMA)', defaultParams: { period: 20 } },
   { type: 'RSI', label: 'Relative Strength Index (RSI)', defaultParams: { period: 14 } },
-  { type: 'MACD', label: 'Moving Average Conv/Div (MACD)', defaultParams: { fastPeriod: 12, slowPeriod: 26, signalPeriod: 9 } },
+  { 
+    type: 'MACD', 
+    label: 'Moving Average Conv/Div (MACD)', 
+    defaultParams: { 
+      fastPeriod: 12, 
+      slowPeriod: 26, 
+      signalPeriod: 9, 
+      showSignal: true, // Default to showing signal
+      showHistogram: true // Default to showing histogram
+    } 
+  },
 ];
 
 const IndicatorModal: React.FC<IndicatorModalProps> = ({ 
@@ -62,13 +72,33 @@ const IndicatorModal: React.FC<IndicatorModalProps> = ({
     setIndicators(indicators.filter(ind => ind.id !== id));
   };
 
-  const handleParamChange = (id: string, param: keyof Omit<ActiveIndicator, 'id' | 'type'>, value: string) => {
-    const numValue = parseInt(value, 10);
-    if (isNaN(numValue) || numValue <= 0) return; // Basic validation
-
-    setIndicators(indicators.map(ind => 
-      ind.id === id ? { ...ind, [param]: numValue } : ind
-    ));
+  const handleParamChange = (
+      id: string, 
+      param: keyof Omit<ActiveIndicator, 'id' | 'type'>, 
+      value: string | boolean // Accept boolean for checkboxes
+    ) => {
+    setIndicators(indicators.map(ind => {
+      if (ind.id === id) {
+        let processedValue: number | boolean | undefined = value;
+        // Try parsing number only if it's not already a boolean
+        if (typeof value === 'string') {
+           const numValue = parseInt(value, 10);
+           // Update only if it's a valid positive number
+           if (!isNaN(numValue) && numValue > 0) {
+               processedValue = numValue;
+           } else if (value === '') { // Allow clearing numeric input
+               processedValue = undefined;
+           } else {
+               // If not a valid number and not empty string, don't update numeric fields
+               if (param === 'period' || param === 'fastPeriod' || param === 'slowPeriod' || param === 'signalPeriod') {
+                   return ind; // Keep existing value
+               }
+           }
+        }
+        return { ...ind, [param]: processedValue };
+      }
+      return ind;
+    }));
   };
 
   const handleApplyChanges = () => {
@@ -129,7 +159,7 @@ const IndicatorModal: React.FC<IndicatorModalProps> = ({
                      <Trash2 size={16} />
                   </button>
                 </div>
-                {/* Parameter Inputs - Updated */}
+                {/* Parameter Inputs - Updated for MACD toggles */}
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm mt-2">
                    {/* Period Input (SMA, EMA, RSI) */}
                    {(ind.type === 'SMA' || ind.type === 'EMA' || ind.type === 'RSI') && ind.period !== undefined && (
@@ -172,6 +202,28 @@ const IndicatorModal: React.FC<IndicatorModalProps> = ({
                             onChange={(e) => handleParamChange(ind.id, 'signalPeriod', e.target.value)}
                             className="w-16 border border-gray-300 dark:border-zinc-600 rounded px-2 py-1 text-sm text-gray-900 dark:text-white bg-white dark:bg-zinc-700"
                           />
+                        </div>
+                        {/* Toggle for Signal Line */} 
+                        <div className="flex items-center gap-1">
+                            <input 
+                               type="checkbox" 
+                               id={`${ind.id}-showSignal`}
+                               checked={!!ind.showSignal} 
+                               onChange={(e) => handleParamChange(ind.id, 'showSignal', e.target.checked)}
+                               className="h-4 w-4 rounded text-indigo-600 focus:ring-indigo-500 border-gray-300 dark:border-zinc-600 dark:bg-zinc-700 dark:checked:bg-indigo-500"
+                              />
+                             <label htmlFor={`${ind.id}-showSignal`} className="text-gray-600 dark:text-gray-400">Show Signal Line</label>
+                        </div>
+                        {/* Toggle for Histogram */} 
+                        <div className="flex items-center gap-1">
+                           <input 
+                              type="checkbox" 
+                              id={`${ind.id}-showHisto`}
+                              checked={!!ind.showHistogram} 
+                              onChange={(e) => handleParamChange(ind.id, 'showHistogram', e.target.checked)}
+                              className="h-4 w-4 rounded text-indigo-600 focus:ring-indigo-500 border-gray-300 dark:border-zinc-600 dark:bg-zinc-700 dark:checked:bg-indigo-500"
+                            />
+                           <label htmlFor={`${ind.id}-showHisto`} className="text-gray-600 dark:text-gray-400">Show Histogram</label>
                         </div>
                      </>
                    )}

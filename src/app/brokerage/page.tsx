@@ -10,7 +10,7 @@ import TradingInterface from '../../components/dashboard/TradingInterface';
 import { Settings } from 'lucide-react'; // Using Settings icon for Indicators button
 import IndicatorModal from '@/components/brokerage/IndicatorModal'; // Import the new modal
 import { calculateSMA, calculateEMA, calculateRSI, calculateMACD } from '@/lib/trading-engine/indicators'; // Import SMA, EMA, and RSI calculation
-import { LineData, Time } from 'lightweight-charts'; // Import types for chart data
+import { LineData, Time, HistogramData, CandlestickData } from 'lightweight-charts'; // Import types for chart data
 
 // Create a simple AlertMessage component inline since it's missing
 const AlertMessage = ({ 
@@ -266,24 +266,32 @@ export interface InsiderTrade {
   };
 }
 
-// Define structure for active indicator configuration (MOVED OUTSIDE and EXPORTED)
+// Define structure for active indicator configuration
 export interface ActiveIndicator {
   id: string; 
   type: 'SMA' | 'EMA' | 'RSI' | 'MACD'; 
   period?: number;
+  // MACD specific
   fastPeriod?: number;
   slowPeriod?: number;
   signalPeriod?: number;
+  showSignal?: boolean; // Flag to show MACD Signal line
+  showHistogram?: boolean; // Flag to show MACD Histogram
+  // BBands specific (add later)
   stdDevMultiplier?: number;
 }
 
 // Add type for indicator data to be passed to chart
 export interface IndicatorData {
-  id: string;        // Unique ID from ActiveIndicator
-  type: 'SMA' | 'EMA' | 'RSI' | 'MACD';
-  data: LineData[]; // Data formatted for lightweight-charts LineSeries
-  color?: string;    // Optional color for the line
-  period?: number;   // Store period for labeling/tooltip
+  id: string;        
+  type: 'SMA' | 'EMA' | 'RSI' | 'MACD' | 'MACD_Signal' | 'MACD_Histogram'; // Add MACD sub-types
+  data: LineData[] | HistogramData[]; // Allow HistogramData for histogram
+  color?: string;    
+  period?: number;   
+  // Optional flags for display hints
+  isSignalLine?: boolean; 
+  isHistogram?: boolean;
+  pane?: number; // To plot histogram on a separate pane (e.g., 1)
 }
 
 export default function BrokeragePage() {
@@ -308,12 +316,6 @@ export default function BrokeragePage() {
   const [refreshInterval, setRefreshInterval] = useState<number>(60); // seconds
   const [activeTab, setActiveTab] = useState<'ai' | 'congress' | 'insiders'>('ai'); // Tab navigation state
   
-  // Add state for copied Congress trades
-  const [copiedCongressTrades, setCopiedCongressTrades] = useState<CongressTrade[]>([]);
-  
-  // Add state for copied insider trades
-  const [copiedInsiderTrades, setCopiedInsiderTrades] = useState<InsiderTrade[]>([]);
-
   // Add state for showIndicatorModal and activeIndicators
   const [showIndicatorModal, setShowIndicatorModal] = useState(false);
   const [activeIndicators, setActiveIndicators] = useState<ActiveIndicator[]>([]); // State for active indicators
@@ -833,9 +835,6 @@ export default function BrokeragePage() {
 
   // Handle copying a trade from a Congress member
   const handleCopyCongressTrade = (trade: CongressTrade) => {
-    // Add to copied trades list
-    setCopiedCongressTrades(prev => [...prev, trade]);
-    
     // Create a corresponding manual order
     const newOrder: Omit<ManualOrder, 'id' | 'timestamp' | 'status' | 'price'> = {
       symbol: trade.symbol,
@@ -890,9 +889,6 @@ export default function BrokeragePage() {
 
   // Handle copying a business insider trade
   const handleCopyInsiderTrade = (trade: InsiderTrade) => {
-    // Add to copied trades list
-    setCopiedInsiderTrades(prev => [...prev, trade]);
-    
     // Create a corresponding manual order
     const newOrder: Omit<ManualOrder, 'id' | 'timestamp' | 'status' | 'price'> = {
       symbol: trade.symbol,
@@ -916,17 +912,16 @@ export default function BrokeragePage() {
       setIndicatorChartData([]); 
       return;
     }
-
-    console.log('[BROKERAGE] Recalculating indicator data...');
     const newIndicatorData: IndicatorData[] = [];
     const closingPrices = candleData.map(c => c.close);
 
     activeIndicators.forEach(indicator => {
       let indicatorLineData: LineData[] | null = null;
+      let indicatorHistogramData: HistogramData[] | null = null; // Separate state
       let values: number[] = [];
-      let color = '#FFA500'; // Default color
+      let color = '#FFA500'; 
       let alignmentOffset = 0;
-      let labelPeriod = indicator.period; // Default label period
+      let labelPeriod = indicator.period;
 
       // Calculate based on type
       if (indicator.type === 'SMA' && indicator.period) {
@@ -944,12 +939,61 @@ export default function BrokeragePage() {
       } else if (indicator.type === 'MACD' && indicator.fastPeriod && indicator.slowPeriod && indicator.signalPeriod) {
         const macdResult = calculateMACD(closingPrices, indicator.fastPeriod, indicator.slowPeriod, indicator.signalPeriod);
         if (macdResult) {
-           values = macdResult.macdLine; // Use the main MACD line for now
-           // MACD alignment is complex, depends on signalPeriod too. Calculate offset based on final macdLine length.
-           alignmentOffset = candleData.length - values.length;
-           color = '#FF6347'; // Tomato Red for MACD line
-           // We don't have a single 'period' for MACD label, could construct one or omit
-           labelPeriod = undefined; // Or construct like `${indicator.fastPeriod},${indicator.slowPeriod},${indicator.signalPeriod}`
+          alignmentOffset = candleData.length - macdResult.macdLine.length;
+          labelPeriod = undefined; 
+
+          // MACD Line Data
+          const macdLineData = macdResult.macdLine.map((value, index) => {
+             const candleIndex = index + alignmentOffset;
+             if (candleIndex < 0 || candleIndex >= candleData.length) return null; 
+             return { time: Math.floor(candleData[candleIndex].timestamp / 1000) as Time, value: parseFloat(value.toFixed(2)) };
+           }).filter((p): p is LineData => p !== null);
+           if (macdLineData.length > 0) {
+              newIndicatorData.push({
+                id: indicator.id, type: indicator.type, data: macdLineData, color: '#FF6347',
+              });
+           }
+
+          // Signal Line Data
+          if (indicator.showSignal && macdResult.signalLine.length > 0) {
+             const signalLineData = macdResult.signalLine.map((value, index) => {
+               const candleIndex = index + alignmentOffset; // Align with MACD line
+               if (candleIndex < 0 || candleIndex >= candleData.length) return null;
+               return { time: Math.floor(candleData[candleIndex].timestamp / 1000) as Time, value: parseFloat(value.toFixed(2)) };
+             }).filter((p): p is LineData => p !== null);
+             if (signalLineData.length > 0) {
+                newIndicatorData.push({
+                  id: `${indicator.id}-Signal`, type: 'MACD_Signal', data: signalLineData, color: '#4682B4', isSignalLine: true
+                });
+             }
+          }
+
+          // Histogram Data - Corrected Typing
+          if (indicator.showHistogram && macdResult.histogram.length > 0) {
+             const histogramPoints = macdResult.histogram.map((value, index) => {
+               const candleIndex = index + alignmentOffset; 
+               if (candleIndex < 0 || candleIndex >= candleData.length) return null;
+               // Map to the structure expected by lightweight-charts HistogramData
+               return {
+                 time: Math.floor(candleData[candleIndex].timestamp / 1000) as Time,
+                 value: parseFloat(value.toFixed(2)),
+                 // Color is optional for HistogramData type, set on series later
+               };
+             }).filter((p): p is { time: Time; value: number } => p !== null); // Filter nulls first
+
+             // Now cast the filtered array to HistogramData[]
+             indicatorHistogramData = histogramPoints as HistogramData[];
+             
+              if (indicatorHistogramData && indicatorHistogramData.length > 0) {
+                  newIndicatorData.push({
+                    id: `${indicator.id}-Histogram`,
+                    type: 'MACD_Histogram',
+                    data: indicatorHistogramData, // Assign the correctly typed data
+                    isHistogram: true,
+                    pane: 1 
+                  });
+              }
+          }
         }
       }
       // --- Add logic for other calculations here later --- 
@@ -1171,7 +1215,7 @@ export default function BrokeragePage() {
                 }`}
                 onClick={() => setActiveTab('ai')}
               >
-                AI Trading
+                AI
               </button>
               <button
                 className={`px-3 py-2 text-sm font-medium ${
@@ -1191,12 +1235,12 @@ export default function BrokeragePage() {
                 }`}
                 onClick={() => setActiveTab('insiders')}
               >
-                Insiders
+                Business Insider
               </button>
             </div>
             {/* Tab content */}
             <div className="p-4 flex-grow overflow-auto">
-              {activeTab === 'ai' ? (
+              {activeTab === 'ai' && (
                 <TradingInterface 
                   currentSymbol={symbol}
                   onSymbolChange={handleSymbolChange}
@@ -1204,84 +1248,69 @@ export default function BrokeragePage() {
                   onNewAIPosition={(newPos) => setAiPositions(prev => [...prev, newPos])}
                   onClosePosition={(posId) => {
                     const positionToClose = aiPositions.find(p => p.id === posId);
-                    if (!positionToClose) return; // Position not found
-                    
-                    // Use the current market price as exit price
-                    // Fetching live price here might be ideal, but for simulation, 
-                    // we use the last known currentPrice state variable.
-                    const exitPrice = currentPrice || positionToClose.entryPrice; // Fallback to entry if no current price
-                    
-                    // Calculate profit/loss (simple calculation for now)
+                    if (!positionToClose) return; 
+                    const exitPrice = currentPrice || positionToClose.entryPrice; 
                     let profit = 0;
                     if (positionToClose.type === 'buy') {
                       profit = (exitPrice - positionToClose.entryPrice) * positionToClose.quantity;
-                    } else { // Assuming 'sell' implies short selling for P/L calc
+                    } else { 
                       profit = (positionToClose.entryPrice - exitPrice) * positionToClose.quantity;
                     }
-                    
-                    console.log(`[BROKERAGE] Closing position ${posId} for ${positionToClose.symbol}. Entry: ${positionToClose.entryPrice}, Exit: ${exitPrice}, Profit: ${profit.toFixed(2)}`);
-
-                    // Update the state: mark as closed, add exit details
+                    console.log(`[BROKERAGE] Closing position ${posId}... Profit: ${profit.toFixed(2)}`);
                     setAiPositions(prev => 
                       prev.map(p => 
                         p.id === posId 
-                          ? { 
-                              ...p, 
-                              status: 'closed', 
-                              exitPrice: exitPrice, 
-                              closeDate: new Date(), 
-                              profit: parseFloat(profit.toFixed(2)) // Store calculated profit
-                            }
+                          ? { ...p, status: 'closed', exitPrice: exitPrice, closeDate: new Date(), profit: parseFloat(profit.toFixed(2)) }
                           : p
                       )
                     );
                   }}
                 />
-              ) : activeTab === 'congress' ? (
+              )}
+              {activeTab === 'congress' && (
                 <CongressTradingPanel 
-                  symbol={symbol} 
-                  onCopyTrade={handleCopyCongressTrade} 
+                  symbol={symbol}
+                  onCopyTrade={handleCopyCongressTrade}
                 />
-              ) : (
+              )}
+              {activeTab === 'insiders' && (
                 <BusinessInsiderTradingPanel 
-                  symbol={symbol} 
-                  onCopyTrade={handleCopyInsiderTrade} 
+                  symbol={symbol}
+                  onCopyTrade={handleCopyInsiderTrade}
                 />
               )}
             </div>
           </div>
         </div>
-
-        {/* Right Sidebar (Order Entry, Order Book, Trade History) */}
+        
+        {/* Right Sidebar */}
         <div className="lg:col-span-1 flex flex-col gap-4">
-          {/* Order entry panel */} 
-          <div className="bg-white dark:bg-zinc-800 rounded-lg shadow p-4 flex-shrink-0"> 
+          {/* Order entry panel */}
+          <div className="bg-white dark:bg-zinc-800 rounded-lg shadow p-4 flex-shrink-0">
             <OrderEntryPanel
               symbol={symbol}
               currentPrice={currentPrice}
               onOrderSubmit={handleManualOrder}
             />
           </div>
-          
           {/* Order book */}
-          <div className="bg-white dark:bg-zinc-800 rounded-lg shadow p-4 flex-grow flex flex-col min-h-0"> {/* Adjust flex properties */}
+          <div className="bg-white dark:bg-zinc-800 rounded-lg shadow p-4 flex-grow flex flex-col min-h-0">
             <h3 className="text-lg font-semibold mb-3 flex-shrink-0">Order Book</h3>
-            <div className="flex-grow overflow-auto"> {/* Make content scrollable */} 
+            <div className="flex-grow overflow-auto">
               <OrderBook orders={manualOrders.filter(order => order.status === 'open')} />
             </div>
           </div>
-
           {/* Trade history */}
-          <div className="bg-white dark:bg-zinc-800 rounded-lg shadow p-4 flex-grow flex flex-col min-h-0"> {/* Adjust flex properties */}
+          <div className="bg-white dark:bg-zinc-800 rounded-lg shadow p-4 flex-grow flex flex-col min-h-0">
             <h3 className="text-lg font-semibold mb-3 flex-shrink-0">Trade History</h3>
-            <div className="flex-grow overflow-auto"> {/* Make content scrollable */} 
+            <div className="flex-grow overflow-auto">
               <TradeHistory orders={manualOrders.filter(order => order.status === 'filled')} />
             </div>
           </div>
         </div>
       </div>
 
-      {/* Render IndicatorModal conditionally */}
+      {/* Modal */}
       <IndicatorModal 
         isOpen={showIndicatorModal} 
         onClose={() => setShowIndicatorModal(false)} 
