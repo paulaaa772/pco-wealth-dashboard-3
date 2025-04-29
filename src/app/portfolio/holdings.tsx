@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useManualAccounts, ManualAccount, ManualAsset } from '@/context/ManualAccountsContext'; // Import context hook and types
 import { Edit, Trash2 } from 'lucide-react';
+import EditAccountModal from '@/components/dashboard/EditAccountModal';
 
 // Define the structure for a displayable row in the holdings table
 interface HoldingRow extends ManualAsset { 
@@ -34,6 +35,8 @@ export function PortfolioHoldings() {
   const { manualAccounts, isLoading, error: contextError, openModal, deleteManualAccount } = useManualAccounts(); 
   const [loading, setLoading] = useState(false); 
   const [error, setError] = useState<string | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [selectedAccount, setSelectedAccount] = useState<ManualAccount | null>(null);
 
   const [sortConfig, setSortConfig] = useState<{
     key: keyof HoldingRow;
@@ -112,8 +115,14 @@ export function PortfolioHoldings() {
       const account = manualAccounts.find(acc => acc.id === accountId);
       if (account) {
           console.log("Editing account:", account); 
-          alert("Edit functionality coming soon!");
+          setSelectedAccount(account);
+          setIsEditModalOpen(true);
       }
+  };
+
+  const handleCloseEditModal = () => {
+    setIsEditModalOpen(false);
+    setSelectedAccount(null);
   };
 
   const handleDeleteAccount = async (accountId: string, accountName: string) => {
@@ -297,7 +306,14 @@ export function PortfolioHoldings() {
             </tbody>
           </table>
         </div>
-      )}
+      ) : null}
+      
+      {/* Add EditAccountModal */}
+      <EditAccountModal 
+        isOpen={isEditModalOpen}
+        onClose={handleCloseEditModal}
+        account={selectedAccount}
+      />
     </div>
   );
 } 
