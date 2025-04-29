@@ -20,6 +20,7 @@ const accountColors = ['#4A90E2', '#50E3C2', '#B8E986', '#F8E71C', '#F5A623', '#
 let colorIndex = 0;
 const accountColorMap = new Map<string, string>();
 
+// Force rebuild comment
 const getAccountColor = (accountId: string): string => {
   if (!accountColorMap.has(accountId)) {
     accountColorMap.set(accountId, accountColors[colorIndex % accountColors.length]);
@@ -29,8 +30,8 @@ const getAccountColor = (accountId: string): string => {
 };
 
 export function PortfolioHoldings() {
-  // Use context hook to get accounts AND modal controls
-  const { manualAccounts, isLoading, error: contextError, openModal } = useManualAccounts(); 
+  // Use context hook to get accounts AND modal controls AND delete function
+  const { manualAccounts, isLoading, error: contextError, openModal, deleteManualAccount } = useManualAccounts(); 
   const [loading, setLoading] = useState(false); 
   const [error, setError] = useState<string | null>(null);
 
