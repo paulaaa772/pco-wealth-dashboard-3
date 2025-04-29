@@ -1,5 +1,3 @@
-'use client';
-
 import axios, { AxiosError, AxiosInstance } from 'axios';
 
 // Mock data generator functions
