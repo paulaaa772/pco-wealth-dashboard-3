@@ -34,10 +34,7 @@ export default function DashboardPage() {
           <PortfolioChart totalValue={displayValue} />
         </div>
       </div>
-      <AggregationModal 
-        isOpen={isModalOpen} 
-        onClose={closeModal} 
-      />
+      <AggregationModal />
     </main>
   );
 }
