@@ -16,6 +16,7 @@ interface DonutChartProps {
   outerRadius?: number;
   darkMode?: boolean;
   showLegend?: boolean;
+  onSliceClick?: (sliceName: string) => void;
 }
 
 const defaultData = [
@@ -35,11 +36,13 @@ const DonutChart: React.FC<DonutChartProps> = ({
   innerRadius: propsInnerRadius = 60,
   outerRadius: propsOuterRadius = 100,
   darkMode = false,
-  showLegend = true
+  showLegend = true,
+  onSliceClick
 }) => {
   const chartRef = useRef<HTMLDivElement>(null);
   const [chartSize, setChartSize] = useState({ width, height });
   const [isMobile, setIsMobile] = useState(false);
+  const [hoveredSector, setHoveredSector] = useState<string | null>(null);
   
   // Calculate inner and outer radius based on container size
   const innerRadius = isMobile ? propsInnerRadius * 0.7 : propsInnerRadius;
@@ -141,6 +144,77 @@ const DonutChart: React.FC<DonutChartProps> = ({
     return pos;
   };
 
+  // Check if a point is within a sector
+  const isPointInSector = (x: number, y: number, sector: any) => {
+    const centerX = chartSize.width / 2;
+    const centerY = chartSize.height / 2;
+    
+    // Get vector from center to point
+    const dx = x - centerX;
+    const dy = y - centerY;
+    
+    // Get distance from center
+    const distance = Math.sqrt(dx * dx + dy * dy);
+    
+    // Check if point is within donut
+    if (distance < innerRadius || distance > outerRadius) {
+      return false;
+    }
+    
+    // Get angle of point (in degrees)
+    let angle = Math.atan2(dy, dx) * (180 / Math.PI);
+    
+    // Convert to 0-360 range
+    angle = (angle + 90) % 360;
+    if (angle < 0) angle += 360;
+    
+    // Check if angle is within sector
+    if (sector.startAngle <= sector.endAngle) {
+      return angle >= sector.startAngle && angle <= sector.endAngle;
+    } else {
+      return angle >= sector.startAngle || angle <= sector.endAngle;
+    }
+  };
+
+  // Handler for mouse move to detect which sector the pointer is over
+  const handleMouseMove = (e: React.MouseEvent<SVGSVGElement>) => {
+    if (!chartRef.current) return;
+    
+    const rect = chartRef.current.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    
+    for (const sector of sectors) {
+      if (isPointInSector(x, y, sector)) {
+        setHoveredSector(sector.name);
+        return;
+      }
+    }
+    
+    setHoveredSector(null);
+  };
+  
+  // Handler for mouse leave
+  const handleMouseLeave = () => {
+    setHoveredSector(null);
+  };
+  
+  // Handler for click on a sector
+  const handleClick = (e: React.MouseEvent<SVGSVGElement>) => {
+    if (!chartRef.current || !onSliceClick) return;
+    
+    const rect = chartRef.current.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    
+    for (const sector of sectors) {
+      if (isPointInSector(x, y, sector)) {
+        onSliceClick(sector.name);
+        return;
+      }
+    }
+  };
+
   const textClass = darkMode ? 'fill-white' : 'fill-gray-800';
   const bgClass = darkMode ? 'fill-[#1D2939]' : 'fill-white';
   const legendTextClass = darkMode ? 'text-gray-300' : 'text-gray-700';
@@ -149,17 +223,38 @@ const DonutChart: React.FC<DonutChartProps> = ({
   return (
     <div className={containerClass} ref={chartRef}>
       <div style={{ position: 'relative', width: chartSize.width, height: chartSize.height }}>
-        <svg width={chartSize.width} height={chartSize.height} viewBox={`0 0 ${chartSize.width} ${chartSize.height}`}>
+        <svg 
+          width={chartSize.width} 
+          height={chartSize.height} 
+          viewBox={`0 0 ${chartSize.width} ${chartSize.height}`}
+          onMouseMove={handleMouseMove}
+          onMouseLeave={handleMouseLeave}
+          onClick={handleClick}
+          style={{ cursor: onSliceClick ? 'pointer' : 'default' }}
+        >
           {/* Sectors */}
-          {sectors.map((sector, index) => (
-            <path
-              key={`sector-${index}`}
-              d={drawSector(sector)}
-              fill={sector.color}
-              stroke={darkMode ? '#172033' : '#fff'}
-              strokeWidth={1}
-            />
-          ))}
+          {sectors.map((sector, index) => {
+            const isHovered = sector.name === hoveredSector;
+            const scale = isHovered ? 1.05 : 1;
+            const translateX = isHovered ? (chartSize.width / 2) * 0.03 * Math.cos(angleToRadians((sector.startAngle + sector.endAngle) / 2 - 90)) : 0;
+            const translateY = isHovered ? (chartSize.height / 2) * 0.03 * Math.sin(angleToRadians((sector.startAngle + sector.endAngle) / 2 - 90)) : 0;
+            
+            return (
+              <path
+                key={`sector-${index}`}
+                d={drawSector(sector)}
+                fill={sector.color}
+                stroke={darkMode ? '#172033' : '#fff'}
+                strokeWidth={1}
+                transform={isHovered ? `translate(${translateX}, ${translateY}) scale(${scale})` : ''}
+                style={{ 
+                  transition: 'transform 0.2s ease', 
+                  filter: isHovered ? 'brightness(1.1)' : 'none',
+                  opacity: hoveredSector && !isHovered ? 0.7 : 1
+                }}
+              />
+            );
+          })}
 
           {/* Inner Circle */}
           <circle
@@ -198,7 +293,14 @@ const DonutChart: React.FC<DonutChartProps> = ({
       {showLegend && (
         <div className={`mt-4 grid grid-cols-2 gap-x-4 gap-y-2 text-sm ${isMobile ? 'text-xs' : ''}`}>
           {sortedData.map((item, index) => (
-            <div key={`legend-${index}`} className="flex items-center">
+            <div 
+              key={`legend-${index}`} 
+              className="flex items-center cursor-pointer" 
+              onClick={() => onSliceClick?.(item.name)}
+              onMouseEnter={() => setHoveredSector(item.name)}
+              onMouseLeave={() => setHoveredSector(null)}
+              style={{ opacity: hoveredSector && hoveredSector !== item.name ? 0.7 : 1 }}
+            >
               <div
                 className="w-3 h-3 rounded-full mr-2"
                 style={{ backgroundColor: item.color }}
