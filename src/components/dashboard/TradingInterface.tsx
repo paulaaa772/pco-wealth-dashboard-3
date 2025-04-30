@@ -18,6 +18,8 @@ interface Position {
   status?: 'open' | 'closed';
   profit?: number;
   stopLoss?: number;
+  strategy?: string;
+  confidence?: number;
 }
 
 export interface TradingInterfaceProps {
@@ -63,7 +65,7 @@ export default function TradingInterface({
     totalLoss: number,
     netPL: number,
     todayPL: number,
-    trades: {id: string, symbol: string, pl: number, date: Date}[]
+    trades: {id: string, symbol: string, pl: number, date: Date, strategy?: string, type?: 'buy' | 'sell', entryPrice?: number, exitPrice?: number, quantity?: number, confidence?: number}[]
   }>({
     totalProfit: 0,
     totalLoss: 0,
@@ -91,6 +93,21 @@ export default function TradingInterface({
     'DIS', 'BAC', 'HD', 'PG', 'XOM', 'INTC', 'VZ', 'CSCO', 'NFLX', 'ADBE',
     'PYPL', 'CRM', 'AVGO', 'QCOM', 'TXN', 'COST', 'NKE', 'MCD', 'ABT', 'UNH'
   ];
+
+  // Add new state for trade details modal
+  const [selectedTrade, setSelectedTrade] = useState<{
+    id: string, 
+    symbol: string, 
+    pl: number, 
+    date: Date,
+    strategy?: string,
+    type?: 'buy' | 'sell',
+    entryPrice?: number,
+    exitPrice?: number,
+    quantity?: number,
+    confidence?: number
+  } | null>(null);
+  const [showTradeDetails, setShowTradeDetails] = useState<boolean>(false);
 
   // Recalculate performance whenever the positions prop changes
   useEffect(() => {
@@ -235,7 +252,13 @@ export default function TradingInterface({
       id: trade.id,
       symbol: trade.symbol,
       pl: trade.profit ?? 0,
-      date: trade.closeDate ? new Date(trade.closeDate) : new Date()
+      date: trade.closeDate ? new Date(trade.closeDate) : new Date(),
+      strategy: trade.strategy,
+      type: trade.type,
+      entryPrice: trade.entryPrice,
+      exitPrice: trade.exitPrice,
+      quantity: trade.quantity,
+      confidence: trade.confidence
     })).sort((a, b) => b.date.getTime() - a.date.getTime()); // Sort newest first
     
     setTradeProfitLoss({
@@ -310,7 +333,13 @@ export default function TradingInterface({
     }
   };
 
-  // Modify executeTradeSignal to respect balance limits
+  // Handle view trade details
+  const handleViewTradeDetails = (trade: any) => {
+    setSelectedTrade(trade);
+    setShowTradeDetails(true);
+  };
+
+  // Modify executeTradeSignal to store strategy information
   const executeTradeSignal = async (signal: TradeSignal) => {
     try {
       console.log(`[TRADING UI] Attempting to execute ${signal.direction} signal for ${signal.symbol}`);
@@ -356,7 +385,9 @@ export default function TradingInterface({
           quantity: shares,
           timestamp: Date.now(),
           id: `pos-${Date.now()}`,
-          status: 'open' // Mark position as open
+          status: 'open', // Mark position as open
+          strategy: signal.strategy, // Store strategy information
+          confidence: signal.confidence // Store confidence score
         };
         
         // Instead of setPositions, call the parent's handler
@@ -780,10 +811,10 @@ export default function TradingInterface({
           </div>
         </div>
         
-        {/* Recent trades table */}
+        {/* Recent trades table - modified to make rows clickable */}
         {tradeProfitLoss.trades.length > 0 && (
           <div className="mt-2">
-            <div className="text-xs text-gray-400 mb-1">Recent Trade History</div>
+            <div className="text-xs text-gray-400 mb-1">Recent Trade History (click for details)</div>
             <div className="bg-gray-700 rounded-md max-h-32 overflow-y-auto">
               <table className="w-full text-sm">
                 <thead className="text-xs text-gray-400 border-b border-gray-600">
@@ -795,7 +826,11 @@ export default function TradingInterface({
                 </thead>
                 <tbody className="divide-y divide-gray-600">
                   {tradeProfitLoss.trades.slice(0, 5).map(trade => (
-                    <tr key={trade.id}>
+                    <tr 
+                      key={trade.id} 
+                      className="cursor-pointer hover:bg-gray-600"
+                      onClick={() => handleViewTradeDetails(trade)}
+                    >
                       <td className="p-2">{trade.date.toLocaleDateString()}</td>
                       <td className="p-2">{trade.symbol}</td>
                       <td className={`p-2 text-right ${trade.pl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
@@ -964,6 +999,104 @@ export default function TradingInterface({
               <button
                 onClick={() => setShowBalanceModal(false)}
                 className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-md"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Trade details modal */}
+      {showTradeDetails && selectedTrade && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-gray-800 rounded-lg p-4 w-full max-w-md">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold text-white">Trade Details</h3>
+              <button
+                onClick={() => setShowTradeDetails(false)}
+                className="text-gray-400 hover:text-white"
+              >
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-gray-400">Symbol:</span>
+                <span className="font-semibold text-white">{selectedTrade.symbol}</span>
+              </div>
+              
+              {selectedTrade.type && (
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-400">Position:</span>
+                  <span className={`font-semibold ${
+                    selectedTrade.type === 'buy' ? 'text-green-400' : 'text-red-400'
+                  }`}>
+                    {selectedTrade.type.toUpperCase()}
+                  </span>
+                </div>
+              )}
+              
+              <div className="flex items-center justify-between">
+                <span className="text-gray-400">Entry Price:</span>
+                <span className="font-semibold text-white">${selectedTrade.entryPrice?.toFixed(2) || 'N/A'}</span>
+              </div>
+              
+              <div className="flex items-center justify-between">
+                <span className="text-gray-400">Exit Price:</span>
+                <span className="font-semibold text-white">${selectedTrade.exitPrice?.toFixed(2) || 'N/A'}</span>
+              </div>
+              
+              <div className="flex items-center justify-between">
+                <span className="text-gray-400">Quantity:</span>
+                <span className="font-semibold text-white">{selectedTrade.quantity || 0} shares</span>
+              </div>
+              
+              <div className="flex items-center justify-between">
+                <span className="text-gray-400">P/L:</span>
+                <span className={`font-semibold ${selectedTrade.pl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                  ${selectedTrade.pl.toFixed(2)}
+                </span>
+              </div>
+              
+              <div className="flex items-center justify-between">
+                <span className="text-gray-400">Date:</span>
+                <span className="font-semibold text-white">{selectedTrade.date.toLocaleString()}</span>
+              </div>
+              
+              {selectedTrade.strategy && (
+                <div className="bg-gray-700 p-3 rounded-md">
+                  <div className="text-gray-400 mb-1">Strategy:</div>
+                  <div className="text-blue-400 font-medium">{selectedTrade.strategy}</div>
+                  
+                  {selectedTrade.confidence && (
+                    <div className="mt-2">
+                      <div className="text-gray-400 mb-1">Signal Confidence:</div>
+                      <div className="flex items-center space-x-2">
+                        <div className="w-full bg-gray-600 rounded-full h-2">
+                          <div 
+                            className={`h-2 rounded-full ${
+                              selectedTrade.confidence > 0.8 ? 'bg-green-500' : 
+                              selectedTrade.confidence > 0.6 ? 'bg-yellow-500' : 'bg-red-500'
+                            }`}
+                            style={{ width: `${selectedTrade.confidence * 100}%` }}
+                          ></div>
+                        </div>
+                        <span className="text-xs text-gray-300">{(selectedTrade.confidence * 100).toFixed()}%</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+            
+            <div className="mt-6 flex justify-end">
+              <button
+                onClick={() => setShowTradeDetails(false)}
+                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md"
               >
                 Close
               </button>
