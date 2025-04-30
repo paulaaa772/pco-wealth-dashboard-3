@@ -68,6 +68,9 @@ export default function PaperTradingPanel({
 
   // Initialize trading engines
   useEffect(() => {
+    console.log(`[Paper Trading] useEffect triggered for symbol prop: ${symbol}`);
+    addStatusMessage(`[Effect] Initializing/Re-initializing for symbol: ${symbol}`);
+    
     console.log('[Paper Trading] Initializing trading engines for symbol:', symbol);
     
     // Initialize AITradingEngine
@@ -92,9 +95,13 @@ export default function PaperTradingPanel({
           stopLossPercent: riskPerTrade / 100, // Risk percentage
         }
       );
+    } else {
+       // If risk manager exists, maybe just update relevant parts if needed?
+       // For now, we re-initialize for simplicity, but could optimize.
+       console.log('[Paper Trading] Re-initializing Risk Manager settings for new symbol (if applicable)');
     }
     
-    fetchMarketData();
+    fetchMarketData(); // Fetches data for the current symbol prop
     setIsInitialized(true);
     
     // Log message
@@ -109,7 +116,7 @@ export default function PaperTradingPanel({
     return () => {
       clearInterval(monitorInterval);
     };
-  }, [symbol]);
+  }, [symbol]); // DEPENDS ON SYMBOL PROP!
 
   // Update risk manager settings when strategy settings change
   useEffect(() => {
