@@ -12,7 +12,7 @@ interface IndicatorModalProps {
 }
 
 // Define IndicatorType including all indicators
-type IndicatorType = 'SMA' | 'EMA' | 'RSI' | 'MACD' | 'Stochastic' | 'ATR' | 'ADX' | 'OBV' | 'Parabolic SAR' | 'Pivot Points' | 'Ichimoku Cloud';
+type IndicatorType = 'SMA' | 'EMA' | 'RSI' | 'MACD' | 'Stochastic' | 'ATR' | 'ADX' | 'OBV' | 'Parabolic SAR' | 'Pivot Points' | 'Ichimoku Cloud' | 'AI Trend Prediction' | 'Neural Oscillator' | 'Adaptive MA';
 
 interface IndicatorOption {
   type: IndicatorType;
@@ -99,6 +99,37 @@ const availableIndicators: IndicatorOption[] = [
       showKijun: true,
       showCloud: true,
       showChikou: true
+    }
+  },
+  // Machine Learning Indicators
+  {
+    type: 'AI Trend Prediction',
+    label: 'AI Trend Prediction',
+    defaultParams: {
+      lookbackPeriod: 20,
+      forecastPeriod: 5,
+      showPredictionLine: true,
+      showForecast: true
+    }
+  },
+  {
+    type: 'Neural Oscillator',
+    label: 'Neural Network Oscillator',
+    defaultParams: {
+      lookbackPeriod: 14,
+      threshold: 0.8,
+      showOverbought: true,
+      showOversold: true
+    }
+  },
+  {
+    type: 'Adaptive MA',
+    label: 'Self-Adaptive Moving Average',
+    defaultParams: {
+      minPeriod: 5,
+      maxPeriod: 50,
+      volatilityWindow: 10,
+      showPeriodIndicator: true
     }
   },
 ];

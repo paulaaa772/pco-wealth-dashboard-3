@@ -10,6 +10,7 @@ import TradingInterface from '../../components/dashboard/TradingInterface';
 import { Settings } from 'lucide-react'; // Using Settings icon for Indicators button
 import IndicatorModal from '@/components/brokerage/IndicatorModal'; // Import the new modal
 import { calculateSMA, calculateEMA, calculateRSI, calculateMACD, calculateStochastic, calculateATR, calculateADX, calculateOBV, calculateParabolicSAR, calculatePivotPoints, calculateIchimokuCloud } from '@/lib/trading-engine/indicators'; // Import SMA, EMA, and RSI calculation
+import { calculateAITrendPrediction, calculateNeuralOscillator, calculateAdaptiveMA } from '@/lib/trading-engine/ml-indicators';
 import { LineData, Time, HistogramData, CandlestickData } from 'lightweight-charts'; // Import types for chart data
 
 // Create a simple AlertMessage component inline since it's missing
@@ -269,7 +270,7 @@ export interface InsiderTrade {
 // Define structure for active indicator configuration
 export interface ActiveIndicator {
   id: string; 
-  type: 'SMA' | 'EMA' | 'RSI' | 'MACD' | 'Stochastic' | 'ATR' | 'ADX' | 'OBV' | 'Parabolic SAR' | 'Pivot Points' | 'Ichimoku Cloud'; 
+  type: 'SMA' | 'EMA' | 'RSI' | 'MACD' | 'Stochastic' | 'ATR' | 'ADX' | 'OBV' | 'Parabolic SAR' | 'Pivot Points' | 'Ichimoku Cloud' | 'AI Trend Prediction' | 'Neural Oscillator' | 'Adaptive MA'; 
   period?: number;
   // MACD specific
   fastPeriod?: number;
@@ -304,6 +305,21 @@ export interface ActiveIndicator {
   showKijun?: boolean;
   showCloud?: boolean;
   showChikou?: boolean;
+  // ML-specific parameters
+  // AI Trend Prediction
+  lookbackPeriod?: number;
+  forecastPeriod?: number;
+  showPredictionLine?: boolean;
+  showForecast?: boolean;
+  // Neural Oscillator
+  threshold?: number;
+  showOverbought?: boolean;
+  showOversold?: boolean;
+  // Adaptive MA
+  minPeriod?: number;
+  maxPeriod?: number;
+  volatilityWindow?: number;
+  showPeriodIndicator?: boolean;
   // BBands specific (add later)
   stdDevMultiplier?: number;
 }
@@ -942,7 +958,7 @@ export default function BrokeragePage() {
     const newIndicatorData: IndicatorData[] = [];
     const closingPrices = candleData.map(c => c.close);
 
-    activeIndicators.forEach(indicator => {
+    activeIndicators.forEach(async (indicator) => {
       let indicatorLineData: LineData[] | null = null;
       let indicatorHistogramData: HistogramData[] | null = null; // Separate state
       let values: number[] = [];
@@ -1284,6 +1300,288 @@ export default function BrokeragePage() {
           // Add Chikou Span (Lagging Span)
           if (indicator.showChikou !== false) {
             addIchimokuLine(ichimokuResult.chikou, 'Chikou', '#50C878'); // Green
+          }
+        }
+      } else if (indicator.type === 'AI Trend Prediction') {
+        // Skip if there's not enough data
+        if (candleData.length < 20) return;
+        
+        // Prepare candle data for the AI model
+        const candlesForML = candleData.map(candle => ({
+          h: candle.high,
+          l: candle.low,
+          c: candle.close,
+          v: candle.volume,
+          o: candle.open,
+          t: candle.timestamp
+        }));
+        
+        // Set reasonable defaults
+        const lookbackPeriod = indicator.lookbackPeriod || 20;
+        const forecastPeriod = indicator.forecastPeriod || 5;
+        
+        try {
+          // This is an async operation - ML models take time to train
+          const aiResult = await calculateAITrendPrediction(
+            candlesForML,
+            lookbackPeriod,
+            forecastPeriod
+          );
+          
+          if (aiResult) {
+            // Historical fitted values
+            if (indicator.showPredictionLine !== false) {
+              const predictionLineData: LineData[] = [];
+              
+              // Map prediction values to chart data points
+              for (let i = 0; i < aiResult.predictedValues.length; i++) {
+                predictionLineData.push({
+                  time: Math.floor(candleData[i].timestamp / 1000) as Time,
+                  value: aiResult.predictedValues[i]
+                });
+              }
+              
+              if (predictionLineData.length > 0) {
+                newIndicatorData.push({
+                  id: `${indicator.id}-prediction`,
+                  type: 'AI_Trend_Prediction',
+                  data: predictionLineData,
+                  color: '#8884d8' // Purple
+                });
+              }
+            }
+            
+            // Future forecasted values
+            if (indicator.showForecast !== false && aiResult.futurePredictions.length > 0) {
+              const forecastLineData: LineData[] = [];
+              
+              // Map forecast values to future time points
+              // Start from the last historical point
+              const lastTime = candleData[candleData.length - 1].timestamp;
+              const timeStep = lastTime - candleData[candleData.length - 2].timestamp; // Estimate time interval
+              
+              // Add the last historical point to connect the lines
+              forecastLineData.push({
+                time: Math.floor(lastTime / 1000) as Time,
+                value: aiResult.predictedValues[aiResult.predictedValues.length - 1]
+              });
+              
+              // Add forecast points
+              for (let i = 0; i < aiResult.futurePredictions.length; i++) {
+                forecastLineData.push({
+                  time: Math.floor((lastTime + timeStep * (i + 1)) / 1000) as Time,
+                  value: aiResult.futurePredictions[i]
+                });
+              }
+              
+              if (forecastLineData.length > 0) {
+                newIndicatorData.push({
+                  id: `${indicator.id}-forecast`,
+                  type: 'AI_Trend_Forecast',
+                  data: forecastLineData,
+                  color: '#F1025E' // Bright pink for forecast line
+                });
+              }
+            }
+          }
+        } catch (error) {
+          console.error('[ML] AI Trend Prediction error:', error);
+        }
+      } else if (indicator.type === 'Neural Oscillator') {
+        // Skip if there's not enough data
+        if (candleData.length < 30) return;
+        
+        // Prepare candle data for the oscillator
+        const candlesForML = candleData.map(candle => ({
+          h: candle.high,
+          l: candle.low,
+          c: candle.close,
+          v: candle.volume,
+          o: candle.open,
+          t: candle.timestamp
+        }));
+        
+        // Set reasonable defaults
+        const lookbackPeriod = indicator.lookbackPeriod || 14;
+        const threshold = indicator.threshold || 0.8;
+        
+        try {
+          // Neural Network calculation
+          const neuralResult = await calculateNeuralOscillator(
+            candlesForML,
+            lookbackPeriod,
+            threshold
+          );
+          
+          if (neuralResult) {
+            const alignmentOffset = candleData.length - neuralResult.values.length;
+            
+            // Main oscillator values
+            const oscillatorLineData: LineData[] = [];
+            
+            // Map oscillator values to chart data points
+            for (let i = 0; i < neuralResult.values.length; i++) {
+              const candleIndex = i + alignmentOffset;
+              if (candleIndex < 0 || candleIndex >= candleData.length) continue;
+              
+              oscillatorLineData.push({
+                time: Math.floor(candleData[candleIndex].timestamp / 1000) as Time,
+                value: neuralResult.values[i]
+              });
+            }
+            
+            if (oscillatorLineData.length > 0) {
+              newIndicatorData.push({
+                id: `${indicator.id}-line`,
+                type: 'Neural_Oscillator',
+                data: oscillatorLineData,
+                color: '#00BFFF', // Deep sky blue
+                pane: 1 // Display in separate pane
+              });
+            }
+            
+            // Overbought signals
+            if (indicator.showOverbought !== false) {
+              const overboughtLineData: LineData[] = [];
+              
+              for (let i = 0; i < neuralResult.overbought.length; i++) {
+                if (neuralResult.overbought[i] === 0) continue; // Skip non-overbought points
+                
+                const candleIndex = i + alignmentOffset;
+                if (candleIndex < 0 || candleIndex >= candleData.length) continue;
+                
+                overboughtLineData.push({
+                  time: Math.floor(candleData[candleIndex].timestamp / 1000) as Time,
+                  value: threshold // Fixed value for visualization
+                });
+              }
+              
+              if (overboughtLineData.length > 0) {
+                newIndicatorData.push({
+                  id: `${indicator.id}-overbought`,
+                  type: 'Neural_Overbought',
+                  data: overboughtLineData,
+                  color: '#FF4500', // OrangeRed
+                  pane: 1 // Display in same pane as oscillator
+                });
+              }
+            }
+            
+            // Oversold signals
+            if (indicator.showOversold !== false) {
+              const oversoldLineData: LineData[] = [];
+              
+              for (let i = 0; i < neuralResult.oversold.length; i++) {
+                if (neuralResult.oversold[i] === 0) continue; // Skip non-oversold points
+                
+                const candleIndex = i + alignmentOffset;
+                if (candleIndex < 0 || candleIndex >= candleData.length) continue;
+                
+                oversoldLineData.push({
+                  time: Math.floor(candleData[candleIndex].timestamp / 1000) as Time,
+                  value: -threshold // Fixed value for visualization
+                });
+              }
+              
+              if (oversoldLineData.length > 0) {
+                newIndicatorData.push({
+                  id: `${indicator.id}-oversold`,
+                  type: 'Neural_Oversold',
+                  data: oversoldLineData,
+                  color: '#32CD32', // LimeGreen
+                  pane: 1 // Display in same pane as oscillator
+                });
+              }
+            }
+          }
+        } catch (error) {
+          console.error('[ML] Neural Oscillator error:', error);
+        }
+      } else if (indicator.type === 'Adaptive MA') {
+        // Skip if there's not enough data
+        if (candleData.length < 60) return;
+        
+        // Prepare candle data
+        const candlesForMA = candleData.map(candle => ({
+          h: candle.high,
+          l: candle.low,
+          c: candle.close,
+          v: candle.volume,
+          o: candle.open,
+          t: candle.timestamp
+        }));
+        
+        // Get parameters with defaults
+        const minPeriod = indicator.minPeriod || 5;
+        const maxPeriod = indicator.maxPeriod || 50;
+        const volatilityWindow = indicator.volatilityWindow || 10;
+        
+        // Calculate Adaptive MA
+        const adaptiveResult = calculateAdaptiveMA(
+          candlesForMA,
+          minPeriod,
+          maxPeriod,
+          volatilityWindow
+        );
+        
+        if (adaptiveResult) {
+          const alignmentOffset = candleData.length - adaptiveResult.values.length;
+          
+          // MA values
+          const maLineData: LineData[] = [];
+          
+          // Map MA values to chart data points
+          for (let i = 0; i < adaptiveResult.values.length; i++) {
+            const candleIndex = i + alignmentOffset;
+            if (candleIndex < 0 || candleIndex >= candleData.length) continue;
+            
+            maLineData.push({
+              time: Math.floor(candleData[candleIndex].timestamp / 1000) as Time,
+              value: adaptiveResult.values[i]
+            });
+          }
+          
+          if (maLineData.length > 0) {
+            newIndicatorData.push({
+              id: `${indicator.id}-ma`,
+              type: 'Adaptive_MA',
+              data: maLineData,
+              color: '#FF6EC7' // Pink
+            });
+          }
+          
+          // Optional period indicator (shows the period used at each point)
+          if (indicator.showPeriodIndicator && adaptiveResult.periods.length > 0) {
+            const periodData: LineData[] = [];
+            
+            // Scale periods to a visible range on the chart
+            const priceRange = Math.max(...candleData.map(c => c.high)) - Math.min(...candleData.map(c => c.low));
+            const scaleFactor = priceRange / (maxPeriod - minPeriod) * 0.1; // Use 10% of price range
+            
+            // Calculate base level (near the bottom of the chart)
+            const baseLevel = Math.min(...candleData.map(c => c.low)) - priceRange * 0.05;
+            
+            for (let i = 0; i < adaptiveResult.periods.length; i++) {
+              const candleIndex = i + alignmentOffset;
+              if (candleIndex < 0 || candleIndex >= candleData.length) continue;
+              
+              // Scale period to visible chart area
+              const scaledValue = baseLevel + (adaptiveResult.periods[i] - minPeriod) * scaleFactor;
+              
+              periodData.push({
+                time: Math.floor(candleData[candleIndex].timestamp / 1000) as Time,
+                value: scaledValue
+              });
+            }
+            
+            if (periodData.length > 0) {
+              newIndicatorData.push({
+                id: `${indicator.id}-period`,
+                type: 'Adaptive_MA_Period',
+                data: periodData,
+                color: '#AAEEEE' // Light cyan
+              });
+            }
           }
         }
       } else if (indicator.type === 'MACD' && indicator.fastPeriod && indicator.slowPeriod && indicator.signalPeriod) {

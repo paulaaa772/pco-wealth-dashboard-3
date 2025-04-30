@@ -13,5 +13,9 @@ export const indicatorDefinitions = [
   { name: 'OBV', create: createLineIndicator('obv') },
   { name: 'Parabolic SAR', create: createLineIndicator('psar') },
   { name: 'Pivot Points', create: createLineIndicator('pivots') },
-  { name: 'Ichimoku Cloud', create: createBandIndicator('ichimoku') }
+  { name: 'Ichimoku Cloud', create: createBandIndicator('ichimoku') },
+  // Machine Learning Indicators
+  { name: 'AI Trend Prediction', create: createLineIndicator('ai_trend') },
+  { name: 'Neural Oscillator', create: createLineIndicator('neural_osc') },
+  { name: 'Adaptive MA', create: createLineIndicator('adaptive_ma') }
 ]
