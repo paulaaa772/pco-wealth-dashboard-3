@@ -15,6 +15,7 @@ interface HoldingRow extends ManualAsset {
   allocation: number;
   gain: number;
   gainPercent: number;
+  assetType?: string; // Added for asset type
 }
 
 // Function to assign colors for grouping accounts visually
@@ -46,6 +47,7 @@ export function PortfolioHoldings() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedAccount, setSelectedAccount] = useState<ManualAccount | null>(null);
   const [isConsolidated, setIsConsolidated] = useState(false);
+  const [assetTypeFilter, setAssetTypeFilter] = useState<string | null>(null);
 
   const [sortConfig, setSortConfig] = useState<{
     key: keyof HoldingRow;
@@ -142,6 +144,7 @@ export function PortfolioHoldings() {
           totalCostBasis: number;
           symbol: string;
           id: string;
+          assetType?: string; // Add asset type to track in consolidated view
         }>();
         
         accounts.forEach(account => {
@@ -153,7 +156,8 @@ export function PortfolioHoldings() {
                 totalValue: 0, 
                 totalCostBasis: 0,
                 symbol: asset.symbol,
-                id: `${consolidatedId}-${asset.symbol}`
+                id: `${consolidatedId}-${asset.symbol}`,
+                assetType: asset.assetType // Capture asset type
               });
             }
             
@@ -161,6 +165,10 @@ export function PortfolioHoldings() {
             item.totalQuantity += asset.quantity;
             item.totalValue += asset.value;
             item.totalCostBasis += asset.costBasis ?? asset.value;
+            // Keep asset type if present
+            if (!item.assetType && asset.assetType) {
+              item.assetType = asset.assetType;
+            }
           });
         });
         
@@ -175,6 +183,7 @@ export function PortfolioHoldings() {
             quantity: asset.totalQuantity,
             value: asset.totalValue,
             costBasis: asset.totalCostBasis,
+            assetType: asset.assetType, // Include asset type in consolidated view
             accountName: `${brokerName} (Consolidated)`,
             brokerName: brokerName,
             accountType: firstAccount.accountType,
@@ -211,9 +220,15 @@ export function PortfolioHoldings() {
     return { groups, accountDetails };
   }, [manualAccounts, isConsolidated, brokersWithMultipleAccounts]);
 
-  // Sort holding rows based on current config
+  // Sort holding rows based on current config and apply filters
   const sortedHoldingRows = useMemo(() => {
-    const sortableItems = [...Object.values(groupedRowsGroups).flat()];
+    let sortableItems = [...Object.values(groupedRowsGroups).flat()];
+    
+    // Apply asset type filter if selected
+    if (assetTypeFilter) {
+      sortableItems = sortableItems.filter(item => item.assetType === assetTypeFilter);
+    }
+    
     if (sortConfig.key) {
       sortableItems.sort((a, b) => {
         // Add checks/defaults for potential undefined values
@@ -226,7 +241,18 @@ export function PortfolioHoldings() {
       });
     }
     return sortableItems;
-  }, [groupedRowsGroups, sortConfig]);
+  }, [groupedRowsGroups, sortConfig, assetTypeFilter]);
+
+  // Calculate available asset types for filter
+  const availableAssetTypes = useMemo(() => {
+    const types = new Set<string>();
+    Object.values(groupedRowsGroups).flat().forEach(row => {
+      if (row.assetType) {
+        types.add(row.assetType);
+      }
+    });
+    return Array.from(types).sort();
+  }, [groupedRowsGroups]);
 
   // Calculate overall summary metrics from processed rows
   const summary = useMemo(() => {
@@ -235,6 +261,27 @@ export function PortfolioHoldings() {
     const totalGain = totalValue - totalCost;
     const averageGainPercent = totalCost > 0 ? (totalGain / totalCost) * 100 : 0;
     return { totalValue, totalCost, totalGain, averageGainPercent };
+  }, [sortedHoldingRows]);
+
+  // Calculate the asset type distribution for the portfolio
+  const assetTypeDistribution = useMemo(() => {
+    const distribution: Record<string, { value: number; percentage: number }> = {};
+    const totalValue = sortedHoldingRows.reduce((sum, row) => sum + row.value, 0);
+    
+    sortedHoldingRows.forEach(row => {
+      const type = row.assetType || 'Unspecified';
+      if (!distribution[type]) {
+        distribution[type] = { value: 0, percentage: 0 };
+      }
+      distribution[type].value += row.value;
+    });
+    
+    // Calculate percentages
+    Object.keys(distribution).forEach(type => {
+      distribution[type].percentage = (distribution[type].value / totalValue) * 100;
+    });
+    
+    return distribution;
   }, [sortedHoldingRows]);
 
   // Combine loading and error states from context
@@ -308,6 +355,27 @@ export function PortfolioHoldings() {
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold">Investment Holdings</h2>
         <div className="flex gap-4">
+          {/* Asset Type Filter */}
+          {availableAssetTypes.length > 0 && (
+            <div className="relative">
+              <select
+                value={assetTypeFilter || ''}
+                onChange={(e) => setAssetTypeFilter(e.target.value || null)}
+                className="bg-[#2A3C61] text-gray-300 py-2 px-4 rounded-lg text-sm appearance-none pr-8 hover:bg-[#344571] transition-colors"
+              >
+                <option value="">All Asset Types</option>
+                {availableAssetTypes.map(type => (
+                  <option key={type} value={type}>{type}</option>
+                ))}
+              </select>
+              <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none text-gray-400">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M6 9l6 6 6-6"/>
+                </svg>
+              </div>
+            </div>
+          )}
+          
           {/* Consolidate toggle - only show if there are accounts that can be consolidated */}
           {brokersWithMultipleAccounts.size > 0 && (
             <button
@@ -334,28 +402,55 @@ export function PortfolioHoldings() {
       
       {/* Portfolio Summary */}
       {manualAccounts.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-            <div className="bg-[#2A3C61] rounded-lg p-4">
-              <div className="text-sm text-gray-400 mb-1">Total Value</div>
-              <div className="text-2xl font-bold">${summary.totalValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-            </div>
-            <div className="bg-[#2A3C61] rounded-lg p-4">
-              <div className="text-sm text-gray-400 mb-1">Total Cost</div>
-              <div className="text-2xl font-bold">${summary.totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-            </div>
-            <div className="bg-[#2A3C61] rounded-lg p-4">
-              <div className="text-sm text-gray-400 mb-1">Total Gain/Loss</div>
-              <div className={`text-2xl font-bold ${summary.totalGain >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                ${summary.totalGain.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+              <div className="bg-[#2A3C61] rounded-lg p-4">
+                <div className="text-sm text-gray-400 mb-1">Total Value</div>
+                <div className="text-2xl font-bold">${summary.totalValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+              </div>
+              <div className="bg-[#2A3C61] rounded-lg p-4">
+                <div className="text-sm text-gray-400 mb-1">Total Cost</div>
+                <div className="text-2xl font-bold">${summary.totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+              </div>
+              <div className="bg-[#2A3C61] rounded-lg p-4">
+                <div className="text-sm text-gray-400 mb-1">Total Gain/Loss</div>
+                <div className={`text-2xl font-bold ${summary.totalGain >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                  ${summary.totalGain.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </div>
+              </div>
+              <div className="bg-[#2A3C61] rounded-lg p-4">
+                <div className="text-sm text-gray-400 mb-1">Average Return</div>
+                <div className={`text-2xl font-bold ${summary.averageGainPercent >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                  {summary.averageGainPercent.toFixed(2)}%
+                </div>
               </div>
             </div>
-            <div className="bg-[#2A3C61] rounded-lg p-4">
-              <div className="text-sm text-gray-400 mb-1">Average Return</div>
-              <div className={`text-2xl font-bold ${summary.averageGainPercent >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                {summary.averageGainPercent.toFixed(2)}%
+            
+            {/* Asset Type Distribution */}
+            {Object.keys(assetTypeDistribution).length > 0 && (
+              <div className="bg-[#2A3C61] rounded-lg p-4 mb-6">
+                <h3 className="text-lg font-semibold mb-3">Portfolio Composition by Asset Type</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                  {Object.entries(assetTypeDistribution)
+                    .sort(([, a], [, b]) => b.value - a.value)
+                    .map(([type, data]) => (
+                      <div key={type} className="flex flex-col">
+                        <div className="flex justify-between items-center mb-1">
+                          <span className="text-sm font-medium">{type}</span>
+                          <span className="text-sm text-gray-400">{data.percentage.toFixed(1)}%</span>
+                        </div>
+                        <div className="w-full bg-[#1B2B4B] rounded-full h-2.5">
+                          <div className="bg-blue-500 h-2.5 rounded-full" style={{ width: `${data.percentage}%` }}></div>
+                        </div>
+                        <span className="text-xs text-gray-400 mt-1">
+                          ${data.value.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                        </span>
+                      </div>
+                    ))}
+                </div>
               </div>
-            </div>
-          </div>
+            )}
+          </>
       ) : (
          <div className="text-center py-6 text-gray-400 bg-[#2A3C61] rounded-lg mb-6">
              No manual accounts added yet. Click 'Aggregate Account' to add one.
@@ -380,6 +475,14 @@ export function PortfolioHoldings() {
                   <button onClick={() => requestSort('symbol')} className="flex items-center">
                     Symbol/Asset
                     {sortConfig.key === 'symbol' && (
+                      <span className="ml-1">{sortConfig.direction === 'ascending' ? '↑' : '↓'}</span>
+                    )}
+                  </button>
+                </th>
+                <th className="py-3 px-4 text-left font-medium">
+                  <button onClick={() => requestSort('assetType')} className="flex items-center">
+                    Asset Type
+                    {sortConfig.key === 'assetType' && (
                       <span className="ml-1">{sortConfig.direction === 'ascending' ? '↑' : '↓'}</span>
                     )}
                   </button>
@@ -423,7 +526,7 @@ export function PortfolioHoldings() {
                   <React.Fragment key={accountId}>
                     {/* Account Header Row */}
                     <tr className="bg-[#18233C] border-b border-t border-gray-600">
-                       <td colSpan={5} className="py-2 px-4 font-semibold"> 
+                       <td colSpan={6} className="py-2 px-4 font-semibold"> 
                           <div className="flex items-center">
                               <span 
                                 className="h-2.5 w-2.5 rounded-full mr-2" 
@@ -454,7 +557,18 @@ export function PortfolioHoldings() {
                     {/* Asset Rows */}
                     {rows.map((row, index) => (
                       <tr key={row.id} className={`${index % 2 === 0 ? 'bg-[#2A3C61]' : 'bg-[#233150]'} hover:bg-[#344571]`}>
-                        <td className="py-3 px-4 pl-8 text-sm font-medium">{row.symbol}</td> {/* Indented symbol */}
+                        <td className="py-3 px-4 pl-8 text-sm font-medium">
+                          {row.symbol}
+                        </td>
+                        <td className="py-3 px-4 text-sm">
+                          {row.assetType ? (
+                            <span className="px-2 py-0.5 text-xs bg-[#344571] text-gray-300 rounded-full">
+                              {row.assetType}
+                            </span>
+                          ) : (
+                            <span className="text-gray-500">—</span>
+                          )}
+                        </td>
                         <td className="py-3 px-4 text-right text-sm">{row.quantity.toLocaleString()}</td>
                         <td className="py-3 px-4 text-right text-sm">${row.value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                         <td className={`py-3 px-4 text-right text-sm ${row.gain >= 0 ? 'text-green-500' : 'text-red-500'}`}>
