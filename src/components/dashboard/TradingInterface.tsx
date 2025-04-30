@@ -81,6 +81,17 @@ export default function TradingInterface({
   const aiEngine = useRef<AITradingEngine | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // Add new state for market scanner
+  const [isScanning, setIsScanning] = useState<boolean>(false);
+  const [scanResults, setScanResults] = useState<Array<TradeSignal & { company?: string }>>([]);
+  const [showScanResults, setShowScanResults] = useState<boolean>(false);
+  // List of popular stocks to scan
+  const stocksToScan = [
+    'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'META', 'TSLA', 'NVDA', 'JPM', 'V', 'WMT',
+    'DIS', 'BAC', 'HD', 'PG', 'XOM', 'INTC', 'VZ', 'CSCO', 'NFLX', 'ADBE',
+    'PYPL', 'CRM', 'AVGO', 'QCOM', 'TXN', 'COST', 'NKE', 'MCD', 'ABT', 'UNH'
+  ];
+
   // Recalculate performance whenever the positions prop changes
   useEffect(() => {
       console.log("[TRADING UI] Positions prop updated, recalculating performance.");
@@ -392,6 +403,82 @@ export default function TradingInterface({
     setAiEnabled(!aiEnabled);
   };
 
+  // Add new function to scan multiple stocks
+  const scanMarket = async () => {
+    try {
+      setIsScanning(true);
+      setShowScanResults(true);
+      setScanResults([]);
+      
+      console.log('[TRADING UI] Starting market scan for trading opportunities...');
+      
+      // Create a temporary trading engine for scanning
+      const scannerEngine = new AITradingEngine('', mode, allocatedBalance);
+      const results: Array<TradeSignal & { company?: string }> = [];
+      
+      // Analyze each stock in parallel with a concurrency limit
+      const concurrencyLimit = 3; // Process 3 stocks at a time to avoid rate limits
+      const chunks = [];
+      
+      // Split stocks into chunks based on concurrency limit
+      for (let i = 0; i < stocksToScan.length; i += concurrencyLimit) {
+        chunks.push(stocksToScan.slice(i, i + concurrencyLimit));
+      }
+      
+      // Process each chunk sequentially
+      for (const chunk of chunks) {
+        // Process stocks in this chunk in parallel
+        const chunkPromises = chunk.map(async (stockSymbol) => {
+          try {
+            console.log(`[MARKET SCANNER] Analyzing ${stockSymbol}...`);
+            scannerEngine.setSymbol(stockSymbol);
+            const signal = await scannerEngine.analyzeMarket();
+            
+            if (signal) {
+              // Try to get company name
+              let companyName = '';
+              try {
+                const response = await fetch(`/api/search-tickers?q=${encodeURIComponent(stockSymbol)}`);
+                if (response.ok) {
+                  const searchResults = await response.json();
+                  companyName = searchResults.find((r: any) => r.symbol === stockSymbol)?.name || '';
+                }
+              } catch (e) {
+                console.error(`[MARKET SCANNER] Error fetching company name for ${stockSymbol}:`, e);
+              }
+              
+              results.push({
+                ...signal,
+                company: companyName
+              });
+              
+              console.log(`[MARKET SCANNER] Found ${signal.direction.toUpperCase()} signal for ${stockSymbol}`);
+            }
+          } catch (e) {
+            console.error(`[MARKET SCANNER] Error analyzing ${stockSymbol}:`, e);
+          }
+        });
+        
+        // Wait for all stocks in this chunk to be analyzed
+        await Promise.all(chunkPromises);
+        
+        // Small delay between chunks to avoid rate limits
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+      
+      // Sort results by confidence (highest first)
+      results.sort((a, b) => b.confidence - a.confidence);
+      
+      console.log(`[MARKET SCANNER] Scan complete. Found ${results.length} trading opportunities.`);
+      setScanResults(results);
+    } catch (error) {
+      console.error('[MARKET SCANNER] Error scanning market:', error);
+      setErrorMessage('Error scanning market for trading opportunities');
+    } finally {
+      setIsScanning(false);
+    }
+  };
+
   return (
     <div className="bg-gray-900 rounded-lg p-4">
       <h2 className="text-2xl font-semibold text-white mb-4">AI Terminal</h2>
@@ -558,6 +645,118 @@ export default function TradingInterface({
           </button>
         </div>
       </div>
+      
+      {/* Add Market Scanner button */}
+      <div className="mb-4">
+        <button
+          onClick={scanMarket}
+          disabled={isScanning}
+          className={`w-full p-3 rounded-lg text-white font-medium ${
+            isScanning ? 'bg-indigo-800 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700'
+          }`}
+        >
+          {isScanning ? (
+            <div className="flex items-center justify-center">
+              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+              <span>Scanning Market for Trading Opportunities...</span>
+            </div>
+          ) : (
+            <span>Scan Market for Trading Opportunities</span>
+          )}
+        </button>
+      </div>
+      
+      {/* Market Scanner Results */}
+      {showScanResults && (
+        <div className="mb-4 bg-gray-800 rounded-lg p-3">
+          <div className="flex justify-between items-center mb-2">
+            <h3 className="text-sm font-medium text-gray-400">Market Scanner Results</h3>
+            <button
+              onClick={() => setShowScanResults(false)}
+              className="text-gray-400 hover:text-white"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+          
+          {isScanning ? (
+            <div className="flex items-center justify-center h-32">
+              <div className="animate-pulse text-gray-400 text-sm">Scanning markets for trading opportunities...</div>
+            </div>
+          ) : scanResults.length > 0 ? (
+            <div className="bg-gray-700 rounded-md overflow-hidden">
+              <div className="max-h-80 overflow-auto">
+                <table className="w-full text-sm text-left">
+                  <thead className="text-xs text-gray-400 bg-gray-800">
+                    <tr>
+                      <th className="px-4 py-2">Symbol</th>
+                      <th className="px-4 py-2">Company</th>
+                      <th className="px-4 py-2">Signal</th>
+                      <th className="px-4 py-2">Price</th>
+                      <th className="px-4 py-2">Strategy</th>
+                      <th className="px-4 py-2">Confidence</th>
+                      <th className="px-4 py-2">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-600">
+                    {scanResults.map((signal, index) => (
+                      <tr key={`${signal.symbol}-${index}`} className="bg-gray-700 hover:bg-gray-600">
+                        <td className="px-4 py-2 font-medium text-white">{signal.symbol}</td>
+                        <td className="px-4 py-2 text-gray-300 truncate max-w-[150px]">{signal.company || '-'}</td>
+                        <td className={`px-4 py-2 font-medium ${
+                          signal.direction === 'buy' ? 'text-green-400' : 'text-red-400'
+                        }`}>
+                          {signal.direction.toUpperCase()}
+                        </td>
+                        <td className="px-4 py-2">${signal.price.toFixed(2)}</td>
+                        <td className="px-4 py-2 text-blue-400 text-xs">{signal.strategy}</td>
+                        <td className="px-4 py-2">
+                          <div className="w-full bg-gray-600 rounded-full h-2">
+                            <div 
+                              className={`h-2 rounded-full ${
+                                signal.confidence > 0.8 ? 'bg-green-500' : 
+                                signal.confidence > 0.6 ? 'bg-yellow-500' : 'bg-red-500'
+                              }`}
+                              style={{ width: `${signal.confidence * 100}%` }}
+                            ></div>
+                          </div>
+                          <span className="text-xs text-gray-400">{(signal.confidence * 100).toFixed()}%</span>
+                        </td>
+                        <td className="px-4 py-2">
+                          <button
+                            onClick={() => {
+                              // Set the symbol and then execute the signal
+                              setSymbol(signal.symbol);
+                              onSymbolChange(signal.symbol);
+                              executeTradeSignal(signal);
+                            }}
+                            className={`px-2 py-1 text-xs rounded ${
+                              signal.direction === 'buy' 
+                                ? 'bg-green-600 hover:bg-green-700' 
+                                : 'bg-red-600 hover:bg-red-700'
+                            } text-white`}
+                          >
+                            Execute
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div className="p-2 bg-gray-800 text-xs text-gray-400">
+                Found {scanResults.length} trading opportunities across {stocksToScan.length} stocks
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center justify-center h-32 text-gray-500">
+              No trading opportunities found. Try again later or adjust scanner settings.
+            </div>
+          )}
+        </div>
+      )}
       
       {/* New section for Profit/Loss Details */}
       <div className="mb-4 bg-gray-800 rounded-lg p-3">
