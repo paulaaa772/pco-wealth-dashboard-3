@@ -1,3 +1,5 @@
+'use client';
+
 import * as tf from '@tensorflow/tfjs';
 import { PolygonCandle } from '../market-data/PolygonService';
 
