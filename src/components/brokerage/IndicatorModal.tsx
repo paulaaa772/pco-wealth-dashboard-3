@@ -12,7 +12,7 @@ interface IndicatorModalProps {
 }
 
 // Define IndicatorType including all indicators
-type IndicatorType = 'SMA' | 'EMA' | 'RSI' | 'MACD' | 'Stochastic' | 'ATR' | 'ADX';
+type IndicatorType = 'SMA' | 'EMA' | 'RSI' | 'MACD' | 'Stochastic' | 'ATR' | 'ADX' | 'OBV';
 
 interface IndicatorOption {
   type: IndicatorType;
@@ -60,6 +60,11 @@ const availableIndicators: IndicatorOption[] = [
       period: 14,
       showDI: true
     }
+  },
+  {
+    type: 'OBV',
+    label: 'On-Balance Volume (OBV)',
+    defaultParams: {} // OBV doesn't require any parameters
   },
 ];
 

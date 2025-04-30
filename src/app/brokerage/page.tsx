@@ -9,7 +9,7 @@ import BusinessInsiderTradingPanel from '../../components/brokerage/BusinessInsi
 import TradingInterface from '../../components/dashboard/TradingInterface';
 import { Settings } from 'lucide-react'; // Using Settings icon for Indicators button
 import IndicatorModal from '@/components/brokerage/IndicatorModal'; // Import the new modal
-import { calculateSMA, calculateEMA, calculateRSI, calculateMACD, calculateStochastic, calculateATR, calculateADX } from '@/lib/trading-engine/indicators'; // Import SMA, EMA, and RSI calculation
+import { calculateSMA, calculateEMA, calculateRSI, calculateMACD, calculateStochastic, calculateATR, calculateADX, calculateOBV } from '@/lib/trading-engine/indicators'; // Import SMA, EMA, and RSI calculation
 import { LineData, Time, HistogramData, CandlestickData } from 'lightweight-charts'; // Import types for chart data
 
 // Create a simple AlertMessage component inline since it's missing
@@ -269,7 +269,7 @@ export interface InsiderTrade {
 // Define structure for active indicator configuration
 export interface ActiveIndicator {
   id: string; 
-  type: 'SMA' | 'EMA' | 'RSI' | 'MACD' | 'Stochastic' | 'ATR' | 'ADX'; 
+  type: 'SMA' | 'EMA' | 'RSI' | 'MACD' | 'Stochastic' | 'ATR' | 'ADX' | 'OBV'; 
   period?: number;
   // MACD specific
   fastPeriod?: number;
@@ -1035,6 +1035,43 @@ export default function BrokeragePage() {
                 pane: 1 // Display in same pane as ADX
               });
             }
+          }
+        }
+      } else if (indicator.type === 'OBV') {
+        // Calculate OBV
+        const candlesForOBV = candleData.map(candle => ({
+          h: candle.high,
+          l: candle.low,
+          c: candle.close,
+          v: candle.volume,
+          o: candle.open,
+          t: candle.timestamp
+        }));
+        
+        const obvValues = calculateOBV(candlesForOBV);
+        
+        if (obvValues && obvValues.length > 0) {
+          alignmentOffset = candleData.length - obvValues.length;
+          labelPeriod = undefined;
+          
+          // OBV Line
+          const obvLineData = obvValues.map((value, index) => {
+            const candleIndex = index + alignmentOffset;
+            if (candleIndex < 0 || candleIndex >= candleData.length) return null;
+            return { 
+              time: Math.floor(candleData[candleIndex].timestamp / 1000) as Time, 
+              value: parseFloat(value.toFixed(2)) 
+            };
+          }).filter((p): p is LineData => p !== null);
+          
+          if (obvLineData.length > 0) {
+            newIndicatorData.push({
+              id: indicator.id,
+              type: 'OBV',
+              data: obvLineData,
+              color: '#4B0082', // Indigo
+              pane: 1 // Display in separate pane
+            });
           }
         }
       } else if (indicator.type === 'MACD' && indicator.fastPeriod && indicator.slowPeriod && indicator.signalPeriod) {
