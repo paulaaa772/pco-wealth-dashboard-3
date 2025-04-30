@@ -201,4 +201,31 @@ export const calculateOBV = (candles: PolygonCandle[]): number[] => {
     return obv;
 };
 
+export const calculateATR = (candles: PolygonCandle[], period: number = 14): number[] => {
+    if (period <= 0 || !candles || candles.length < period + 1) return [];
+    
+    // Calculate True Ranges first
+    const trueRanges: number[] = [];
+    
+    for (let i = 1; i < candles.length; i++) {
+        const { h: high, l: low } = candles[i];
+        const { c: prevClose } = candles[i - 1];
+        
+        // True Range is the greatest of:
+        // 1. Current High - Current Low
+        // 2. |Current High - Previous Close|
+        // 3. |Current Low - Previous Close|
+        const tr = Math.max(
+            high - low,
+            Math.abs(high - prevClose),
+            Math.abs(low - prevClose)
+        );
+        
+        trueRanges.push(tr);
+    }
+    
+    // Calculate ATR using Wilder's smoothing method
+    return wilderSmoothing(trueRanges, period);
+};
+
 // Add other indicator calculations here... 

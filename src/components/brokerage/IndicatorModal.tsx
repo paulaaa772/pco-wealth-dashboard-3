@@ -12,7 +12,7 @@ interface IndicatorModalProps {
 }
 
 // Define IndicatorType including MACD
-type IndicatorType = 'SMA' | 'EMA' | 'RSI' | 'MACD' | 'Stochastic';
+type IndicatorType = 'SMA' | 'EMA' | 'RSI' | 'MACD' | 'Stochastic' | 'ATR';
 
 interface IndicatorOption {
   type: IndicatorType;
@@ -44,6 +44,13 @@ const availableIndicators: IndicatorOption[] = [
       dPeriod: 3,
       showK: true,
       showD: true
+    }
+  },
+  {
+    type: 'ATR',
+    label: 'Average True Range (ATR)',
+    defaultParams: {
+      period: 14
     }
   },
 ];

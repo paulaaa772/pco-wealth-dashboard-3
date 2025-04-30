@@ -9,7 +9,7 @@ import BusinessInsiderTradingPanel from '../../components/brokerage/BusinessInsi
 import TradingInterface from '../../components/dashboard/TradingInterface';
 import { Settings } from 'lucide-react'; // Using Settings icon for Indicators button
 import IndicatorModal from '@/components/brokerage/IndicatorModal'; // Import the new modal
-import { calculateSMA, calculateEMA, calculateRSI, calculateMACD, calculateStochastic } from '@/lib/trading-engine/indicators'; // Import SMA, EMA, and RSI calculation
+import { calculateSMA, calculateEMA, calculateRSI, calculateMACD, calculateStochastic, calculateATR } from '@/lib/trading-engine/indicators'; // Import SMA, EMA, and RSI calculation
 import { LineData, Time, HistogramData, CandlestickData } from 'lightweight-charts'; // Import types for chart data
 
 // Create a simple AlertMessage component inline since it's missing
@@ -269,7 +269,7 @@ export interface InsiderTrade {
 // Define structure for active indicator configuration
 export interface ActiveIndicator {
   id: string; 
-  type: 'SMA' | 'EMA' | 'RSI' | 'MACD' | 'Stochastic'; 
+  type: 'SMA' | 'EMA' | 'RSI' | 'MACD' | 'Stochastic' | 'ATR'; 
   period?: number;
   // MACD specific
   fastPeriod?: number;
@@ -941,6 +941,20 @@ export default function BrokeragePage() {
         values = calculateRSI(closingPrices, indicator.period);
         alignmentOffset = candleData.length - values.length;
         color = '#DA70D6'; // Orchid
+      } else if (indicator.type === 'ATR' && indicator.period) {
+        // Calculate ATR
+        const candlesForATR = candleData.map(candle => ({
+          h: candle.high,
+          l: candle.low,
+          c: candle.close,
+          v: candle.volume,
+          o: candle.open,
+          t: candle.timestamp
+        }));
+        
+        values = calculateATR(candlesForATR, indicator.period);
+        alignmentOffset = candleData.length - values.length;
+        color = '#FF4500'; // OrangeRed
       } else if (indicator.type === 'MACD' && indicator.fastPeriod && indicator.slowPeriod && indicator.signalPeriod) {
         const macdResult = calculateMACD(closingPrices, indicator.fastPeriod, indicator.slowPeriod, indicator.signalPeriod);
         if (macdResult) {
@@ -1085,8 +1099,8 @@ export default function BrokeragePage() {
           type: indicator.type,
           data: indicatorLineData,
           color: color,
-          period: labelPeriod // Pass label period
-          // Add other relevant params like fastPeriod, slowPeriod for MACD later
+          period: labelPeriod, // Pass label period
+          pane: indicator.type === 'ATR' ? 1 : undefined // Display ATR in separate pane
         });
       }
     });

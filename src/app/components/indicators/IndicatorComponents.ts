@@ -7,5 +7,6 @@ export const indicatorDefinitions = [
   { name: 'MACD', create: createLineIndicator('macd') },
   { name: 'Bollinger Bands', create: createBandIndicator('bbands') },
   { name: 'Volume', create: createVolumeIndicator() },
-  { name: 'Stochastic', create: createLineIndicator('stochastic') }
+  { name: 'Stochastic', create: createLineIndicator('stochastic') },
+  { name: 'ATR', create: createLineIndicator('atr') }
 ]
