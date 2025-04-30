@@ -195,7 +195,7 @@ export default function PaperTradingPanel({
         setVolatility(stdDev);
         
         // Check if asset should be blacklisted
-        if (riskManager.current) {
+        if (riskManager.current && price !== null) {
           const avgVolume = candles.reduce((sum, candle) => sum + candle.v, 0) / candles.length;
           const marketCap = price * avgVolume * 30; // Rough estimate
           
