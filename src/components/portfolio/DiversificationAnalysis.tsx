@@ -77,6 +77,16 @@ const benchmarkSectorWeights: Record<string, number> = {
     'Crypto': 0,
 };
 
+// Mock Correlation Matrix Data (replace with actual calculations/API)
+const assetClasses = ['US Stocks', 'Intl Stocks', 'Bonds', 'Real Estate', 'Crypto'];
+const mockCorrelationMatrix = [
+  [1.00, 0.75, 0.15, 0.40, 0.30], // US Stocks vs All
+  [0.75, 1.00, 0.20, 0.50, 0.35], // Intl Stocks vs All
+  [0.15, 0.20, 1.00, 0.25, 0.05], // Bonds vs All
+  [0.40, 0.50, 0.25, 1.00, 0.15], // Real Estate vs All
+  [0.30, 0.35, 0.05, 0.15, 1.00], // Crypto vs All
+];
+
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#A569BD', '#F1948A', '#76D7C4'];
 
 interface ConcentrationItem {
@@ -84,6 +94,16 @@ interface ConcentrationItem {
     weight: number;
     benchmark: number;
     status: string;
+}
+
+// Function to get color based on correlation value (-1 to 1)
+function getCorrelationColor(value: number): string {
+    if (value > 0.7) return 'bg-red-700';
+    if (value > 0.4) return 'bg-red-500';
+    if (value > 0.1) return 'bg-yellow-500';
+    if (value > -0.1) return 'bg-gray-500'; // Near zero
+    if (value > -0.4) return 'bg-blue-500';
+    return 'bg-blue-700'; // Low or negative
 }
 
 const DiversificationAnalysis: React.FC = () => {
@@ -159,13 +179,40 @@ const DiversificationAnalysis: React.FC = () => {
           <p className="text-sm text-gray-400 mt-1">Measure of asset spread (Placeholder Score).</p>
       </div>
 
-      {/* Asset Correlation Heatmap Placeholder */}
+      {/* Asset Correlation Heatmap Implementation */}
       <div className="mb-6">
-        <h4 className="text-lg font-medium mb-3 text-gray-200">Asset Correlation</h4>
-         <div className="h-48 bg-[#1B2B4B]/50 rounded flex items-center justify-center text-gray-500">
-            [Placeholder for Correlation Heatmap]
+        <h4 className="text-lg font-medium mb-3 text-gray-200">Asset Class Correlation (Illustrative)</h4>
+         <div className="overflow-x-auto">
+             <div className="inline-block min-w-full align-middle">
+                <div className="relative">
+                    {/* Column Headers */}
+                    <div className="flex sticky top-0 z-10 bg-[#2A3C61]">
+                        <div className="w-28 flex-shrink-0 px-2 py-1 border-b border-r border-gray-700 text-xs font-medium text-gray-400"></div>
+                        {assetClasses.map(header => (
+                            <div key={header} className="w-24 flex-shrink-0 px-2 py-1 text-center border-b border-r border-gray-700 text-xs font-medium text-gray-300 truncate" title={header}>{header}</div>
+                        ))}
+                    </div>
+                    {/* Heatmap Rows */}
+                    {assetClasses.map((rowHeader, rowIndex) => (
+                        <div key={rowHeader} className="flex">
+                            {/* Row Header */}
+                            <div className="w-28 flex-shrink-0 px-2 py-1 text-left border-b border-r border-gray-700 text-xs font-medium text-gray-300 truncate sticky left-0 bg-[#2A3C61]" title={rowHeader}>{rowHeader}</div>
+                            {/* Cells */}
+                            {mockCorrelationMatrix[rowIndex].map((value, colIndex) => (
+                                <div 
+                                    key={`${rowIndex}-${colIndex}`}
+                                    className={`w-24 h-10 flex-shrink-0 flex items-center justify-center border-b border-r border-gray-700 text-xs font-medium text-white ${getCorrelationColor(value)}`}
+                                    title={`${rowHeader} / ${assetClasses[colIndex]}`}
+                                >
+                                    {value.toFixed(2)}
+                                </div>
+                            ))}
+                        </div>
+                    ))}
+                </div>
+             </div>
          </div>
-        <p className="text-xs text-gray-400 mt-2">Shows how similarly different assets move. Lower correlations improve diversification.</p>
+        <p className="text-xs text-gray-400 mt-2">Shows how similarly different asset classes move. Lower/negative values (blue) indicate better diversification potential than high positive values (red).</p>
       </div>
 
       {/* Concentration Risk - Use calculated data */}

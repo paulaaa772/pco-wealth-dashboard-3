@@ -1,8 +1,13 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { 
+    BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, 
+    ScatterChart, Scatter, Label 
+} from 'recharts';
 import { useManualAccounts } from '@/context/ManualAccountsContext'; // Import context
+import RiskQuestionnaire, { RiskProfile } from './RiskQuestionnaire'; // Import Questionnaire
+import { Button } from "@/components/ui/button"; // Import Button for toggle
 
 // Mock data for recommendations (can be dynamic later)
 const mockRecommendedAllocation = [
@@ -31,9 +36,49 @@ const mapAccountTypeToAssetClass = (accountType: string): string => {
   }
 };
 
+// Mock data for Efficient Frontier (replace with actual calculation)
+const efficientFrontierData = [
+  { risk: 8, return: 5 },
+  { risk: 9, return: 6 },
+  { risk: 10, return: 7 },
+  { risk: 11, return: 7.8 },
+  { risk: 12, return: 8.5 },
+  { risk: 13, return: 9.1 },
+  { risk: 14, return: 9.6 },
+  { risk: 15, return: 10 },
+  { risk: 16, return: 10.3 },
+  { risk: 17, return: 10.5 },
+];
+
+// Mock data for current portfolio position (replace with actual calculation)
+const currentPortfolioPosition = [{ risk: 14.5, return: 9.0, name: 'Current' }];
+
+// Define recommended allocations per profile (replace with actual logic)
+const recommendedAllocations: Record<RiskProfile, { name: string; value: number }[]> = {
+  Conservative: [
+    { name: 'Stocks/Funds', value: 40 },
+    { name: 'Bonds', value: 40 }, // Higher bonds
+    { name: 'Cash', value: 15 },
+    { name: 'Alternatives', value: 5 },
+  ],
+  Moderate: [
+    { name: 'Stocks/Funds', value: 60 },
+    { name: 'Bonds', value: 25 },
+    { name: 'Cash', value: 10 },
+    { name: 'Alternatives', value: 5 },
+  ],
+  Aggressive: [
+    { name: 'Stocks/Funds', value: 80 },
+    { name: 'Bonds', value: 10 }, // Lower bonds
+    { name: 'Cash', value: 5 },
+    { name: 'Alternatives', value: 5 },
+  ],
+};
+
 const RiskBasedAllocation: React.FC = () => {
   const { manualAccounts, isLoading } = useManualAccounts();
-  const [riskProfile, setRiskProfile] = useState<string>('Moderate'); // Example state
+  const [determinedProfile, setDeterminedProfile] = useState<RiskProfile | null>(null);
+  const [showQuestionnaire, setShowQuestionnaire] = useState<boolean>(false);
 
   // Calculate current allocation from real data
   const currentAllocation = useMemo(() => {
@@ -54,10 +99,16 @@ const RiskBasedAllocation: React.FC = () => {
     }));
   }, [manualAccounts]);
 
-  // Placeholder for interactive elements and logic
-  const handleRiskProfileChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
-    setRiskProfile(event.target.value);
-    // TODO: Add logic to update mockRecommendedAllocation based on selected risk profile
+  // Get recommended allocation based on determined profile
+  const recommendedAllocation = useMemo(() => {
+      return recommendedAllocations[determinedProfile || 'Moderate']; // Default to Moderate if no profile
+  }, [determinedProfile]);
+
+  // Handler for questionnaire callback
+  const handleProfileDetermined = (profile: RiskProfile) => {
+    setDeterminedProfile(profile);
+    setShowQuestionnaire(false); // Hide questionnaire after profile is determined
+    console.log("Risk profile determined:", profile);
   };
 
   if (isLoading) {
@@ -73,25 +124,24 @@ const RiskBasedAllocation: React.FC = () => {
 
   return (
     <div className="bg-[#2A3C61]/30 p-6 rounded-lg shadow-lg border border-gray-700">
-      <h3 className="text-xl font-semibold mb-4 text-gray-100">Risk-Based Allocation</h3>
-
-      {/* Risk Tolerance Assessment (Placeholder) */}
-      <div className="mb-6">
-        <label htmlFor="riskProfile" className="block text-sm font-medium text-gray-300 mb-2">
-          Select Your Risk Profile:
-        </label>
-        <select
-          id="riskProfile"
-          value={riskProfile}
-          onChange={handleRiskProfileChange}
-          className="w-full p-2 rounded bg-[#1B2B4B] border border-gray-600 text-white focus:ring-blue-500 focus:border-blue-500"
+      <div className="flex justify-between items-center mb-4">
+        <h3 className="text-xl font-semibold text-gray-100">Risk-Based Allocation</h3>
+        <Button 
+          variant="outline"
+          size="sm"
+          onClick={() => setShowQuestionnaire(!showQuestionnaire)}
+          className="text-sm border-blue-500 text-blue-300 hover:bg-blue-900/30 hover:text-blue-200"
         >
-          <option value="Conservative">Conservative</option>
-          <option value="Moderate">Moderate</option>
-          <option value="Aggressive">Aggressive</option>
-        </select>
-        <p className="text-xs text-gray-400 mt-2">Based on your profile, we recommend the following allocation.</p>
+          {showQuestionnaire ? 'Hide' : 'Determine'} Risk Profile
+        </Button>
       </div>
+
+      {/* Conditionally render Questionnaire */} 
+      {showQuestionnaire && (
+         <div className="mb-6">
+            <RiskQuestionnaire onProfileDetermined={handleProfileDetermined} />
+         </div>
+      )}
 
       {/* Allocation Comparison Chart */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
@@ -113,10 +163,10 @@ const RiskBasedAllocation: React.FC = () => {
           </ResponsiveContainer>
         </div>
         <div>
-          <h4 className="text-lg font-medium mb-2 text-gray-200">Recommended ({riskProfile})</h4>
+          <h4 className="text-lg font-medium mb-2 text-gray-200">Recommended ({determinedProfile || 'Default: Moderate'})</h4>
            <ResponsiveContainer width="100%" height={200}>
-             {/* Use mockRecommendedAllocation data for now */}
-            <BarChart data={mockRecommendedAllocation} layout="vertical">
+             {/* Use determined profile in title and recommended allocation data */}
+            <BarChart data={recommendedAllocation} layout="vertical">
               <CartesianGrid strokeDasharray="3 3" stroke="#4B5563" />
               <XAxis type="number" domain={[0, 100]} tick={{ fill: '#9CA3AF' }} unit="%" />
               <YAxis type="category" dataKey="name" tick={{ fill: '#D1D5DB' }} width={100} />
@@ -131,14 +181,45 @@ const RiskBasedAllocation: React.FC = () => {
         </div>
       </div>
 
-       {/* Efficient Frontier Placeholder */}
+      {/* Efficient Frontier Implementation */}
       <div className="mt-6 border-t border-gray-700 pt-4">
          <h4 className="text-lg font-medium mb-2 text-gray-200">Efficient Frontier (Illustrative)</h4>
-         <div className="h-48 bg-[#1B2B4B]/50 rounded flex items-center justify-center text-gray-500">
-            [Placeholder for Efficient Frontier Chart]
-            {/* TODO: Implement D3 or Recharts scatter plot for Efficient Frontier */}
-         </div>
-         <p className="text-xs text-gray-400 mt-2">Visualizes optimal portfolios offering the highest expected return for a defined level of risk.</p>
+         <ResponsiveContainer width="100%" height={300}>
+            <ScatterChart margin={{ top: 20, right: 30, bottom: 20, left: 20 }}>
+                <CartesianGrid stroke="#4B5563" strokeDasharray="3 3" />
+                <XAxis 
+                    type="number" 
+                    dataKey="risk" 
+                    name="Risk (Volatility %)" 
+                    unit="%" 
+                    tick={{ fill: '#9CA3AF' }}
+                    domain={['dataMin - 1', 'dataMax + 1']}
+                 >
+                     <Label value="Risk (Volatility %)" offset={-15} position="insideBottom" fill="#9CA3AF"/>
+                 </XAxis>
+                <YAxis 
+                    type="number" 
+                    dataKey="return" 
+                    name="Expected Return %" 
+                    unit="%" 
+                    tick={{ fill: '#9CA3AF' }}
+                    domain={['dataMin - 1', 'dataMax + 1']}
+                 >
+                     <Label value="Expected Return %" angle={-90} position="insideLeft" style={{ textAnchor: 'middle', fill: '#9CA3AF' }} />
+                 </YAxis>
+                <Tooltip 
+                    cursor={{ strokeDasharray: '3 3', stroke: '#777' }}
+                    contentStyle={{ backgroundColor: '#1F2937', border: '1px solid #4B5563', color: '#E5E7EB' }}
+                     formatter={(value: number, name: string) => [`${value}%`, name]}
+                />
+                {/* Frontier Curve */}
+                <Scatter name="Efficient Frontier" data={efficientFrontierData} fill="#8884d8" line={{ stroke: '#8884d8' }} shape="dot" />
+                {/* Current Portfolio Point */}
+                <Scatter name="Current Portfolio" data={currentPortfolioPosition} fill="#FFC658" shape="star" size={100} />
+                 {/* TODO: Add Recommended Portfolio Point based on risk profile */}
+            </ScatterChart>
+         </ResponsiveContainer>
+         <p className="text-xs text-gray-400 mt-2">Visualizes optimal portfolios offering the highest expected return for a defined level of risk. Your current portfolio position is marked (Illustrative).</p>
       </div>
 
     </div>
