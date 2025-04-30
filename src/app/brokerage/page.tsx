@@ -9,7 +9,7 @@ import BusinessInsiderTradingPanel from '../../components/brokerage/BusinessInsi
 import TradingInterface from '../../components/dashboard/TradingInterface';
 import { Settings } from 'lucide-react'; // Using Settings icon for Indicators button
 import IndicatorModal from '@/components/brokerage/IndicatorModal'; // Import the new modal
-import { calculateSMA, calculateEMA, calculateRSI, calculateMACD, calculateStochastic, calculateATR, calculateADX, calculateOBV } from '@/lib/trading-engine/indicators'; // Import SMA, EMA, and RSI calculation
+import { calculateSMA, calculateEMA, calculateRSI, calculateMACD, calculateStochastic, calculateATR, calculateADX, calculateOBV, calculateParabolicSAR } from '@/lib/trading-engine/indicators'; // Import SMA, EMA, and RSI calculation
 import { LineData, Time, HistogramData, CandlestickData } from 'lightweight-charts'; // Import types for chart data
 
 // Create a simple AlertMessage component inline since it's missing
@@ -269,7 +269,7 @@ export interface InsiderTrade {
 // Define structure for active indicator configuration
 export interface ActiveIndicator {
   id: string; 
-  type: 'SMA' | 'EMA' | 'RSI' | 'MACD' | 'Stochastic' | 'ATR' | 'ADX' | 'OBV'; 
+  type: 'SMA' | 'EMA' | 'RSI' | 'MACD' | 'Stochastic' | 'ATR' | 'ADX' | 'OBV' | 'Parabolic SAR'; 
   period?: number;
   // MACD specific
   fastPeriod?: number;
@@ -284,6 +284,9 @@ export interface ActiveIndicator {
   showD?: boolean; // Flag to show %D line
   // ADX specific
   showDI?: boolean; // Flag to show +DI and -DI lines
+  // Parabolic SAR specific
+  initialAcceleration?: number;
+  maxAcceleration?: number;
   // BBands specific (add later)
   stdDevMultiplier?: number;
 }
@@ -1071,6 +1074,49 @@ export default function BrokeragePage() {
               data: obvLineData,
               color: '#4B0082', // Indigo
               pane: 1 // Display in separate pane
+            });
+          }
+        }
+      } else if (indicator.type === 'Parabolic SAR') {
+        // Calculate Parabolic SAR
+        const candlesForPSAR = candleData.map(candle => ({
+          h: candle.high,
+          l: candle.low,
+          c: candle.close,
+          v: candle.volume,
+          o: candle.open,
+          t: candle.timestamp
+        }));
+        
+        const initialAF = indicator.initialAcceleration || 0.02;
+        const maxAF = indicator.maxAcceleration || 0.2;
+        
+        const psarResult = calculateParabolicSAR(candlesForPSAR, initialAF, maxAF);
+        
+        if (psarResult && psarResult.sarValues.length > 0) {
+          alignmentOffset = candleData.length - psarResult.sarValues.length;
+          
+          // Create line data for SAR - simplify typings to avoid errors
+          const psarLineData: LineData[] = [];
+          
+          for (let i = 0; i < psarResult.sarValues.length; i++) {
+            const candleIndex = i + alignmentOffset;
+            if (candleIndex >= 0 && candleIndex < candleData.length) {
+              // Add to array directly rather than filtering
+              psarLineData.push({
+                time: Math.floor(candleData[candleIndex].timestamp / 1000) as Time,
+                value: parseFloat(psarResult.sarValues[i].toFixed(2))
+              });
+            }
+          }
+          
+          if (psarLineData.length > 0) {
+            newIndicatorData.push({
+              id: indicator.id,
+              type: 'Parabolic SAR',
+              data: psarLineData,
+              color: '#FF00FF', // Magenta
+              // No separate pane - display on main price chart
             });
           }
         }

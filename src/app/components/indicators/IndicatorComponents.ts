@@ -10,5 +10,6 @@ export const indicatorDefinitions = [
   { name: 'Stochastic', create: createLineIndicator('stochastic') },
   { name: 'ATR', create: createLineIndicator('atr') },
   { name: 'ADX', create: createLineIndicator('adx') },
-  { name: 'OBV', create: createLineIndicator('obv') }
+  { name: 'OBV', create: createLineIndicator('obv') },
+  { name: 'Parabolic SAR', create: createLineIndicator('psar') }
 ]

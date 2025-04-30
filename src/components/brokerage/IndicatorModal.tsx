@@ -12,7 +12,7 @@ interface IndicatorModalProps {
 }
 
 // Define IndicatorType including all indicators
-type IndicatorType = 'SMA' | 'EMA' | 'RSI' | 'MACD' | 'Stochastic' | 'ATR' | 'ADX' | 'OBV';
+type IndicatorType = 'SMA' | 'EMA' | 'RSI' | 'MACD' | 'Stochastic' | 'ATR' | 'ADX' | 'OBV' | 'Parabolic SAR';
 
 interface IndicatorOption {
   type: IndicatorType;
@@ -65,6 +65,14 @@ const availableIndicators: IndicatorOption[] = [
     type: 'OBV',
     label: 'On-Balance Volume (OBV)',
     defaultParams: {} // OBV doesn't require any parameters
+  },
+  {
+    type: 'Parabolic SAR',
+    label: 'Parabolic SAR',
+    defaultParams: {
+      initialAcceleration: 0.02,
+      maxAcceleration: 0.2
+    }
   },
 ];
 

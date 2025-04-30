@@ -228,4 +228,74 @@ export const calculateATR = (candles: PolygonCandle[], period: number = 14): num
     return wilderSmoothing(trueRanges, period);
 };
 
+export interface ParabolicSARResult {
+    sarValues: number[];  // SAR values for each candle
+    isUptrend: boolean[]; // Whether the trend is up at each point
+}
+
+export const calculateParabolicSAR = (
+    candles: PolygonCandle[],
+    initialAF: number = 0.02,
+    maxAF: number = 0.2
+): ParabolicSARResult | null => {
+    if (!candles || candles.length < 3) return null;
+    
+    const sarValues: number[] = [];
+    const isUptrend: boolean[] = [];
+    
+    // Determine initial trend direction using the first two candles
+    let uptrend = candles[1].c > candles[0].c;
+    
+    // Initialize values
+    let extremePoint = uptrend ? candles[0].h : candles[0].l; // Initial EP
+    let sar = uptrend ? candles[0].l : candles[0].h; // Initial SAR value
+    let accelerationFactor = initialAF; // Initial AF
+    
+    for (let i = 1; i < candles.length; i++) {
+        const { h: high, l: low, c: close } = candles[i];
+        const prevHigh = candles[i-1].h;
+        const prevLow = candles[i-1].l;
+        
+        // Store previous values before updating
+        sarValues.push(sar);
+        isUptrend.push(uptrend);
+        
+        // Calculate SAR for the current period
+        sar = sar + accelerationFactor * (extremePoint - sar);
+        
+        // Ensure SAR doesn't penetrate previous candle's price range
+        if (uptrend) {
+            // In uptrend, SAR shouldn't be above previous period's low
+            sar = Math.min(sar, prevLow, candles[Math.max(0, i-2)].l);
+        } else {
+            // In downtrend, SAR shouldn't be below previous period's high
+            sar = Math.max(sar, prevHigh, candles[Math.max(0, i-2)].h);
+        }
+        
+        // Check if SAR is penetrated (trend reversal)
+        if ((uptrend && low < sar) || (!uptrend && high > sar)) {
+            // Reverse trend
+            uptrend = !uptrend;
+            
+            // Reset AF and extreme point for new trend
+            accelerationFactor = initialAF;
+            extremePoint = uptrend ? high : low;
+            
+            // Recalculate SAR for the reversal point
+            sar = uptrend ? Math.min(prevLow, low) : Math.max(prevHigh, high);
+        } else {
+            // No reversal, check if we need to update extreme point
+            if (uptrend && high > extremePoint) {
+                extremePoint = high;
+                accelerationFactor = Math.min(accelerationFactor + initialAF, maxAF);
+            } else if (!uptrend && low < extremePoint) {
+                extremePoint = low;
+                accelerationFactor = Math.min(accelerationFactor + initialAF, maxAF);
+            }
+        }
+    }
+    
+    return { sarValues, isUptrend };
+};
+
 // Add other indicator calculations here... 
