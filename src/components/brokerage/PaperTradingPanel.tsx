@@ -54,6 +54,8 @@ export default function PaperTradingPanel({
   const [maxDrawdownTolerance, setMaxDrawdownTolerance] = useState<number>(20); // 20% max drawdown
   const [riskPerTrade, setRiskPerTrade] = useState<number>(1); // 1% risk per trade
   const [targetRiskReward, setTargetRiskReward] = useState<number>(2); // 2:1 risk/reward
+  const [positionSizingMode, setPositionSizingMode] = useState<'auto' | 'fixed'>('auto');
+  const [fixedShares, setFixedShares] = useState<number>(10); // Default fixed shares
 
   // Status messages
   const [statusMessages, setStatusMessages] = useState<string[]>([]);
@@ -263,33 +265,40 @@ export default function PaperTradingPanel({
     try {
       addStatusMessage(`Executing ${signal.direction.toUpperCase()} signal for ${symbol}...`);
       
-      // Calculate position size
+      // Calculate position size based on selected mode
       let shares = 0;
       
-      if (positionSizingMethod === 'kelly') {
-        // Kelly Criterion position sizing
-        shares = riskManager.current.calculateKellyPositionSize(
-          symbol,
-          signal.price,
-          volatility,
-          {
-            winRate: tradeStats.winRate || 0.5, // Default to 50% if no history
-            avgWinPercent: tradeStats.avgWinPercent || (riskPerTrade / 100 * targetRiskReward),
-            avgLossPercent: tradeStats.avgLossPercent || (riskPerTrade / 100)
-          }
-        );
-      } else {
-        // ATR position sizing
-        shares = riskManager.current.calculateATRPositionSize(
-          symbol,
-          signal.price,
-          atr,
-          riskPerTrade / 100
-        );
+      if (positionSizingMode === 'auto') {
+        addStatusMessage(`Calculating position size automatically using ${positionSizingMethod} method...`);
+        if (positionSizingMethod === 'kelly') {
+          // Kelly Criterion position sizing
+          shares = riskManager.current.calculateKellyPositionSize(
+            symbol,
+            signal.price,
+            volatility,
+            {
+              winRate: tradeStats.winRate || 0.5, // Default to 50% if no history
+              avgWinPercent: tradeStats.avgWinPercent || (riskPerTrade / 100 * targetRiskReward),
+              avgLossPercent: tradeStats.avgLossPercent || (riskPerTrade / 100)
+            }
+          );
+        } else {
+          // ATR position sizing
+          shares = riskManager.current.calculateATRPositionSize(
+            symbol,
+            signal.price,
+            atr,
+            riskPerTrade / 100
+          );
+        }
+      } else { // Fixed sizing mode
+        shares = fixedShares;
+        addStatusMessage(`Using fixed position size: ${shares} shares.`);
       }
       
       // Ensure minimum position size
       shares = Math.max(1, shares);
+      addStatusMessage(`Calculated position size: ${shares} shares.`);
       
       // Check exposure limits
       const exposureCheck = riskManager.current.checkExposureLimits(
@@ -317,10 +326,11 @@ export default function PaperTradingPanel({
         type: signal.direction,
         entryPrice: signal.price,
         quantity: shares,
-        timestamp: Date.now(),
+        timestamp: Date.now().toString(), // Ensure timestamp is a string
         status: 'open',
         stopLoss,
-        takeProfit
+        takeProfit,
+        strategy: signal.strategy // Add strategy from signal
       };
       
       // Add position
@@ -331,7 +341,7 @@ export default function PaperTradingPanel({
       
     } catch (error) {
       console.error('[Paper Trading] Error executing signal:', error);
-      addStatusMessage(`❌ Error executing signal: ${error}`);
+      addStatusMessage(`❌ Error executing signal: ${error.message}`);
     }
   };
 
@@ -467,20 +477,68 @@ export default function PaperTradingPanel({
       <div className="bg-gray-800 p-3 rounded-lg mb-4">
         <h3 className="text-sm font-medium text-gray-400 mb-2">Strategy Settings</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-gray-400 text-xs mb-1">Position Sizing Method</label>
-            <select 
-              value={positionSizingMethod}
-              onChange={(e) => setPositionSizingMethod(e.target.value as 'kelly' | 'atr')}
-              className="w-full bg-gray-700 text-white p-2 rounded-md text-sm"
-            >
-              <option value="atr">ATR-Based</option>
-              <option value="kelly">Kelly Criterion</option>
-            </select>
+          {/* Position Sizing Mode Selection */}
+          <div className="sm:col-span-2">
+              <label className="block text-gray-400 text-xs mb-1">Position Sizing</label>
+              <div className="flex gap-4">
+                  <label className="flex items-center text-sm text-gray-300">
+                      <input
+                          type="radio"
+                          name="sizingMode"
+                          value="auto"
+                          checked={positionSizingMode === 'auto'}
+                          onChange={() => setPositionSizingMode('auto')}
+                          className="mr-1"
+                      />
+                      Automatic (Risk-based)
+                  </label>
+                  <label className="flex items-center text-sm text-gray-300">
+                      <input
+                          type="radio"
+                          name="sizingMode"
+                          value="fixed"
+                          checked={positionSizingMode === 'fixed'}
+                          onChange={() => setPositionSizingMode('fixed')}
+                          className="mr-1"
+                      />
+                      Fixed Shares
+                  </label>
+              </div>
           </div>
+
+          {/* Conditionally render Fixed Shares input */}
+          {positionSizingMode === 'fixed' && (
+              <div>
+                  <label htmlFor="fixedSharesInput" className="block text-gray-400 text-xs mb-1">Shares per Trade</label>
+                  <input
+                      id="fixedSharesInput"
+                      type="number"
+                      min="1"
+                      step="1"
+                      value={fixedShares}
+                      onChange={(e) => setFixedShares(Math.max(1, parseInt(e.target.value) || 1))}
+                      className="w-full bg-gray-700 text-white p-2 rounded-md text-sm"
+                  />
+              </div>
+          )}
+
+          {/* Existing settings... hide the ATR/Kelly selector if fixed mode */}
+          {positionSizingMode === 'auto' && (
+            <div>
+              <label className="block text-gray-400 text-xs mb-1">Automatic Sizing Method</label>
+              <select
+                value={positionSizingMethod}
+                onChange={(e) => setPositionSizingMethod(e.target.value as 'kelly' | 'atr')}
+                className="w-full bg-gray-700 text-white p-2 rounded-md text-sm"
+              >
+                <option value="atr">ATR-Based</option>
+                <option value="kelly">Kelly Criterion</option>
+              </select>
+            </div>
+          )}
           
           <div>
-            <label className="block text-gray-400 text-xs mb-1">Risk Per Trade (%)</label>
+            <label className="block text-gray-400 text-xs mb-1">Risk Per Trade (%) (Auto Mode)</label>
             <input 
               type="number" 
               min="0.1" 
@@ -489,11 +547,12 @@ export default function PaperTradingPanel({
               value={riskPerTrade}
               onChange={(e) => setRiskPerTrade(Number(e.target.value))}
               className="w-full bg-gray-700 text-white p-2 rounded-md text-sm"
+              disabled={positionSizingMode === 'fixed'} // Disable if fixed sizing
             />
           </div>
           
           <div>
-            <label className="block text-gray-400 text-xs mb-1">Target Risk:Reward</label>
+            <label className="block text-gray-400 text-xs mb-1">Target Risk:Reward (Auto Mode)</label>
             <input 
               type="number" 
               min="1" 
@@ -502,6 +561,7 @@ export default function PaperTradingPanel({
               value={targetRiskReward}
               onChange={(e) => setTargetRiskReward(Number(e.target.value))}
               className="w-full bg-gray-700 text-white p-2 rounded-md text-sm"
+              disabled={positionSizingMode === 'fixed'} // Disable if fixed sizing
             />
           </div>
           
