@@ -446,6 +446,46 @@ export default function PaperTradingPanel({
     }
   };
 
+  // Function to handle executing a signal from the scan results
+  const handleExecuteScanResult = (result: ScanResult) => {
+    addStatusMessage(`Attempting to execute scanned signal for ${result.symbol}...`);
+    
+    // Determine direction based on the reason string
+    let direction: 'buy' | 'sell' | null = null;
+    if (result.reason.toLowerCase().includes('oversold')) {
+      direction = 'buy';
+    } else if (result.reason.toLowerCase().includes('overbought')) {
+      direction = 'sell';
+    } else if (result.reason.toLowerCase().includes('volume spike')) {
+      // Decide default action for volume spike, e.g., BUY, or make it non-actionable
+      // For now, let's make it non-actionable from the button
+      addStatusMessage(`ℹ️ Volume spike for ${result.symbol} requires manual confirmation or different logic.`);
+      return; 
+    } else {
+        addStatusMessage(`⚠️ Unknown signal reason for ${result.symbol}: ${result.reason}`);
+        return; // Don't execute if direction is unclear
+    }
+
+    if (!direction) {
+         addStatusMessage(`⚠️ Could not determine trade direction for ${result.symbol}`);
+         return;
+    }
+
+    // Construct the TradeSignal object
+    const signalToExecute: TradeSignal = {
+      symbol: result.symbol,
+      direction: direction,
+      price: result.currentPrice,
+      confidence: result.details?.rsi ? parseFloat(result.details.rsi) / 100 : 0.7, // Use RSI for confidence if available, else default
+      strategy: result.reason, // Use the reason as the strategy description
+    };
+    
+    addStatusMessage(`Constructed signal: ${signalToExecute.direction.toUpperCase()} ${signalToExecute.symbol} @ ${signalToExecute.price.toFixed(2)} based on scan.`);
+    
+    // Call the main executeSignal function
+    executeSignal(signalToExecute);
+  };
+
   return (
     <div className="bg-gray-900 rounded-lg p-4">
       <h2 className="text-xl font-semibold text-white mb-4">AI Paper Trading</h2>
@@ -466,12 +506,37 @@ export default function PaperTradingPanel({
             <h3 className="text-sm font-medium text-gray-400 mb-2">Scan Results ({scanResults.length} found)</h3>
             <div className="max-h-40 overflow-y-auto space-y-2">
               {scanResults.map((result, index) => (
-                <div key={index} className="p-2 bg-gray-700 rounded text-xs flex justify-between items-center">
-                  <div>
-                    <span className="font-semibold text-white mr-2">{result.symbol}</span>
-                    <span className="text-gray-300">({result.reason})</span>
+                <div key={index} className="p-2 bg-gray-700 rounded text-xs flex justify-between items-center gap-2">
+                  <div className="flex-1 flex items-center">
+                    <span className="font-semibold text-white mr-2 w-16 truncate" title={result.symbol}>{result.symbol}</span>
+                    <span className="text-gray-300 truncate flex-1" title={result.reason}>{result.reason}</span>
                   </div>
-                  <span className="text-gray-400">${result.currentPrice.toFixed(2)}</span>
+                  <div className="w-16 text-right">
+                    <span className="text-gray-400">${result.currentPrice.toFixed(2)}</span>
+                  </div>
+                  <div className="w-20 text-center">
+                    {/* Add confidence bar if details available */}
+                    {result.details?.rsi && (
+                        <div className="w-full bg-gray-600 rounded-full h-1.5">
+                          <div className="bg-yellow-400 h-1.5 rounded-full" style={{ width: `${Math.abs(parseFloat(result.details.rsi) - 50) * 2}%` }}></div>
+                        </div>
+                    )}
+                     {result.details?.volumeRatio && (
+                        <div className="w-full bg-gray-600 rounded-full h-1.5">
+                          <div className="bg-blue-400 h-1.5 rounded-full" style={{ width: `${Math.min(100, (parseFloat(result.details.volumeRatio) / 3) * 100)}%` }}></div>
+                        </div>
+                     )}
+                  </div>
+                  <div className="w-20 text-right">
+                     <button 
+                      onClick={() => handleExecuteScanResult(result)} 
+                      className={`px-2 py-1 text-xs rounded ${result.reason.toLowerCase().includes('oversold') ? 'bg-green-600 hover:bg-green-700' : result.reason.toLowerCase().includes('overbought') ? 'bg-red-600 hover:bg-red-700' : 'bg-gray-500 cursor-not-allowed' } text-white font-semibold`}
+                      // Disable button if direction can't be determined
+                      disabled={!result.reason.toLowerCase().includes('oversold') && !result.reason.toLowerCase().includes('overbought')}
+                     >
+                       Execute {result.reason.toLowerCase().includes('oversold') ? 'BUY' : 'SELL'}
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
