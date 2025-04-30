@@ -381,7 +381,14 @@ export default function BrokeragePage() {
   
   // Add state for showIndicatorModal and activeIndicators
   const [showIndicatorModal, setShowIndicatorModal] = useState(false);
-  const [activeIndicators, setActiveIndicators] = useState<ActiveIndicator[]>([]); // State for active indicators
+  const [activeIndicators, setActiveIndicators] = useState<ActiveIndicator[]>(() => {
+    // Initialize from localStorage if available, otherwise empty array
+    if (typeof window !== 'undefined') {
+      const savedIndicators = localStorage.getItem('activeIndicators');
+      return savedIndicators ? JSON.parse(savedIndicators) : [];
+    }
+    return [];
+  });
   const [indicatorChartData, setIndicatorChartData] = useState<IndicatorData[]>([]); // State for calculated indicator data
 
   // WebSocket Connection Logic
@@ -969,7 +976,12 @@ export default function BrokeragePage() {
   // Handler for when indicators are changed in the modal
   const handleIndicatorsChange = (newIndicators: ActiveIndicator[]) => {
     console.log('[BROKERAGE] Updating active indicators:', newIndicators);
+    // Save to state
     setActiveIndicators(newIndicators);
+    // Persist to localStorage
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('activeIndicators', JSON.stringify(newIndicators));
+    }
   };
 
   // Recalculate indicator data when candleData or activeIndicators change
