@@ -122,11 +122,11 @@ export const calculateNeuralOscillator = async (
   // Create a neural network model
   const model = tf.sequential();
   
-  // Add layers
-  model.add(tf.layers.lstm({
+  // Add layers with a simpler architecture to avoid tensor shape issues
+  model.add(tf.layers.dense({
     units: 10,
-    inputShape: [lookbackPeriod, 1],
-    returnSequences: false
+    inputShape: [lookbackPeriod],
+    activation: 'relu'
   }));
   
   model.add(tf.layers.dense({ units: 5, activation: 'relu' }));
@@ -139,7 +139,7 @@ export const calculateNeuralOscillator = async (
   });
   
   // Train the model
-  await model.fit(xs.reshape([inputs.length, lookbackPeriod, 1]), ys, {
+  await model.fit(xs, ys, {
     epochs: 50,
     batchSize: 32,
     verbose: 0
@@ -151,7 +151,8 @@ export const calculateNeuralOscillator = async (
     allInputs.push(normalizedPrices.slice(i - lookbackPeriod, i));
   }
   
-  const allXs = tf.tensor3d(allInputs, [allInputs.length, lookbackPeriod, 1]);
+  // Use tensor2d instead of tensor3d to match our model architecture
+  const allXs = tf.tensor2d(allInputs, [allInputs.length, lookbackPeriod]);
   const predictions = model.predict(allXs) as tf.Tensor;
   const oscillatorValues = await predictions.array() as number[][];
   
