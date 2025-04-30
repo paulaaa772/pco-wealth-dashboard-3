@@ -285,7 +285,7 @@ export default function PaperTradingPanel({
         if (positionSizingMethod === 'kelly') {
           // Kelly Criterion position sizing
           shares = riskManager.current.calculateKellyPositionSize(
-            symbol,
+            signal.symbol,
             signal.price,
             volatility,
             {
@@ -297,7 +297,7 @@ export default function PaperTradingPanel({
         } else {
           // ATR position sizing
           shares = riskManager.current.calculateATRPositionSize(
-            symbol,
+            signal.symbol,
             signal.price,
             atr,
             riskPerTrade / 100
@@ -314,7 +314,7 @@ export default function PaperTradingPanel({
       
       // Check exposure limits
       const exposureCheck = riskManager.current.checkExposureLimits(
-        symbol,
+        signal.symbol,
         'Technology', // You would need a sector mapping in real implementation
         shares * signal.price
       );
@@ -334,7 +334,7 @@ export default function PaperTradingPanel({
       // Create position
       const newPosition: AIPosition = {
         id: `pos-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        symbol,
+        symbol: signal.symbol,
         type: signal.direction,
         entryPrice: signal.price,
         quantity: shares,
