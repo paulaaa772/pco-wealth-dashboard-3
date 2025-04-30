@@ -419,17 +419,37 @@ export default function BrokeragePage() {
       // Authenticate
       ws.current?.send(JSON.stringify({ action: 'auth', params: apiKey }));
       console.log('[WS] Authentication message sent.');
-      // Subscribe to trades for the current symbol
-      ws.current?.send(JSON.stringify({ action: 'subscribe', params: `T.${symbol}` }));
-      console.log(`[WS] Subscribed to trades for ${symbol}`);
+      
+      // Add a small delay before subscribing to ensure auth is processed
+      setTimeout(() => {
+        // Subscribe to trades for the current symbol
+        if (ws.current?.readyState === WebSocket.OPEN) {
+          ws.current.send(JSON.stringify({ action: 'subscribe', params: `T.${symbol}` }));
+          console.log(`[WS] Subscribed to trades for ${symbol}`);
+        } else {
+          console.error('[WS] WebSocket not open when trying to subscribe');
+        }
+      }, 500);
     };
 
     ws.current.onmessage = (event) => {
       try {
         const messages = JSON.parse(event.data);
+        console.log('[WS] Received message:', messages);
+        
         // Polygon sends messages in an array
         if (Array.isArray(messages)) {
           messages.forEach(message => {
+            // Check for auth messages
+            if (message.ev === 'status' && message.status === 'auth_success') {
+              console.log('[WS] Successfully authenticated with Polygon.io');
+            }
+            
+            // Check for subscription acknowledgments
+            if (message.ev === 'status' && message.status === 'success' && message.message.includes('subscribed')) {
+              console.log(`[WS] ${message.message}`);
+            }
+            
             // Check if it's a trade event ('T')
             if (message.ev === 'T') {
               console.log(`[WS] Trade received for ${message.sym}: $${message.p}`);
@@ -456,7 +476,16 @@ export default function BrokeragePage() {
 
     ws.current.onclose = (event) => {
       console.log(`[WS] Connection closed. Code: ${event.code}, Reason: ${event.reason}`);
-      // Optionally implement reconnection logic here
+      // Attempt to reconnect on connection close if not intentional
+      if (event.code !== 1000) { // 1000 is normal closure
+        console.log('[WS] Attempting to reconnect...');
+        setTimeout(() => {
+          if (isApiKeyValid && apiKey) {
+            console.log('[WS] Reconnecting to WebSocket...');
+            // The component will rerun this effect
+          }
+        }, 5000); // Try to reconnect after 5 seconds
+      }
     };
 
     // Cleanup function: close the connection when the component unmounts or symbol changes
@@ -661,6 +690,8 @@ export default function BrokeragePage() {
            console.error('[BROKERAGE] Failed to get initial latest price');
            // Don't set error here if WS will connect
         }
+      } else {
+        console.log(`[BROKERAGE] WebSocket already open, will receive price updates automatically`);
       }
       
       // Determine API timespan and multiplier

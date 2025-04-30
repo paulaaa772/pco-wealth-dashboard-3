@@ -94,7 +94,8 @@ export class PolygonService {
       console.error('[POLYGON] No API key found. You must set NEXT_PUBLIC_POLYGON_API_KEY environment variable.');
       this.useRealData = false; // Fall back to mock only if no API key
     } else {
-      console.log('[POLYGON] API key found, using real Polygon API');
+      console.log(`[POLYGON] API key found: ${this.apiKey.substring(0, 4)}... (using real Polygon API)`);
+      this.useRealData = true; // Explicitly set to true when API key exists
       
       // Set up axios client with base URL and default params
       this.client = axios.create({
@@ -103,6 +104,9 @@ export class PolygonService {
           apiKey: this.apiKey
         }
       });
+      
+      // Test axios client is set up correctly
+      console.log('[POLYGON] Axios client initialized successfully.');
     }
   }
 
@@ -137,6 +141,7 @@ export class PolygonService {
       console.log(`[POLYGON] Calling endpoint: ${endpoint} with key ${apiKeyPreview}`);
       
       const response = await this.client.get(endpoint);
+      console.log(`[POLYGON] Response received - Status: ${response.status}, Data status: ${response.data.status}, Count: ${response.data.resultsCount || 0}`);
       
       // Accept 'OK' or 'DELAYED' status if results exist
       if ((response.data.status === 'OK' || response.data.status === 'DELAYED') && response.data.resultsCount > 0 && response.data.results) {
@@ -175,25 +180,26 @@ export class PolygonService {
         return this.generateMockPrice(symbol);
       }
       
-      console.log(`[POLYGON SVC] Fetching latest price for ${symbol}`);
+      console.log(`[POLYGON] Fetching latest price for ${symbol}`);
       
       const response = await this.client.get<PolygonPriceResponse>(`/v2/last/trade/${symbol}`);
+      console.log(`[POLYGON] Price response received for ${symbol} - Status: ${response.status}, Data status: ${response.data.status}`);
       
       // Check if status is OK or DELAYED and if results exist
       if ((response.data.status === 'OK' || response.data.status === 'DELAYED') && 
           response.data.results && 
           typeof response.data.results.p === 'number') {
         const price = response.data.results.p;
-        console.log(`[POLYGON SVC] Latest price for ${symbol}: ${price}`);
+        console.log(`[POLYGON] Latest price for ${symbol}: ${price}`);
         return price;
       } else {
-        console.warn(`[POLYGON SVC] API returned unexpected data for ${symbol}, falling back to mock price`);
+        console.warn(`[POLYGON] API returned unexpected data for ${symbol}, falling back to mock price`);
         return this.generateMockPrice(symbol);
       }
     } catch (error) {
-      console.error(`[POLYGON SVC] Error fetching latest price for ${symbol}:`, error);
+      console.error(`[POLYGON] Error fetching latest price for ${symbol}:`, error);
       if (axios.isAxiosError(error)) {
-        console.error(`[POLYGON SVC] Axios Error Details: Status=${error.response?.status}, Data=`, error.response?.data);
+        console.error(`[POLYGON] Axios Error Details: Status=${error.response?.status}, Data=`, error.response?.data);
       }
       return this.generateMockPrice(symbol);
     }
