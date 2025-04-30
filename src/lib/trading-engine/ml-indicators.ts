@@ -193,12 +193,12 @@ export const calculateAdaptiveMA = (
   const prices = candles.map(c => c.c);
   
   // Calculate rolling volatility (using standard deviation of returns)
-  const returns = [];
+  const returns: number[] = [];
   for (let i = 1; i < prices.length; i++) {
     returns.push((prices[i] / prices[i - 1]) - 1);
   }
   
-  const volatility = [];
+  const volatility: number[] = [];
   for (let i = volatilityWindow; i < returns.length; i++) {
     const windowReturns = returns.slice(i - volatilityWindow, i);
     const mean = windowReturns.reduce((sum, r) => sum + r, 0) / volatilityWindow;
@@ -207,17 +207,17 @@ export const calculateAdaptiveMA = (
   }
   
   // Map volatility to periods (higher volatility = shorter period)
-  const periods = volatility.map(v => {
-    // Normalize volatility to range [0, 1] using a simple percentile rank
+  const periods: number[] = volatility.map(v => {
+    // Create a copy for sorting to find percentile rank
     const sortedVolatility = [...volatility].sort((a, b) => a - b);
-    const rank = sortedVolatility.indexOf(v) / sortedVolatility.length;
+    const rank = sortedVolatility.findIndex(val => val >= v) / sortedVolatility.length;
     
     // Map rank to period range (0 = maxPeriod, 1 = minPeriod)
     return Math.round(maxPeriod - rank * (maxPeriod - minPeriod));
   });
   
   // Calculate MA values using adaptive periods
-  const maValues = [];
+  const maValues: number[] = [];
   
   for (let i = 0; i < periods.length; i++) {
     const period = periods[i];
