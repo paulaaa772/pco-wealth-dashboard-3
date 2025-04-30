@@ -7,6 +7,7 @@ import { TradingMode } from '@/lib/trading-engine/TradingMode';
 import { AIRiskManager, TradeStats } from '@/lib/trading-engine/AIRiskManager';
 import { PolygonService, PolygonCandle } from '@/lib/market-data/PolygonService';
 import { calculateATR } from '@/lib/trading-engine/indicators';
+import { AIScanner, ScanResult } from '@/lib/trading-engine/AIScanner';
 
 interface PaperTradingPanelProps {
   symbol: string;
@@ -60,6 +61,10 @@ export default function PaperTradingPanel({
   // Status messages
   const [statusMessages, setStatusMessages] = useState<string[]>([]);
   const [blacklistedAssets, setBlacklistedAssets] = useState<Map<string, string>>(new Map());
+
+  // Add state variables for scanner
+  const [isScanning, setIsScanning] = useState<boolean>(false);
+  const [scanResults, setScanResults] = useState<ScanResult[]>([]);
 
   // Initialize trading engines
   useEffect(() => {
@@ -409,9 +414,66 @@ export default function PaperTradingPanel({
     });
   };
 
+  // Function to run the market scan
+  const runMarketScan = async () => {
+    setIsScanning(true);
+    setScanResults([]); // Clear previous results
+    addStatusMessage('Starting market scan...');
+    
+    // Define the list of assets to scan
+    const stockList = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'META', 'TSLA', 'NVDA', 'JPM', 'JNJ']; // Example stock list
+    const etfList = ['SPY', 'QQQ', 'DIA', 'IWM', 'GLD', 'SLV', 'XLF', 'XLK']; // Example ETF list
+    const cryptoList = ['X:BTCUSD']; // Bitcoin
+    const assetList = [...stockList, ...etfList, ...cryptoList];
+    
+    try {
+      const scanner = new AIScanner();
+      const results = await scanner.scanMarket(assetList);
+      setScanResults(results);
+      addStatusMessage(`Scan complete. Found ${results.length} potential opportunities.`);
+    } catch (error) {
+      console.error('[Paper Trading] Error during market scan:', error);
+      addStatusMessage(`❌ Market scan failed: ${error.message}`);
+    } finally {
+      setIsScanning(false);
+    }
+  };
+
   return (
     <div className="bg-gray-900 rounded-lg p-4">
       <h2 className="text-xl font-semibold text-white mb-4">AI Paper Trading</h2>
+      
+      {/* Market Scan Section */}
+      <div className="mb-4">
+        <button
+          onClick={runMarketScan}
+          disabled={isScanning}
+          className={`w-full px-4 py-2 rounded-md text-white font-semibold ${isScanning ? 'bg-gray-600 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700'}`}
+        >
+          {isScanning ? 'Scanning Market...' : 'Scan Market for Opportunities'}
+        </button>
+        
+        {/* Display Scan Results */}
+        {scanResults.length > 0 && (
+          <div className="mt-4 bg-gray-800 p-3 rounded-lg">
+            <h3 className="text-sm font-medium text-gray-400 mb-2">Scan Results ({scanResults.length} found)</h3>
+            <div className="max-h-40 overflow-y-auto space-y-2">
+              {scanResults.map((result, index) => (
+                <div key={index} className="p-2 bg-gray-700 rounded text-xs flex justify-between items-center">
+                  <div>
+                    <span className="font-semibold text-white mr-2">{result.symbol}</span>
+                    <span className="text-gray-300">({result.reason})</span>
+                  </div>
+                  <span className="text-gray-400">${result.currentPrice.toFixed(2)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        {scanResults.length === 0 && isScanning === false && (
+           <div className="mt-2 text-center text-xs text-gray-500">Click 'Scan Market' to find opportunities.</div>
+        )}
+      </div>
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
         {/* Current market data */}
