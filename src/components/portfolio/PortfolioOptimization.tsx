@@ -112,7 +112,7 @@ interface OptimizationConstraints {
 }
 
 const PortfolioOptimization: React.FC = () => {
-  const { manualAccounts, holdings, isLoading } = useManualAccounts();
+  const { manualAccounts, isLoading } = useManualAccounts();
   const [assets, setAssets] = useState(mockAssets);
   const [portfolios, setPortfolios] = useState(mockPortfolios);
   const [selectedPortfolio, setSelectedPortfolio] = useState(mockPortfolios[0]);
@@ -147,7 +147,7 @@ const PortfolioOptimization: React.FC = () => {
       sharpeRatio: 0.41,
       maxDrawdown: 32.5
     });
-  }, [holdings]);
+  }, [manualAccounts]);
 
   // Handler for constraint changes
   const handleConstraintChange = (key: keyof OptimizationConstraints, value: any) => {
