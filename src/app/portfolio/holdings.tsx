@@ -144,7 +144,7 @@ export function PortfolioHoldings() {
           totalCostBasis: number;
           symbol: string;
           id: string;
-          assetType?: string; // Add asset type to track in consolidated view
+          assetType?: 'Stock' | 'Bond' | 'ETF' | 'Mutual Fund' | 'CD' | 'Crypto' | 'Cash' | 'Other'; // Specify the exact type
         }>();
         
         accounts.forEach(account => {
@@ -157,7 +157,7 @@ export function PortfolioHoldings() {
                 totalCostBasis: 0,
                 symbol: asset.symbol,
                 id: `${consolidatedId}-${asset.symbol}`,
-                assetType: asset.assetType // Capture asset type
+                assetType: asset.assetType // asset.assetType is already properly typed
               });
             }
             
