@@ -15,6 +15,7 @@ import AssetAllocation from '@/components/portfolio/AssetAllocation';
 import EnhancedPerformanceAnalytics from '@/components/portfolio/EnhancedPerformanceAnalytics';
 import GoalTrackingDashboard from '@/components/portfolio/GoalTrackingDashboard';
 import TaxAnalyticsDashboard from '@/components/portfolio/TaxAnalyticsDashboard';
+import PortfolioOptimizationTools from '@/components/portfolio/PortfolioOptimizationTools';
 
 export default function PortfolioPage() {
   const { manualAccounts, isLoading: isLoadingAccounts, error: accountsError } = useManualAccounts();
@@ -67,7 +68,7 @@ export default function PortfolioPage() {
         
         {/* Tab Navigation */}
         <div className="border-b border-gray-700">
-          <nav className="flex gap-4">
+          <nav className="flex flex-wrap gap-4">
             <button 
               className={activeTab === 'holdings' ? activeTabStyle : inactiveTabStyle}
               onClick={() => setActiveTab('holdings')}
@@ -99,6 +100,12 @@ export default function PortfolioPage() {
               Tax
             </button>
             <button 
+              className={activeTab === 'optimization' ? activeTabStyle : inactiveTabStyle}
+              onClick={() => setActiveTab('optimization')}
+            >
+              Optimization
+            </button>
+            <button 
               className={activeTab === 'income' ? activeTabStyle : inactiveTabStyle}
               onClick={() => setActiveTab('income')}
             >
@@ -119,6 +126,9 @@ export default function PortfolioPage() {
         
         {/* Tax Tab */}
         {activeTab === 'tax' && <TaxAnalyticsDashboard />}
+        
+        {/* Optimization Tab */}
+        {activeTab === 'optimization' && <PortfolioOptimizationTools />}
         
         {/* Income Analysis Tab */}
         {activeTab === 'income' && <IncomeAnalysis />}
