@@ -12,7 +12,7 @@ interface IndicatorModalProps {
 }
 
 // Define IndicatorType including all indicators
-type IndicatorType = 'SMA' | 'EMA' | 'RSI' | 'MACD' | 'Stochastic' | 'ATR' | 'ADX' | 'OBV' | 'Parabolic SAR' | 'Pivot Points';
+type IndicatorType = 'SMA' | 'EMA' | 'RSI' | 'MACD' | 'Stochastic' | 'ATR' | 'ADX' | 'OBV' | 'Parabolic SAR' | 'Pivot Points' | 'Ichimoku Cloud';
 
 interface IndicatorOption {
   type: IndicatorType;
@@ -85,6 +85,20 @@ const availableIndicators: IndicatorOption[] = [
       showS1: true,
       showS2: true,
       showS3: true
+    }
+  },
+  {
+    type: 'Ichimoku Cloud',
+    label: 'Ichimoku Cloud',
+    defaultParams: {
+      tenkanPeriod: 9,
+      kijunPeriod: 26,
+      senkouBPeriod: 52,
+      displacement: 26,
+      showTenkan: true,
+      showKijun: true,
+      showCloud: true,
+      showChikou: true
     }
   },
 ];

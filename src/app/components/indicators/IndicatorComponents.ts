@@ -12,5 +12,6 @@ export const indicatorDefinitions = [
   { name: 'ADX', create: createLineIndicator('adx') },
   { name: 'OBV', create: createLineIndicator('obv') },
   { name: 'Parabolic SAR', create: createLineIndicator('psar') },
-  { name: 'Pivot Points', create: createLineIndicator('pivots') }
+  { name: 'Pivot Points', create: createLineIndicator('pivots') },
+  { name: 'Ichimoku Cloud', create: createBandIndicator('ichimoku') }
 ]

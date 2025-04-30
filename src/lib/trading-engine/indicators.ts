@@ -334,4 +334,71 @@ export const calculatePivotPoints = (
   return { pivot, r1, r2, r3, s1, s2, s3 };
 };
 
+export interface IchimokuCloudResult {
+  tenkan: number[];      // Conversion Line (Tenkan-sen)
+  kijun: number[];       // Base Line (Kijun-sen)
+  senkouA: number[];     // Leading Span A (Senkou Span A) - forms one edge of the cloud
+  senkouB: number[];     // Leading Span B (Senkou Span B) - forms the other edge of the cloud
+  chikou: number[];      // Lagging Span (Chikou Span)
+}
+
+export const calculateIchimokuCloud = (
+  candles: PolygonCandle[],
+  tenkanPeriod: number = 9,
+  kijunPeriod: number = 26,
+  senkouBPeriod: number = 52,
+  displacement: number = 26
+): IchimokuCloudResult | null => {
+  if (!candles || candles.length < Math.max(tenkanPeriod, kijunPeriod, senkouBPeriod) + displacement) {
+    return null;
+  }
+
+  const highs = candles.map(c => c.h);
+  const lows = candles.map(c => c.l);
+  const closes = candles.map(c => c.c);
+
+  // Helper to calculate highest high and lowest low over a period
+  const calculateHighLow = (highs: number[], lows: number[], period: number, startIdx: number) => {
+    const highSlice = highs.slice(startIdx, startIdx + period);
+    const lowSlice = lows.slice(startIdx, startIdx + period);
+    
+    const highestHigh = Math.max(...highSlice);
+    const lowestLow = Math.min(...lowSlice);
+    
+    return (highestHigh + lowestLow) / 2;
+  };
+
+  const tenkan: number[] = [];
+  const kijun: number[] = [];
+  const senkouA: number[] = [];
+  const senkouB: number[] = [];
+  const chikou: number[] = [];
+
+  // Calculate values
+  for (let i = 0; i < candles.length - Math.max(tenkanPeriod, kijunPeriod, senkouBPeriod); i++) {
+    // Tenkan-sen (Conversion Line)
+    const tenkanValue = calculateHighLow(highs, lows, tenkanPeriod, i);
+    tenkan.push(tenkanValue);
+
+    // Kijun-sen (Base Line)
+    const kijunValue = calculateHighLow(highs, lows, kijunPeriod, i);
+    kijun.push(kijunValue);
+
+    // Senkou Span A (Leading Span A)
+    const senkouAValue = (tenkanValue + kijunValue) / 2;
+    senkouA.push(senkouAValue);
+
+    // Senkou Span B (Leading Span B)
+    const senkouBValue = calculateHighLow(highs, lows, senkouBPeriod, i);
+    senkouB.push(senkouBValue);
+
+    // Chikou Span (Lagging Span) - current close plotted 26 periods in the past
+    if (i + displacement < closes.length) {
+      chikou.push(closes[i + displacement]);
+    }
+  }
+
+  return { tenkan, kijun, senkouA, senkouB, chikou };
+};
+
 // Add other indicator calculations here... 

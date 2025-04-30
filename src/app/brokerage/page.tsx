@@ -9,7 +9,7 @@ import BusinessInsiderTradingPanel from '../../components/brokerage/BusinessInsi
 import TradingInterface from '../../components/dashboard/TradingInterface';
 import { Settings } from 'lucide-react'; // Using Settings icon for Indicators button
 import IndicatorModal from '@/components/brokerage/IndicatorModal'; // Import the new modal
-import { calculateSMA, calculateEMA, calculateRSI, calculateMACD, calculateStochastic, calculateATR, calculateADX, calculateOBV, calculateParabolicSAR, calculatePivotPoints } from '@/lib/trading-engine/indicators'; // Import SMA, EMA, and RSI calculation
+import { calculateSMA, calculateEMA, calculateRSI, calculateMACD, calculateStochastic, calculateATR, calculateADX, calculateOBV, calculateParabolicSAR, calculatePivotPoints, calculateIchimokuCloud } from '@/lib/trading-engine/indicators'; // Import SMA, EMA, and RSI calculation
 import { LineData, Time, HistogramData, CandlestickData } from 'lightweight-charts'; // Import types for chart data
 
 // Create a simple AlertMessage component inline since it's missing
@@ -269,7 +269,7 @@ export interface InsiderTrade {
 // Define structure for active indicator configuration
 export interface ActiveIndicator {
   id: string; 
-  type: 'SMA' | 'EMA' | 'RSI' | 'MACD' | 'Stochastic' | 'ATR' | 'ADX' | 'OBV' | 'Parabolic SAR' | 'Pivot Points'; 
+  type: 'SMA' | 'EMA' | 'RSI' | 'MACD' | 'Stochastic' | 'ATR' | 'ADX' | 'OBV' | 'Parabolic SAR' | 'Pivot Points' | 'Ichimoku Cloud'; 
   period?: number;
   // MACD specific
   fastPeriod?: number;
@@ -295,6 +295,15 @@ export interface ActiveIndicator {
   showS1?: boolean;
   showS2?: boolean;
   showS3?: boolean;
+  // Ichimoku Cloud specific
+  tenkanPeriod?: number;
+  kijunPeriod?: number;
+  senkouBPeriod?: number;
+  displacement?: number;
+  showTenkan?: boolean;
+  showKijun?: boolean;
+  showCloud?: boolean;
+  showChikou?: boolean;
   // BBands specific (add later)
   stdDevMultiplier?: number;
 }
@@ -1199,6 +1208,82 @@ export default function BrokeragePage() {
             if (indicator.showS3 !== false) {
               createLevelLine(pivotResult.s3, 'S3', '#00FF00');
             }
+          }
+        }
+      } else if (indicator.type === 'Ichimoku Cloud') {
+        // Calculate Ichimoku Cloud
+        const candlesForIchimoku = candleData.map(candle => ({
+          h: candle.high,
+          l: candle.low,
+          c: candle.close,
+          v: candle.volume,
+          o: candle.open,
+          t: candle.timestamp
+        }));
+        
+        const tenkanPeriod = indicator.tenkanPeriod || 9;
+        const kijunPeriod = indicator.kijunPeriod || 26;
+        const senkouBPeriod = indicator.senkouBPeriod || 52;
+        const displacement = indicator.displacement || 26;
+        
+        const ichimokuResult = calculateIchimokuCloud(
+          candlesForIchimoku, 
+          tenkanPeriod, 
+          kijunPeriod, 
+          senkouBPeriod, 
+          displacement
+        );
+        
+        if (ichimokuResult) {
+          // Process each component of the Ichimoku Cloud
+          const addIchimokuLine = (values: number[], name: string, color: string) => {
+            const alignmentOffset = candleData.length - values.length;
+            
+            const lineData = values.map((value, index) => {
+              const candleIndex = index + alignmentOffset;
+              if (candleIndex < 0 || candleIndex >= candleData.length) return null;
+              return { 
+                time: Math.floor(candleData[candleIndex].timestamp / 1000) as Time, 
+                value: parseFloat(value.toFixed(2)) 
+              };
+            }).filter((p): p is LineData => p !== null);
+            
+            if (lineData.length > 0) {
+              newIndicatorData.push({
+                id: `${indicator.id}-${name}`,
+                type: `Ichimoku_${name}`,
+                data: lineData,
+                color: color
+              });
+            }
+          };
+          
+          // Add Tenkan-sen (Conversion Line)
+          if (indicator.showTenkan !== false) {
+            addIchimokuLine(ichimokuResult.tenkan, 'Tenkan', '#FF6B6B'); // Red
+          }
+          
+          // Add Kijun-sen (Base Line)
+          if (indicator.showKijun !== false) {
+            addIchimokuLine(ichimokuResult.kijun, 'Kijun', '#4ECDC4'); // Blue
+          }
+          
+          // Add Senkou Span A and B (Cloud)
+          if (indicator.showCloud !== false) {
+            // Future values are displaced forward
+            // Senkou Span A (Leading Span A)
+            addIchimokuLine(ichimokuResult.senkouA, 'SenkouA', '#6B66FF'); // Blue cloud
+            
+            // Senkou Span B (Leading Span B)
+            addIchimokuLine(ichimokuResult.senkouB, 'SenkouB', '#FE9A76'); // Red cloud
+            
+            // TODO: Add actual cloud fill between Senkou Span A and B
+            // This would require a special area series or band in the chart library
+          }
+          
+          // Add Chikou Span (Lagging Span)
+          if (indicator.showChikou !== false) {
+            addIchimokuLine(ichimokuResult.chikou, 'Chikou', '#50C878'); // Green
           }
         }
       } else if (indicator.type === 'MACD' && indicator.fastPeriod && indicator.slowPeriod && indicator.signalPeriod) {
