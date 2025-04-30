@@ -7,6 +7,7 @@ const ManualAssetSchema = new Schema({
   quantity: { type: Number, required: true },
   value: { type: Number, required: true },
   costBasis: { type: Number },
+  assetType: { type: String, enum: ['Stock', 'Bond', 'ETF', 'Mutual Fund', 'CD', 'Crypto', 'Cash', 'Other'] },
 }, { _id: false }); // Don't create separate _id for subdocuments unless needed
 
 // Main schema for the ManualAccount
@@ -20,6 +21,7 @@ export interface ManualAccountDocument extends Document {
     quantity: number;
     value: number;
     costBasis?: number;
+    assetType?: 'Stock' | 'Bond' | 'ETF' | 'Mutual Fund' | 'CD' | 'Crypto' | 'Cash' | 'Other';
   }[];
   totalValue: number;
   createdAt?: Date;
