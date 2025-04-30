@@ -60,6 +60,13 @@ const SymbolSearch = ({
   const dropdownRef = useRef<HTMLDivElement>(null);
   const inputTimeout = useRef<NodeJS.Timeout | null>(null);
 
+  // Update selected symbol whenever the parent component passes a new value
+  useEffect(() => {
+    if (defaultSymbol) {
+      setSelectedSymbol(defaultSymbol);
+    }
+  }, [defaultSymbol]); // This ensures the displayed symbol stays in sync with parent state
+
   // Close dropdown on outside click
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -136,7 +143,7 @@ const SymbolSearch = ({
         </div>
         <input
           type="text"
-          placeholder={`Search symbols...`}
+          placeholder={`Current: ${selectedSymbol}. Search symbols...`}
           value={searchTerm}
           onChange={handleSearch}
           onFocus={() => setIsOpen(true)}
@@ -169,6 +176,10 @@ const SymbolSearch = ({
           </div>
         </div>
       )}
+      
+      <div className="mt-1 text-sm text-gray-600 dark:text-gray-300">
+        Currently viewing: <span className="font-semibold">{selectedSymbol}</span>
+      </div>
     </div>
   );
 };
@@ -526,35 +537,38 @@ export default function BrokeragePage() {
   };
 
   // Handle symbol changes from search
-  const handleSymbolChange = useCallback((newSymbol: string) => {
-    console.log('Symbol changed to:', newSymbol);
+  const handleSymbolChange = (newSymbol: string) => {
+    console.log(`Symbol changed to: ${newSymbol}`);
     setSymbol(newSymbol);
-    setIsLoading(true);
-    setError(null);
-    loadMarketData(newSymbol, timeframe, candleInterval);
     
-    // Update positions for the new symbol
-    const now = Date.now();
-    setAiPositions(prev => {
-      // Keep existing positions
-      const existing = [...prev];
-      
-      // Add a position for the new symbol if none exists
-      if (!existing.some(p => p.symbol === newSymbol && p.status === 'open')) {
-        existing.push({
-          id: `position-${now}`,
+    // Update positions for the new symbol if not already tracked
+    const symbolExists = aiPositions.some(pos => pos.symbol === newSymbol);
+    if (!symbolExists) {
+      // Add new symbol to positions with default values
+      setAiPositions(prev => [
+        ...prev,
+        {
+          id: `pos-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
           symbol: newSymbol,
           type: 'buy',
-          entryPrice: generateSimulatedPrice(newSymbol),
-          quantity: Math.floor(5 + Math.random() * 15),
-          timestamp: now - Math.floor(Math.random() * 604800000), // Random time in the last week
+          entryPrice: 0,
+          quantity: 0,
+          timestamp: Date.now(),
           status: 'open',
-        });
-      }
-      
-      return existing;
-    });
-  }, [timeframe, candleInterval]);
+        }
+      ]);
+    }
+
+    // Load market data for the new symbol
+    loadMarketData(newSymbol, timeframe, candleInterval);
+    
+    // Reset state related to previous symbol
+    setIsLoading(true);
+    setError(null);
+    
+    // Update selected symbol in localStorage to persist between sessions
+    localStorage.setItem('selectedSymbol', newSymbol);
+  };
 
   // Handle timeframe changes
   const handleTimeframeChange = useCallback((newTimeframe: string) => {
