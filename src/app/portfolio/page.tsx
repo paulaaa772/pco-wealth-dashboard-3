@@ -17,6 +17,8 @@ import GoalTrackingDashboard from '@/components/portfolio/GoalTrackingDashboard'
 import TaxAnalyticsDashboard from '@/components/portfolio/TaxAnalyticsDashboard';
 import PortfolioOptimizationTools from '@/components/portfolio/PortfolioOptimizationTools';
 import ESGSustainabilityMetrics from '@/components/portfolio/ESGSustainabilityMetrics';
+import AIFeatures from '@/components/portfolio/AIFeatures';
+import Link from 'next/link';
 
 export default function PortfolioPage() {
   const { manualAccounts, isLoading: isLoadingAccounts, error: accountsError } = useManualAccounts();
@@ -100,17 +102,28 @@ export default function PortfolioPage() {
             >
               Tax
             </button>
-            <button 
-              className={activeTab === 'optimization' ? activeTabStyle : inactiveTabStyle}
+            <Link 
+              href="#portfolio-optimization" 
+              className={`px-4 py-2 text-sm font-medium rounded-md ${
+                activeTab === 'optimization' 
+                  ? 'bg-blue-600 text-white' 
+                  : 'text-gray-800 hover:bg-gray-200 dark:text-gray-200 dark:hover:bg-gray-700'
+              }`}
               onClick={() => setActiveTab('optimization')}
             >
-              Optimization
-            </button>
+              Optimization Tools
+            </Link>
             <button 
               className={activeTab === 'esg' ? activeTabStyle : inactiveTabStyle}
               onClick={() => setActiveTab('esg')}
             >
               ESG
+            </button>
+            <button 
+              className={activeTab === 'ai' ? activeTabStyle : inactiveTabStyle}
+              onClick={() => setActiveTab('ai')}
+            >
+              AI Insights
             </button>
             <button 
               className={activeTab === 'income' ? activeTabStyle : inactiveTabStyle}
@@ -135,10 +148,17 @@ export default function PortfolioPage() {
         {activeTab === 'tax' && <TaxAnalyticsDashboard />}
         
         {/* Optimization Tab */}
-        {activeTab === 'optimization' && <PortfolioOptimizationTools />}
+        {activeTab === 'optimization' && (
+          <div id="portfolio-optimization" className="mt-4">
+            <PortfolioOptimizationTools />
+          </div>
+        )}
         
         {/* ESG Tab */}
         {activeTab === 'esg' && <ESGSustainabilityMetrics />}
+        
+        {/* AI Insights Tab */}
+        {activeTab === 'ai' && <AIFeatures />}
         
         {/* Income Analysis Tab */}
         {activeTab === 'income' && <IncomeAnalysis />}
