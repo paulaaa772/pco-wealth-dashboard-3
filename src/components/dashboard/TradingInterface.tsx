@@ -42,11 +42,36 @@ export default function TradingInterface({
   const [lastSignal, setLastSignal] = useState<TradeSignal | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  
+  // Add new state for balance tracking
+  const [accountBalance, setAccountBalance] = useState<number>(10000); // Default $10,000
+  const [allocatedBalance, setAllocatedBalance] = useState<number>(5000); // Default $5,000 allocated
+  const [dailyTradeLimit, setDailyTradeLimit] = useState<number>(500); // Default $500 daily limit
+  const [depositAmount, setDepositAmount] = useState<string>('');
+  const [withdrawAmount, setWithdrawAmount] = useState<string>('');
+  const [showBalanceModal, setShowBalanceModal] = useState<boolean>(false);
+  
   const [performance, setPerformance] = useState({
     winRate: 0,
     profitLoss: 0,
     totalTrades: 0,
   });
+  
+  // Add state for detailed profit/loss tracking
+  const [tradeProfitLoss, setTradeProfitLoss] = useState<{
+    totalProfit: number,
+    totalLoss: number,
+    netPL: number,
+    todayPL: number,
+    trades: {id: string, symbol: string, pl: number, date: Date}[]
+  }>({
+    totalProfit: 0,
+    totalLoss: 0,
+    netPL: 0,
+    todayPL: 0,
+    trades: []
+  });
+  
   // Add state for ADX values
   const [adxValues, setAdxValues] = useState({
     adx: 0,
@@ -60,6 +85,7 @@ export default function TradingInterface({
   useEffect(() => {
       console.log("[TRADING UI] Positions prop updated, recalculating performance.");
       updatePerformanceDisplay(positions);
+      updateTradeProfitLoss(positions);
   }, [positions]);
 
   // When currentSymbol prop changes, update our local state
@@ -73,7 +99,18 @@ export default function TradingInterface({
   // On component mount
   useEffect(() => {
     console.log('[TRADING UI] Component mounted with symbol:', symbol);
-    aiEngine.current = new AITradingEngine(symbol, mode);
+    
+    // Load saved balance data from localStorage
+    const savedBalance = localStorage.getItem('accountBalance');
+    const savedAllocated = localStorage.getItem('allocatedBalance');
+    const savedDailyLimit = localStorage.getItem('dailyTradeLimit');
+    
+    if (savedBalance) setAccountBalance(parseFloat(savedBalance));
+    if (savedAllocated) setAllocatedBalance(parseFloat(savedAllocated));
+    if (savedDailyLimit) setDailyTradeLimit(parseFloat(savedDailyLimit));
+    
+    // Initialize AI engine with the allocated balance
+    aiEngine.current = new AITradingEngine(symbol, mode, allocatedBalance);
     
     // Initial market analysis
     analyzeMarket();
@@ -168,7 +205,101 @@ export default function TradingInterface({
     }
   };
 
-  // Execute a trade signal
+  // Add new function to update trade profit/loss
+  const updateTradeProfitLoss = (currentPositions: Position[]) => {
+    const closedTrades = currentPositions.filter(p => p.status === 'closed' && p.profit !== undefined);
+    const todayTrades = closedTrades.filter(p => 
+      p.closeDate && new Date(p.closeDate).toDateString() === new Date().toDateString()
+    );
+    
+    const winningTrades = closedTrades.filter(p => (p.profit ?? 0) > 0);
+    const losingTrades = closedTrades.filter(p => (p.profit ?? 0) <= 0);
+    
+    const totalProfit = winningTrades.reduce((sum, trade) => sum + (trade.profit ?? 0), 0);
+    const totalLoss = Math.abs(losingTrades.reduce((sum, trade) => sum + (trade.profit ?? 0), 0));
+    const netPL = totalProfit - totalLoss;
+    const todayPL = todayTrades.reduce((sum, trade) => sum + (trade.profit ?? 0), 0);
+    
+    const tradeDetails = closedTrades.map(trade => ({
+      id: trade.id,
+      symbol: trade.symbol,
+      pl: trade.profit ?? 0,
+      date: trade.closeDate ? new Date(trade.closeDate) : new Date()
+    })).sort((a, b) => b.date.getTime() - a.date.getTime()); // Sort newest first
+    
+    setTradeProfitLoss({
+      totalProfit,
+      totalLoss,
+      netPL,
+      todayPL,
+      trades: tradeDetails
+    });
+    
+    // Update account balance with P/L
+    updateAccountBalance(netPL);
+  };
+  
+  // Handle account balance updates
+  const updateAccountBalance = (profitLoss: number) => {
+    // Only update once
+    if (profitLoss !== 0 && profitLoss !== tradeProfitLoss.netPL) {
+      const newBalance = accountBalance + profitLoss;
+      setAccountBalance(newBalance);
+      localStorage.setItem('accountBalance', newBalance.toString());
+    }
+  };
+  
+  // Handle deposits
+  const handleDeposit = () => {
+    const amount = parseFloat(depositAmount);
+    if (!isNaN(amount) && amount > 0) {
+      const newBalance = accountBalance + amount;
+      setAccountBalance(newBalance);
+      localStorage.setItem('accountBalance', newBalance.toString());
+      setDepositAmount('');
+      setShowBalanceModal(false);
+    }
+  };
+  
+  // Handle withdrawals
+  const handleWithdraw = () => {
+    const amount = parseFloat(withdrawAmount);
+    if (!isNaN(amount) && amount > 0 && amount <= accountBalance) {
+      const newBalance = accountBalance - amount;
+      setAccountBalance(newBalance);
+      localStorage.setItem('accountBalance', newBalance.toString());
+      setWithdrawAmount('');
+      setShowBalanceModal(false);
+    }
+  };
+  
+  // Update allocated balance
+  const handleUpdateAllocated = (newAllocated: number) => {
+    if (newAllocated > 0 && newAllocated <= accountBalance) {
+      setAllocatedBalance(newAllocated);
+      localStorage.setItem('allocatedBalance', newAllocated.toString());
+      
+      // Update AI engine with new allocated balance
+      if (aiEngine.current) {
+        aiEngine.current.setTradingBalance(newAllocated);
+      }
+    }
+  };
+  
+  // Update daily trade limit
+  const handleUpdateDailyLimit = (newLimit: number) => {
+    if (newLimit > 0 && newLimit <= allocatedBalance) {
+      setDailyTradeLimit(newLimit);
+      localStorage.setItem('dailyTradeLimit', newLimit.toString());
+      
+      // Update AI engine with new daily limit
+      if (aiEngine.current) {
+        aiEngine.current.setDailyTradeLimit(newLimit);
+      }
+    }
+  };
+
+  // Modify executeTradeSignal to respect balance limits
   const executeTradeSignal = async (signal: TradeSignal) => {
     try {
       console.log(`[TRADING UI] Attempting to execute ${signal.direction} signal for ${signal.symbol}`);
@@ -176,6 +307,23 @@ export default function TradingInterface({
       // Ensure aiEngine exists
       if (!aiEngine.current) {
         console.error('[TRADING UI] AI Engine not initialized!');
+        return;
+      }
+      
+      // Check if we have enough allocated balance
+      const estimatedCost = signal.price * aiEngine.current.calculatePositionSize(signal.price);
+      if (estimatedCost > allocatedBalance) {
+        setErrorMessage(`Insufficient allocated balance for this trade. Need $${estimatedCost.toFixed(2)}`);
+        return;
+      }
+      
+      // Check daily trade limit
+      const todayUsed = tradeProfitLoss.trades
+        .filter(t => new Date(t.date).toDateString() === new Date().toDateString())
+        .reduce((sum, t) => sum + Math.abs(t.pl), 0);
+      
+      if (todayUsed + estimatedCost > dailyTradeLimit) {
+        setErrorMessage(`This trade would exceed your daily limit of $${dailyTradeLimit}`);
         return;
       }
 
@@ -208,16 +356,6 @@ export default function TradingInterface({
       console.error('[TRADING UI] Error executing trade signal:', error);
       setErrorMessage('Error executing trade signal.');
     }
-  };
-
-  // Calculate position size based on risk
-  const calculatePositionSize = (price: number): number => {
-    // We'll use a fixed account balance for demo purposes
-    const accountBalance = 10000;
-    const riskPerTrade = 0.02; // 2% risk per trade
-    
-    // Simple position sizing based on price
-    return Math.floor(accountBalance * riskPerTrade / price);
   };
 
   // Renamed to avoid confusion, recalculates display based on props
@@ -257,6 +395,39 @@ export default function TradingInterface({
   return (
     <div className="bg-gray-900 rounded-lg p-4">
       <h2 className="text-2xl font-semibold text-white mb-4">AI Terminal</h2>
+      
+      {/* Add account balance section */}
+      <div className="flex flex-wrap md:flex-nowrap gap-4 mb-4">
+        <div className="bg-gray-800 rounded-lg p-3 w-full md:w-auto flex-grow">
+          <h3 className="text-sm font-medium text-gray-400 mb-2">Account Balance</h3>
+          <div className="grid grid-cols-2 gap-2 mb-2">
+            <div className="bg-gray-700 rounded-md p-2">
+              <div className="text-xs text-gray-400">Total Balance</div>
+              <div className="text-lg font-semibold text-white">${accountBalance.toFixed(2)}</div>
+            </div>
+            <div className="bg-gray-700 rounded-md p-2">
+              <div className="text-xs text-gray-400">AI Trading Allocation</div>
+              <div className="text-lg font-semibold text-white">${allocatedBalance.toFixed(2)}</div>
+            </div>
+            <div className="bg-gray-700 rounded-md p-2">
+              <div className="text-xs text-gray-400">Daily Limit</div>
+              <div className="text-lg font-semibold text-white">${dailyTradeLimit.toFixed(2)}</div>
+            </div>
+            <div className="bg-gray-700 rounded-md p-2">
+              <div className="text-xs text-gray-400">Today's P/L</div>
+              <div className={`text-lg font-semibold ${tradeProfitLoss.todayPL >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                ${tradeProfitLoss.todayPL.toFixed(2)}
+              </div>
+            </div>
+          </div>
+          <button 
+            onClick={() => setShowBalanceModal(true)}
+            className="w-full text-sm px-3 py-1 rounded-md bg-blue-600 hover:bg-blue-700 text-white"
+          >
+            Manage Funds
+          </button>
+        </div>
+      </div>
       
       <div className="flex flex-wrap md:flex-nowrap gap-4 mb-4">
         <div className="bg-gray-800 rounded-lg p-3 w-full md:w-auto md:min-w-[250px]">
@@ -388,6 +559,58 @@ export default function TradingInterface({
         </div>
       </div>
       
+      {/* New section for Profit/Loss Details */}
+      <div className="mb-4 bg-gray-800 rounded-lg p-3">
+        <div className="flex justify-between items-center mb-2">
+          <h3 className="text-sm font-medium text-gray-400">Profit/Loss Summary</h3>
+        </div>
+        <div className="grid grid-cols-3 gap-2 mb-2">
+          <div className="bg-gray-700 rounded-md p-2">
+            <div className="text-xs text-gray-400">Total Profit</div>
+            <div className="text-lg font-semibold text-green-400">${tradeProfitLoss.totalProfit.toFixed(2)}</div>
+          </div>
+          <div className="bg-gray-700 rounded-md p-2">
+            <div className="text-xs text-gray-400">Total Loss</div>
+            <div className="text-lg font-semibold text-red-400">-${tradeProfitLoss.totalLoss.toFixed(2)}</div>
+          </div>
+          <div className="bg-gray-700 rounded-md p-2">
+            <div className="text-xs text-gray-400">Net P/L</div>
+            <div className={`text-lg font-semibold ${tradeProfitLoss.netPL >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+              ${tradeProfitLoss.netPL.toFixed(2)}
+            </div>
+          </div>
+        </div>
+        
+        {/* Recent trades table */}
+        {tradeProfitLoss.trades.length > 0 && (
+          <div className="mt-2">
+            <div className="text-xs text-gray-400 mb-1">Recent Trade History</div>
+            <div className="bg-gray-700 rounded-md max-h-32 overflow-y-auto">
+              <table className="w-full text-sm">
+                <thead className="text-xs text-gray-400 border-b border-gray-600">
+                  <tr>
+                    <th className="p-2 text-left">Date</th>
+                    <th className="p-2 text-left">Symbol</th>
+                    <th className="p-2 text-right">P/L</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-600">
+                  {tradeProfitLoss.trades.slice(0, 5).map(trade => (
+                    <tr key={trade.id}>
+                      <td className="p-2">{trade.date.toLocaleDateString()}</td>
+                      <td className="p-2">{trade.symbol}</td>
+                      <td className={`p-2 text-right ${trade.pl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                        ${trade.pl.toFixed(2)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </div>
+      
       {/* Add ADX Indicator component */}
       <div className="mb-4">
         <ADXIndicator 
@@ -445,6 +668,110 @@ export default function TradingInterface({
           </div>
         )}
       </div>
+      
+      {/* Modal for fund management */}
+      {showBalanceModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-gray-800 rounded-lg p-4 w-full max-w-md">
+            <h3 className="text-lg font-semibold text-white mb-4">Manage Funds</h3>
+            
+            <div className="space-y-4">
+              {/* Deposit */}
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">Deposit Funds</label>
+                <div className="flex">
+                  <input
+                    type="number"
+                    min="0"
+                    step="100"
+                    value={depositAmount}
+                    onChange={(e) => setDepositAmount(e.target.value)}
+                    className="flex-grow bg-gray-700 text-white p-2 rounded-l-md"
+                    placeholder="Amount"
+                  />
+                  <button
+                    onClick={handleDeposit}
+                    className="bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-r-md"
+                    disabled={!depositAmount || parseFloat(depositAmount) <= 0}
+                  >
+                    Deposit
+                  </button>
+                </div>
+              </div>
+              
+              {/* Withdraw */}
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">Withdraw Funds</label>
+                <div className="flex">
+                  <input
+                    type="number"
+                    min="0"
+                    max={accountBalance}
+                    step="100"
+                    value={withdrawAmount}
+                    onChange={(e) => setWithdrawAmount(e.target.value)}
+                    className="flex-grow bg-gray-700 text-white p-2 rounded-l-md"
+                    placeholder="Amount"
+                  />
+                  <button
+                    onClick={handleWithdraw}
+                    className="bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded-r-md"
+                    disabled={!withdrawAmount || parseFloat(withdrawAmount) <= 0 || parseFloat(withdrawAmount) > accountBalance}
+                  >
+                    Withdraw
+                  </button>
+                </div>
+                <p className="text-xs text-gray-500 mt-1">Available: ${accountBalance.toFixed(2)}</p>
+              </div>
+              
+              {/* AI Allocation */}
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">Trading Allocation</label>
+                <div className="flex items-center">
+                  <input
+                    type="range"
+                    min="0"
+                    max={accountBalance}
+                    step="100"
+                    value={allocatedBalance}
+                    onChange={(e) => handleUpdateAllocated(parseFloat(e.target.value))}
+                    className="flex-grow mr-2"
+                  />
+                  <span className="text-white min-w-[80px] text-right">${allocatedBalance.toFixed(2)}</span>
+                </div>
+                <p className="text-xs text-gray-500">Amount available for AI to trade with</p>
+              </div>
+              
+              {/* Daily Limit */}
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">Daily Trading Limit</label>
+                <div className="flex items-center">
+                  <input
+                    type="range"
+                    min="0"
+                    max={allocatedBalance}
+                    step="100"
+                    value={dailyTradeLimit}
+                    onChange={(e) => handleUpdateDailyLimit(parseFloat(e.target.value))}
+                    className="flex-grow mr-2"
+                  />
+                  <span className="text-white min-w-[80px] text-right">${dailyTradeLimit.toFixed(2)}</span>
+                </div>
+                <p className="text-xs text-gray-500">Maximum amount to trade per day</p>
+              </div>
+            </div>
+            
+            <div className="mt-6 flex justify-end">
+              <button
+                onClick={() => setShowBalanceModal(false)}
+                className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-md"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 } 

@@ -74,6 +74,9 @@ export class AITradingEngine {
   private symbol: string;
   private mode: TradingMode;
   private polygonService: PolygonService;
+  // Add account balance properties
+  private accountBalance: number = 10000; // Default account size
+  private dailyTradeLimit: number = 1000; // Default daily limit
   
   // Strategy Parameters
   private fastSMAPeriod = 9;
@@ -96,11 +99,12 @@ export class AITradingEngine {
   private stochasticOversold = 20;
   private obvSmaPeriod = 20; // For calculating SMA of OBV later
 
-  constructor(symbol: string = 'AAPL', mode: TradingMode = TradingModeEnum.DEMO) {
+  constructor(symbol: string = 'AAPL', mode: TradingMode = TradingModeEnum.DEMO, initialBalance: number = 10000) {
     this.symbol = symbol;
     this.mode = mode;
+    this.accountBalance = initialBalance;
     this.polygonService = PolygonService.getInstance();
-    console.log(`AI Engine initialized for ${symbol} (${mode}). Strategies: MA(${this.fastSMAPeriod}/${this.slowSMAPeriod}), RSI(${this.rsiPeriod}), MACD(${this.macdFast}/${this.macdSlow}/${this.macdSignal}), BBands(${this.bbandsPeriod}/${this.bbandsStdDev}), ADX(${this.adxPeriod}/${this.adxTrendThreshold}), Stoch(${this.stochasticKPeriod}/${this.stochasticDPeriod}), OBV`);
+    console.log(`AI Engine initialized for ${symbol} (${mode}) with balance $${initialBalance}. Strategies: MA(${this.fastSMAPeriod}/${this.slowSMAPeriod}), RSI(${this.rsiPeriod}), MACD(${this.macdFast}/${this.macdSlow}/${this.macdSignal}), BBands(${this.bbandsPeriod}/${this.bbandsStdDev}), ADX(${this.adxPeriod}/${this.adxTrendThreshold}), Stoch(${this.stochasticKPeriod}/${this.stochasticDPeriod}), OBV`);
   }
 
   // Add a method to update the symbol
@@ -145,10 +149,25 @@ export class AITradingEngine {
   // Calculate position size based on risk
   public calculatePositionSize(price: number): number {
     // Simple position sizing logic
-    const accountBalance = 10000; // Demo account balance
     const riskPercent = 0.02; // 2% risk per trade
     
-    return Math.floor(accountBalance * riskPercent / price);
+    return Math.floor(this.accountBalance * riskPercent / price);
+  }
+
+  // Set trading balance
+  public setTradingBalance(newBalance: number): void {
+    if (newBalance > 0) {
+      console.log(`[AI Engine] Trading balance updated: $${this.accountBalance.toFixed(2)} → $${newBalance.toFixed(2)}`);
+      this.accountBalance = newBalance;
+    }
+  }
+  
+  // Set daily trade limit
+  public setDailyTradeLimit(newLimit: number): void {
+    if (newLimit > 0) {
+      console.log(`[AI Engine] Daily trading limit updated: $${this.dailyTradeLimit.toFixed(2)} → $${newLimit.toFixed(2)}`);
+      this.dailyTradeLimit = newLimit;
+    }
   }
 
   // Get current ADX values for the specified symbol or the current symbol
