@@ -1,26 +1,30 @@
 import axios, { AxiosError, AxiosInstance } from 'axios';
 
 // Mock data generator functions
-const generateMockCandles = (symbol: string, from: string, to: string) => {
-  console.log(`[MOCK] Generating candles for ${symbol} from ${from} to ${to}`);
+const generateMockCandles = (symbol: string, from: string, to: string, assetType?: string) => {
+  console.log(`[MOCK] Generating candles for ${symbol} (${assetType || 'unknown type'}) from ${from} to ${to}`);
   
   const data = [];
   // More realistic price points for common symbols
-  const basePrice = symbol === 'AAPL' ? 180 : 
-                   symbol === 'MSFT' ? 380 : 
-                   symbol === 'GOOG' ? 140 : 
-                   symbol === 'AMZN' ? 173 :
-                   symbol === 'TSLA' ? 190 :
-                   symbol === 'JPM' ? 186 :
-                   symbol === 'V' ? 273 :
-                   symbol === 'META' ? 481 :
-                   symbol === 'NVDA' ? 920 :
-                   symbol === 'BRK.B' ? 408 :
-                   symbol === 'SPY' ? 532 :
-                   symbol === 'QQQ' ? 433 :
-                   symbol === 'VTI' ? 252 :
-                   symbol === 'VOO' ? 488 :
-                   symbol === 'BND' ? 73 : 100;
+  const basePrice = symbol === 'AAPL' ? 186.3 : 
+                   symbol === 'MSFT' ? 403.8 : 
+                   symbol === 'GOOG' ? 142.5 : 
+                   symbol === 'AMZN' ? 185.2 :
+                   symbol === 'TSLA' ? 183.8 :
+                   symbol === 'JPM' ? 182.4 :
+                   symbol === 'V' ? 276.1 :
+                   symbol === 'META' ? 474.5 :
+                   symbol === 'NVDA' ? 1028.6 :
+                   symbol === 'BRK.B' ? 410.3 :
+                   symbol === 'SPY' ? 528.4 :
+                   symbol === 'QQQ' ? 439.7 :
+                   symbol === 'VTI' ? 254.9 :
+                   symbol === 'VOO' ? 483.5 :
+                   symbol === 'VGSH' ? 57.9 :
+                   symbol === 'BND' ? 72.3 : 
+                   symbol === 'BLACKROCK EQUITY INDEX FUND' ? 112.3 :
+                   symbol === 'BLACKROCK US DEBT INDEX FUND' ? 79.6 :
+                   Math.random() * 100 + 50;
   
   // Convert dates to timestamps
   const fromDate = new Date(from);
@@ -29,21 +33,59 @@ const generateMockCandles = (symbol: string, from: string, to: string) => {
   // Calculate number of days
   const daysDiff = Math.ceil((toDate.getTime() - fromDate.getTime()) / (1000 * 3600 * 24));
   
-  // Set trend based on symbol for more consistency
-  // Stocks generally up, bonds generally down/flat in recent market
+  // Set trend based on asset type and symbol for more consistency
   let trendRate;
-  if (symbol.match(/^(BND|AGG|BOND|TLT)/)) {
+  
+  // Use asset type as primary classifier if available
+  if (assetType === 'Bond') {
     // Bonds have been flat to slightly down
-    trendRate = -0.00005 + (Math.random() * 0.0001);
-  } else if (symbol.match(/^(AAPL|MSFT|GOOG|AMZN|NVDA|META)/)) {
-    // Big tech stocks have done well
-    trendRate = 0.0005 + (Math.random() * 0.0005);
-  } else if (symbol.match(/^(SPY|VOO|VTI|QQQ)/)) {
-    // Index funds have steady growth
-    trendRate = 0.0003 + (Math.random() * 0.0002);
+    trendRate = -0.00008 + (Math.random() * 0.00016);
+  } else if (assetType === 'ETF') {
+    if (symbol.match(/^(BND|AGG|VGSH|VCIT|TLT)/)) {
+      // Bond ETFs
+      trendRate = -0.00005 + (Math.random() * 0.0001);
+    } else if (symbol.match(/^(SPY|VOO|VTI|IVV)/)) {
+      // Index ETFs have steady growth
+      trendRate = 0.00032 + (Math.random() * 0.00018);
+    } else if (symbol.match(/^(QQQ|VGT|XLK)/)) {
+      // Tech ETFs have done better
+      trendRate = 0.00045 + (Math.random() * 0.00025);
+    } else {
+      // General ETFs
+      trendRate = 0.00025 + (Math.random() * 0.0002);
+    }
+  } else if (assetType === 'Stock') {
+    if (symbol.match(/^(AAPL|MSFT|GOOG|AMZN|NVDA|META)/)) {
+      // Big tech stocks have done well
+      trendRate = 0.00052 + (Math.random() * 0.00048);
+    } else if (symbol.match(/^(JPM|BAC|WFC|C|GS)/)) {
+      // Financial stocks 
+      trendRate = 0.00038 + (Math.random() * 0.00032);
+    } else {
+      // Other stocks
+      trendRate = 0.00025 + (Math.random() * 0.00045);
+    }
+  } else if (assetType === 'Mutual Fund') {
+    // Mutual funds tend to be less volatile
+    trendRate = 0.00028 + (Math.random() * 0.00022);
+  } else if (assetType === 'Crypto') {
+    // Crypto is highly volatile
+    trendRate = 0.00065 + (Math.random() * 0.001 - 0.0005);
   } else {
-    // General stocks vary more
-    trendRate = 0.0001 + (Math.random() * 0.0006 - 0.0003);
+    // Fallback to symbol-based classification if no asset type
+    if (symbol.match(/^(BND|AGG|BOND|TLT)/)) {
+      // Bonds have been flat to slightly down
+      trendRate = -0.00005 + (Math.random() * 0.0001);
+    } else if (symbol.match(/^(AAPL|MSFT|GOOG|AMZN|NVDA|META)/)) {
+      // Big tech stocks have done well
+      trendRate = 0.0005 + (Math.random() * 0.0005);
+    } else if (symbol.match(/^(SPY|VOO|VTI|QQQ)/)) {
+      // Index funds have steady growth
+      trendRate = 0.0003 + (Math.random() * 0.0002);
+    } else {
+      // General stocks vary more
+      trendRate = 0.0001 + (Math.random() * 0.0006 - 0.0003);
+    }
   }
   
   // Seed with sine wave for cyclical patterns
@@ -223,13 +265,14 @@ export class PolygonService {
       from: string, 
       to: string, 
       timespan = 'day', 
-      multiplier = 1 // Add multiplier with default
+      multiplier = 1, // Add multiplier with default
+      assetType?: string // Add asset type parameter
     ): Promise<PolygonCandle[] | null> {
     if (this.useMockData) {
       // Use mock data only if explicitly configured (no API key)
-      console.log(`[MOCK] Fetching ${multiplier} ${timespan} candles for ${symbol} (No API Key)`);
+      console.log(`[MOCK] Fetching ${multiplier} ${timespan} candles for ${symbol} (${assetType || 'unknown type'}) (No API Key)`);
       await new Promise(resolve => setTimeout(resolve, 500));
-      const mockData = generateMockCandles(symbol, from, to);
+      const mockData = generateMockCandles(symbol, from, to, assetType);
       console.log(`[MOCK] Generated ${mockData.length} candles for ${symbol}`);
       return mockData;
     }

@@ -83,7 +83,14 @@ export async function POST(request: NextRequest) {
                 }
                 
                 // For all other assets, fetch candles
-                const candles = await polygonService.getStockCandles(asset.symbol, adjustedStartDate, endDate, timespan, 1);
+                const candles = await polygonService.getStockCandles(
+                    asset.symbol, 
+                    adjustedStartDate, 
+                    endDate, 
+                    timespan, 
+                    1,
+                    asset.assetType // Pass asset type to the candle generator for better modeling
+                );
                 
                 if (candles && candles.length > 0) {
                     hasAnyData = true;

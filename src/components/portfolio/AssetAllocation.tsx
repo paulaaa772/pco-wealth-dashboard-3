@@ -51,34 +51,50 @@ export default function AssetAllocation() {
   };
 
   // Map account types to asset classes
-  const getAssetClass = (accountType: string, symbol: string): string => {
+  const getAssetClass = (account: any, symbol: string, assetType?: string): string => {
+    // If asset has a specified type, use it directly
+    if (assetType) {
+      return assetType;
+    }
+
+    // Fallback to the previous mapping logic
     const assetClasses: Record<string, AssetClassConfig> = {
       'Brokerage': {
-        default: 'Large Cap Funds',
+        default: 'Stock',
         mappings: {
-          'AAPL': 'Large Cap Funds',
-          'MSFT': 'Large Cap Funds',
-          'AMZN': 'Large Cap Funds',
-          'GOOGL': 'Large Cap Funds',
-          'FB': 'Large Cap Funds',
-          'TSLA': 'Large Cap Funds',
-          'BRK.B': 'Large Cap Funds',
-          'V': 'Large Cap Funds',
-          'JNJ': 'Large Cap Funds',
-          'JPM': 'Large Cap Funds',
-          'NVDA': 'Mid Cap Funds',
-          'PG': 'Large Cap Funds',
-          'HD': 'Large Cap Funds',
-          'UNH': 'Large Cap Funds',
-          'MA': 'Large Cap Funds',
+          'AAPL': 'Stock',
+          'MSFT': 'Stock',
+          'AMZN': 'Stock',
+          'GOOGL': 'Stock',
+          'FB': 'Stock',
+          'TSLA': 'Stock',
+          'BRK.B': 'Stock',
+          'V': 'Stock',
+          'JNJ': 'Stock',
+          'JPM': 'Stock',
+          'NVDA': 'Stock',
+          'PG': 'Stock',
+          'HD': 'Stock',
+          'UNH': 'Stock',
+          'MA': 'Stock',
+          'SPY': 'ETF',
+          'VOO': 'ETF',
+          'QQQ': 'ETF',
+          'VTI': 'ETF',
+          'IVV': 'ETF',
+          'VEA': 'ETF',
+          'IEMG': 'ETF',
+          'AGG': 'Bond',
+          'BND': 'Bond',
+          'LQD': 'Bond',
         }
       },
       'Bank Account': { default: 'Cash' },
-      'Crypto Wallet': { default: 'Alternative Investments' },
+      'Crypto Wallet': { default: 'Crypto' },
       'Other': { default: 'Other' }
     };
 
-    const accountClass = assetClasses[accountType] || { default: 'Other' };
+    const accountClass = assetClasses[account.accountType] || { default: 'Other' };
     return accountClass.mappings?.[symbol] || accountClass.default;
   };
 
@@ -109,12 +125,16 @@ export default function AssetAllocation() {
       }).filter(item => item.value > 0);
     } 
     else if (view === 'accountType') {
-      // Group by account type
+      // Group by asset type instead of account type
       const typeMap = new Map<string, number>();
       
       manualAccounts.forEach(account => {
-        const currentValue = typeMap.get(account.accountType) || 0;
-        typeMap.set(account.accountType, currentValue + account.totalValue);
+        account.assets.forEach(asset => {
+          // Use asset type if available, otherwise use the inferred class
+          const assetType = asset.assetType || getAssetClass(account, asset.symbol);
+          const currentValue = typeMap.get(assetType) || 0;
+          typeMap.set(assetType, currentValue + asset.value);
+        });
       });
 
       return Array.from(typeMap.entries()).map(([type, value], index) => {
@@ -135,7 +155,10 @@ export default function AssetAllocation() {
       
       manualAccounts.forEach(account => {
         account.assets.forEach(asset => {
-          const existing = symbolMap.get(asset.symbol) || { total: 0, assetClass: getAssetClass(account.accountType, asset.symbol) };
+          const existing = symbolMap.get(asset.symbol) || { 
+            total: 0, 
+            assetClass: getAssetClass(account, asset.symbol, asset.assetType) 
+          };
           symbolMap.set(asset.symbol, {
             total: existing.total + asset.value,
             assetClass: existing.assetClass
@@ -220,7 +243,7 @@ export default function AssetAllocation() {
   return (
     <div className="bg-[#1E2D4E] rounded-lg p-6">
       <div className="flex justify-between items-center mb-4">
-        <h2 className="text-xl font-semibold">Asset Allocation</h2>
+        <h2 className="text-2xl font-semibold">Asset Allocation</h2>
         <div className="flex space-x-2 text-sm">
           <button 
             onClick={() => setView('symbol')}
@@ -291,8 +314,13 @@ export default function AssetAllocation() {
               <thead className="bg-[#2A3C61] text-gray-300">
                 <tr>
                   <th className="py-2 px-4 text-left font-medium">PERCENTAGE</th>
-                  <th className="py-2 px-4 text-left font-medium">INVESTMENT</th>
-                  <th className="py-2 px-4 text-left font-medium">ASSET CLASS</th>
+                  <th className="py-2 px-4 text-left font-medium">
+                    {view === 'symbol' ? 'INVESTMENT' : 
+                     view === 'account' ? 'ACCOUNT' : 'ASSET TYPE'}
+                  </th>
+                  <th className="py-2 px-4 text-left font-medium">
+                    {view === 'accountType' ? 'DESCRIPTION' : 'ASSET CLASS'}
+                  </th>
                   <th className="py-2 px-4 text-right font-medium">BALANCE</th>
                 </tr>
               </thead>
