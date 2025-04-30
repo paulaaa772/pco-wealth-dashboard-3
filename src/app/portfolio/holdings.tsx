@@ -6,7 +6,7 @@ import { Edit, Trash2, Layers } from 'lucide-react';
 import EditAccountModal from '@/components/dashboard/EditAccountModal';
 
 // Define the structure for a displayable row in the holdings table
-interface HoldingRow extends ManualAsset { 
+interface HoldingRow extends Omit<ManualAsset, 'assetType'> { 
   // Inherits id, symbol, quantity, value, costBasis from ManualAsset
   accountName: string;
   accountType: string;
@@ -15,7 +15,7 @@ interface HoldingRow extends ManualAsset {
   allocation: number;
   gain: number;
   gainPercent: number;
-  assetType?: string; // Added for asset type
+  assetType?: 'Stock' | 'Bond' | 'ETF' | 'Mutual Fund' | 'CD' | 'Crypto' | 'Cash' | 'Other';
 }
 
 // Function to assign colors for grouping accounts visually
