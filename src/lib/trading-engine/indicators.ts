@@ -298,4 +298,40 @@ export const calculateParabolicSAR = (
     return { sarValues, isUptrend };
 };
 
+export interface PivotPointsResult {
+  pivot: number;      // Main pivot point
+  r1: number;         // Resistance level 1
+  r2: number;         // Resistance level 2
+  r3: number;         // Resistance level 3
+  s1: number;         // Support level 1
+  s2: number;         // Support level 2
+  s3: number;         // Support level 3
+}
+
+export const calculatePivotPoints = (
+  candles: PolygonCandle[],
+  period: 'daily' | 'weekly' | 'monthly' = 'daily'
+): PivotPointsResult | null => {
+  if (!candles || candles.length === 0) return null;
+  
+  // Get the high, low, and close from the previous period
+  const high = candles[0].h;
+  const low = candles[0].l;
+  const close = candles[0].c;
+  
+  // Calculate the pivot point (standard formula)
+  const pivot = (high + low + close) / 3;
+  
+  // Calculate support and resistance levels
+  const r1 = (2 * pivot) - low;
+  const r2 = pivot + (high - low);
+  const r3 = high + 2 * (pivot - low);
+  
+  const s1 = (2 * pivot) - high;
+  const s2 = pivot - (high - low);
+  const s3 = low - 2 * (high - pivot);
+  
+  return { pivot, r1, r2, r3, s1, s2, s3 };
+};
+
 // Add other indicator calculations here... 

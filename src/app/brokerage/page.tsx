@@ -9,7 +9,7 @@ import BusinessInsiderTradingPanel from '../../components/brokerage/BusinessInsi
 import TradingInterface from '../../components/dashboard/TradingInterface';
 import { Settings } from 'lucide-react'; // Using Settings icon for Indicators button
 import IndicatorModal from '@/components/brokerage/IndicatorModal'; // Import the new modal
-import { calculateSMA, calculateEMA, calculateRSI, calculateMACD, calculateStochastic, calculateATR, calculateADX, calculateOBV, calculateParabolicSAR } from '@/lib/trading-engine/indicators'; // Import SMA, EMA, and RSI calculation
+import { calculateSMA, calculateEMA, calculateRSI, calculateMACD, calculateStochastic, calculateATR, calculateADX, calculateOBV, calculateParabolicSAR, calculatePivotPoints } from '@/lib/trading-engine/indicators'; // Import SMA, EMA, and RSI calculation
 import { LineData, Time, HistogramData, CandlestickData } from 'lightweight-charts'; // Import types for chart data
 
 // Create a simple AlertMessage component inline since it's missing
@@ -269,7 +269,7 @@ export interface InsiderTrade {
 // Define structure for active indicator configuration
 export interface ActiveIndicator {
   id: string; 
-  type: 'SMA' | 'EMA' | 'RSI' | 'MACD' | 'Stochastic' | 'ATR' | 'ADX' | 'OBV' | 'Parabolic SAR'; 
+  type: 'SMA' | 'EMA' | 'RSI' | 'MACD' | 'Stochastic' | 'ATR' | 'ADX' | 'OBV' | 'Parabolic SAR' | 'Pivot Points'; 
   period?: number;
   // MACD specific
   fastPeriod?: number;
@@ -287,6 +287,14 @@ export interface ActiveIndicator {
   // Parabolic SAR specific
   initialAcceleration?: number;
   maxAcceleration?: number;
+  // Pivot Points specific
+  pivotType?: 'daily' | 'weekly' | 'monthly';
+  showR1?: boolean;
+  showR2?: boolean;
+  showR3?: boolean;
+  showS1?: boolean;
+  showS2?: boolean;
+  showS3?: boolean;
   // BBands specific (add later)
   stdDevMultiplier?: number;
 }
@@ -1118,6 +1126,79 @@ export default function BrokeragePage() {
               color: '#FF00FF', // Magenta
               // No separate pane - display on main price chart
             });
+          }
+        }
+      } else if (indicator.type === 'Pivot Points') {
+        // Calculate Pivot Points
+        const candlesForPivots = candleData.map(candle => ({
+          h: candle.high,
+          l: candle.low,
+          c: candle.close,
+          v: candle.volume,
+          o: candle.open,
+          t: candle.timestamp
+        }));
+        
+        // Take the most recent candle for pivot calculation
+        const pivotType = indicator.pivotType || 'daily';
+        
+        if (candlesForPivots.length > 0) {
+          const pivotResult = calculatePivotPoints([candlesForPivots[0]], pivotType);
+          
+          if (pivotResult) {
+            const currentChart = {
+              minTime: candleData[0].timestamp,
+              maxTime: candleData[candleData.length - 1].timestamp
+            };
+            
+            // Generate horizontal line data for pivot and support/resistance levels
+            // A horizontal line requires just two points: the start and end time
+            
+            // Helper to create line data for a level
+            const createLevelLine = (value: number, levelName: string, color: string) => {
+              const lineData: LineData[] = [
+                { time: Math.floor(currentChart.minTime / 1000) as Time, value },
+                { time: Math.floor(currentChart.maxTime / 1000) as Time, value }
+              ];
+              
+              if (lineData.length > 0) {
+                newIndicatorData.push({
+                  id: `${indicator.id}-${levelName}`,
+                  type: `Pivot_${levelName}`,
+                  data: lineData,
+                  color: color
+                });
+              }
+            };
+            
+            // Pivot line (always shown)
+            createLevelLine(pivotResult.pivot, 'Pivot', '#FFFFFF');
+            
+            // Resistance levels
+            if (indicator.showR1 !== false) {
+              createLevelLine(pivotResult.r1, 'R1', '#FF6666');
+            }
+            
+            if (indicator.showR2 !== false) {
+              createLevelLine(pivotResult.r2, 'R2', '#FF3333');
+            }
+            
+            if (indicator.showR3 !== false) {
+              createLevelLine(pivotResult.r3, 'R3', '#FF0000');
+            }
+            
+            // Support levels
+            if (indicator.showS1 !== false) {
+              createLevelLine(pivotResult.s1, 'S1', '#66FF66');
+            }
+            
+            if (indicator.showS2 !== false) {
+              createLevelLine(pivotResult.s2, 'S2', '#33FF33');
+            }
+            
+            if (indicator.showS3 !== false) {
+              createLevelLine(pivotResult.s3, 'S3', '#00FF00');
+            }
           }
         }
       } else if (indicator.type === 'MACD' && indicator.fastPeriod && indicator.slowPeriod && indicator.signalPeriod) {

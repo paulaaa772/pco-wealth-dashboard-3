@@ -12,7 +12,7 @@ interface IndicatorModalProps {
 }
 
 // Define IndicatorType including all indicators
-type IndicatorType = 'SMA' | 'EMA' | 'RSI' | 'MACD' | 'Stochastic' | 'ATR' | 'ADX' | 'OBV' | 'Parabolic SAR';
+type IndicatorType = 'SMA' | 'EMA' | 'RSI' | 'MACD' | 'Stochastic' | 'ATR' | 'ADX' | 'OBV' | 'Parabolic SAR' | 'Pivot Points';
 
 interface IndicatorOption {
   type: IndicatorType;
@@ -72,6 +72,19 @@ const availableIndicators: IndicatorOption[] = [
     defaultParams: {
       initialAcceleration: 0.02,
       maxAcceleration: 0.2
+    }
+  },
+  {
+    type: 'Pivot Points',
+    label: 'Pivot Points',
+    defaultParams: {
+      pivotType: 'daily',
+      showR1: true,
+      showR2: true,
+      showR3: true,
+      showS1: true,
+      showS2: true,
+      showS3: true
     }
   },
 ];

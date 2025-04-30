@@ -11,5 +11,6 @@ export const indicatorDefinitions = [
   { name: 'ATR', create: createLineIndicator('atr') },
   { name: 'ADX', create: createLineIndicator('adx') },
   { name: 'OBV', create: createLineIndicator('obv') },
-  { name: 'Parabolic SAR', create: createLineIndicator('psar') }
+  { name: 'Parabolic SAR', create: createLineIndicator('psar') },
+  { name: 'Pivot Points', create: createLineIndicator('pivots') }
 ]
