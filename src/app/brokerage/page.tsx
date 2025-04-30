@@ -338,6 +338,8 @@ export interface ActiveIndicator {
   showPeriodIndicator?: boolean;
   // BBands specific (add later)
   stdDevMultiplier?: number;
+  color?: string; // Add color property
+  isVisible?: boolean; // Add visibility property
 }
 
 // Add type for indicator data to be passed to chart
@@ -385,7 +387,7 @@ export default function BrokeragePage() {
   // Add state for showIndicatorModal and activeIndicators
   const [showIndicatorModal, setShowIndicatorModal] = useState(false);
   const [activeIndicators, setActiveIndicators] = useState<ActiveIndicator[]>(() => {
-    // Initialize from localStorage if available, otherwise empty array
+    // Load active indicators from localStorage if available
     if (typeof window !== 'undefined') {
       const savedIndicators = localStorage.getItem('activeIndicators');
       return savedIndicators ? JSON.parse(savedIndicators) : [];
@@ -587,14 +589,9 @@ export default function BrokeragePage() {
     }
     
     // Load market data for new symbol
-    const startDate = new Date();
-    startDate.setMonth(startDate.getMonth() - 3); // 3 months of data
-    
-    loadMarketData(newSymbol);
+    loadMarketData(newSymbol, timeframe, candleInterval);
     
     // Reset other state related to previous symbol
-    setTimeframe('1D');
-    setCandleInterval('day');
     
     // Store in localStorage
     localStorage.setItem('selectedSymbol', newSymbol);
@@ -1839,6 +1836,150 @@ export default function BrokeragePage() {
     } catch (error) {
       console.error(`[Brokerage] Error closing position:`, error);
       alert('Error closing position. Please try again.');
+    }
+  };
+
+  // Update active indicators
+  const updateActiveIndicators = (indicators: ActiveIndicator[]) => {
+    setActiveIndicators(indicators);
+    // Save to localStorage
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('activeIndicators', JSON.stringify(indicators));
+    }
+  };
+
+  // Toggle indicator selection
+  const toggleIndicator = (indicatorType: string) => {
+    const updatedIndicators = [...activeIndicators];
+    const index = updatedIndicators.findIndex(ind => ind.type === indicatorType);
+    
+    if (index === -1) {
+      // Add indicator if it doesn't exist
+      const newId = `${indicatorType}-${Date.now()}`;
+      updatedIndicators.push({ 
+        id: newId,
+        type: indicatorType as any, // Cast to the union type defined in ActiveIndicator
+        isVisible: true, 
+        color: getRandomColor(),
+        period: getDefaultPeriodForIndicator(indicatorType)
+      });
+    } else {
+      // Remove indicator if it exists
+      updatedIndicators.splice(index, 1);
+    }
+    
+    setActiveIndicators(updatedIndicators);
+    localStorage.setItem('activeIndicators', JSON.stringify(updatedIndicators));
+  };
+
+  const toggleIndicatorVisibility = (indicatorId: string) => {
+    const updatedIndicators = [...activeIndicators];
+    const index = updatedIndicators.findIndex(ind => ind.id === indicatorId);
+    
+    if (index !== -1) {
+      updatedIndicators[index].isVisible = !updatedIndicators[index].isVisible;
+      setActiveIndicators(updatedIndicators);
+      localStorage.setItem('activeIndicators', JSON.stringify(updatedIndicators));
+    }
+  };
+
+  const changeIndicatorColor = (indicatorId: string, color: string) => {
+    const updatedIndicators = [...activeIndicators];
+    const index = updatedIndicators.findIndex(ind => ind.id === indicatorId);
+    
+    if (index !== -1) {
+      updatedIndicators[index].color = color;
+      setActiveIndicators(updatedIndicators);
+      localStorage.setItem('activeIndicators', JSON.stringify(updatedIndicators));
+    }
+  };
+
+  // Helper function to get default period based on indicator type
+  const getDefaultPeriodForIndicator = (indicatorType: string): number => {
+    switch (indicatorType) {
+      case 'SMA':
+      case 'EMA':
+        return 20;
+      case 'RSI':
+        return 14;
+      case 'MACD':
+        return 12; // This is the fast period
+      case 'Stochastic':
+        return 14; // This is the K period
+      case 'ATR':
+        return 14;
+      case 'ADX':
+        return 14;
+      case 'OBV':
+        return 20;
+      case 'AI Trend Prediction':
+        return 50; // Lookback period
+      case 'Neural Oscillator':
+        return 14;
+      case 'Adaptive MA':
+        return 10; // Min period
+      default:
+        return 14;
+    }
+  };
+
+  // Load saved indicator settings from localStorage on page load
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      // Load symbol from localStorage
+      const savedSymbol = localStorage.getItem('selectedSymbol');
+      if (savedSymbol) {
+        setSymbol(savedSymbol);
+      }
+      
+      // Load active indicators from localStorage
+      const savedIndicators = localStorage.getItem('activeIndicators');
+      if (savedIndicators) {
+        try {
+          const parsedIndicators = JSON.parse(savedIndicators);
+          setActiveIndicators(parsedIndicators);
+        } catch (error) {
+          console.error('Error parsing saved indicators:', error);
+        }
+      }
+    }
+  }, []);
+
+  // Helper function to generate random colors for indicators
+  const getRandomColor = () => {
+    const letters = '0123456789ABCDEF';
+    let color = '#';
+    for (let i = 0; i < 6; i++) {
+      color += letters[Math.floor(Math.random() * 16)];
+    }
+    return color;
+  };
+
+  const getDefaultPeriod = (type: string): number => {
+    switch (type) {
+      case 'SMA':
+      case 'EMA':
+        return 20;
+      case 'RSI':
+        return 14;
+      case 'MACD':
+        return 12; // This is the fast period
+      case 'Stochastic':
+        return 14; // This is the K period
+      case 'ATR':
+        return 14;
+      case 'ADX':
+        return 14;
+      case 'OBV':
+        return 20;
+      case 'AI Trend Prediction':
+        return 50; // Lookback period
+      case 'Neural Oscillator':
+        return 14;
+      case 'Adaptive MA':
+        return 10; // Min period
+      default:
+        return 14;
     }
   };
 
