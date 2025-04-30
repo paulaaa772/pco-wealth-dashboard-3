@@ -7,6 +7,7 @@ import TradingChart from '../../components/dashboard/TradingChart';
 import CongressTradingPanel from '../../components/brokerage/CongressTradingPanel';
 import BusinessInsiderTradingPanel from '../../components/brokerage/BusinessInsiderTradingPanel';
 import TradingInterface from '../../components/dashboard/TradingInterface';
+import PaperTradingPanel from '../../components/brokerage/PaperTradingPanel';
 import { Settings } from 'lucide-react'; // Using Settings icon for Indicators button
 import IndicatorModal from '@/components/brokerage/IndicatorModal'; // Import the new modal
 import { calculateSMA, calculateEMA, calculateRSI, calculateMACD, calculateStochastic, calculateATR, calculateADX, calculateOBV, calculateParabolicSAR, calculatePivotPoints, calculateIchimokuCloud } from '@/lib/trading-engine/indicators'; // Import indicators
@@ -375,7 +376,7 @@ export default function BrokeragePage() {
   const [isApiKeyValid, setIsApiKeyValid] = useState<boolean>(true);
   const [lastUpdateTime, setLastUpdateTime] = useState<Date>(new Date());
   const [refreshInterval, setRefreshInterval] = useState<number>(60); // seconds
-  const [activeTab, setActiveTab] = useState<'ai' | 'congress' | 'insiders'>('ai'); // Tab navigation state
+  const [activeTab, setActiveTab] = useState<'ai' | 'congress' | 'insiders' | 'paper'>('ai'); // Tab navigation state
   
   // Add state for showIndicatorModal and activeIndicators
   const [showIndicatorModal, setShowIndicatorModal] = useState(false);
@@ -1969,6 +1970,16 @@ export default function BrokeragePage() {
               >
                 Business Insider
               </button>
+              <button
+                className={`px-3 py-2 text-sm font-medium ${
+                  activeTab === 'paper' 
+                    ? 'text-blue-600 border-b-2 border-blue-600 dark:text-blue-400 dark:border-blue-400' 
+                    : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+                }`}
+                onClick={() => setActiveTab('paper')}
+              >
+                Paper Trading
+              </button>
             </div>
             {/* Tab content */}
             <div className="p-4 flex-grow overflow-auto">
@@ -2009,6 +2020,41 @@ export default function BrokeragePage() {
                 <BusinessInsiderTradingPanel 
                   symbol={symbol}
                   onCopyTrade={handleCopyInsiderTrade}
+                />
+              )}
+              {activeTab === 'paper' && (
+                <PaperTradingPanel
+                  symbol={symbol}
+                  positions={aiPositions}
+                  onNewPosition={(newPos: AIPosition) => setAiPositions(prev => [...prev, newPos])}
+                  onUpdatePosition={(posId: string, updatedPosition: Partial<AIPosition>) => {
+                    setAiPositions(prev => 
+                      prev.map(p => 
+                        p.id === posId 
+                          ? { ...p, ...updatedPosition }
+                          : p
+                      )
+                    );
+                  }}
+                  onClosePosition={(posId: string) => {
+                    const positionToClose = aiPositions.find(p => p.id === posId);
+                    if (!positionToClose) return; 
+                    const exitPrice = currentPrice || positionToClose.entryPrice; 
+                    let profit = 0;
+                    if (positionToClose.type === 'buy') {
+                      profit = (exitPrice - positionToClose.entryPrice) * positionToClose.quantity;
+                    } else { 
+                      profit = (positionToClose.entryPrice - exitPrice) * positionToClose.quantity;
+                    }
+                    console.log(`[BROKERAGE] Closing position ${posId}... Profit: ${profit.toFixed(2)}`);
+                    setAiPositions(prev => 
+                      prev.map(p => 
+                        p.id === posId 
+                          ? { ...p, status: 'closed', exitPrice: exitPrice, closeDate: new Date(), profit: parseFloat(profit.toFixed(2)) }
+                          : p
+                      )
+                    );
+                  }}
                 />
               )}
             </div>
