@@ -12,6 +12,7 @@ export interface ManualAsset {
   value: number;    // Current market value of this holding
   // Add cost basis if needed for performance calculations later
   costBasis?: number; 
+  assetType?: 'Stock' | 'Bond' | 'ETF' | 'Mutual Fund' | 'CD' | 'Crypto' | 'Cash' | 'Other'; // Type of security
 }
 
 // Represents a manually added account

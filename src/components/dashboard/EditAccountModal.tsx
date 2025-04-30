@@ -10,6 +10,7 @@ interface ManualAssetFormRow {
   quantity: string;
   value: string;
   costBasis?: string;
+  assetType?: string;
 }
 
 interface EditAccountModalProps {
@@ -36,7 +37,8 @@ const EditAccountModal: React.FC<EditAccountModalProps> = ({ isOpen, onClose, ac
         symbol: asset.symbol,
         quantity: asset.quantity.toString(),
         value: asset.value.toString(),
-        costBasis: asset.costBasis?.toString()
+        costBasis: asset.costBasis?.toString(),
+        assetType: asset.assetType || 'Stock'
       })));
     }
   }, [account]);
@@ -44,7 +46,7 @@ const EditAccountModal: React.FC<EditAccountModalProps> = ({ isOpen, onClose, ac
   if (!isOpen || !account) return null;
 
   const handleAddAssetRow = () => {
-    setAssets([...assets, { id: Date.now().toString(), symbol: '', quantity: '', value: '' }]);
+    setAssets([...assets, { id: Date.now().toString(), symbol: '', quantity: '', value: '', assetType: 'Stock' }]);
   };
 
   const handleAssetChange = (id: string, field: keyof Omit<ManualAssetFormRow, 'id'>, value: string) => {
@@ -61,7 +63,8 @@ const EditAccountModal: React.FC<EditAccountModalProps> = ({ isOpen, onClose, ac
         symbol: asset.symbol.trim() || 'Unknown Asset',
         quantity: parseFloat(asset.quantity) || 0,
         value: parseFloat(asset.value) || 0,
-        costBasis: asset.costBasis ? parseFloat(asset.costBasis) : undefined
+        costBasis: asset.costBasis ? parseFloat(asset.costBasis) : undefined,
+        assetType: asset.assetType as ManualAsset['assetType'] || 'Stock'
     })).filter(asset => asset.value > 0);
 
     if (!accountName.trim()) {
@@ -127,14 +130,28 @@ const EditAccountModal: React.FC<EditAccountModalProps> = ({ isOpen, onClose, ac
           <div className="border-t pt-4 mt-4">
              <h4 className="text-md font-medium text-gray-800 mb-2">Assets / Holdings</h4>
              {assets.map((asset, index) => (
-               <div key={asset.id} className="grid grid-cols-12 gap-2 mb-2 items-center">
+               <div key={asset.id} className="grid grid-cols-12 gap-2 mb-3 items-center">
                  <input 
                    type="text" 
                    placeholder="Symbol/Name" 
                    value={asset.symbol}
                    onChange={(e) => handleAssetChange(asset.id, 'symbol', e.target.value)}
-                   className="col-span-3 border border-gray-300 rounded px-2 py-1 text-sm text-gray-900"
+                   className="col-span-2 border border-gray-300 rounded px-2 py-1 text-sm text-gray-900"
                  />
+                 <select
+                   value={asset.assetType || 'Stock'}
+                   onChange={(e) => handleAssetChange(asset.id, 'assetType', e.target.value)}
+                   className="col-span-2 border border-gray-300 rounded px-2 py-1 text-sm text-gray-900 bg-white"
+                 >
+                   <option value="Stock">Stock</option>
+                   <option value="Bond">Bond</option>
+                   <option value="ETF">ETF</option>
+                   <option value="Mutual Fund">Mutual Fund</option>
+                   <option value="CD">CD</option>
+                   <option value="Crypto">Crypto</option>
+                   <option value="Cash">Cash</option>
+                   <option value="Other">Other</option>
+                 </select>
                  <input 
                    type="text" 
                    placeholder="Quantity" 
@@ -154,7 +171,7 @@ const EditAccountModal: React.FC<EditAccountModalProps> = ({ isOpen, onClose, ac
                      className="w-full border border-gray-300 rounded pl-6 pr-2 py-1 text-sm text-gray-900"
                    />
                  </div>
-                 <div className="col-span-3 relative rounded-md shadow-sm">
+                 <div className="col-span-2 relative rounded-md shadow-sm">
                    <div className="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none">
                      <span className="text-gray-500 sm:text-sm">$</span>
                    </div>

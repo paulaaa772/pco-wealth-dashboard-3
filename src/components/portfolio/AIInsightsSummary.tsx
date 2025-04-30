@@ -2,7 +2,7 @@
 
 import React, { useMemo } from 'react';
 import { useManualAccounts, ManualAccount } from '@/context/ManualAccountsContext';
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Lightbulb } from 'lucide-react'; // Icon
 
 // --- Helper functions & Data (Copied/adapted from other components) ---

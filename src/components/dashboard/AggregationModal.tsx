@@ -9,6 +9,7 @@ interface ManualAssetFormRow {
   symbol: string;
   quantity: string;
   value: string;
+  assetType?: string;
 }
 
 const AggregationModal: React.FC = () => {
@@ -16,14 +17,14 @@ const AggregationModal: React.FC = () => {
   const [view, setView] = useState<'options' | 'manual'>('options');
   const [accountName, setAccountName] = useState('');
   const [accountType, setAccountType] = useState('Brokerage');
-  const [assets, setAssets] = useState<ManualAssetFormRow[]>([{ id: Date.now().toString(), symbol: '', quantity: '', value: '' }]);
+  const [assets, setAssets] = useState<ManualAssetFormRow[]>([{ id: Date.now().toString(), symbol: '', quantity: '', value: '', assetType: 'Stock' }]);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
   if (!isModalOpen) return null;
 
   const handleAddAssetRow = () => {
-    setAssets([...assets, { id: Date.now().toString(), symbol: '', quantity: '', value: '' }]);
+    setAssets([...assets, { id: Date.now().toString(), symbol: '', quantity: '', value: '', assetType: 'Stock' }]);
   };
 
   const handleAssetChange = (id: string, field: keyof Omit<ManualAssetFormRow, 'id'>, value: string) => {
@@ -40,6 +41,7 @@ const AggregationModal: React.FC = () => {
         symbol: asset.symbol.trim() || 'Unknown Asset',
         quantity: parseFloat(asset.quantity) || 0,
         value: parseFloat(asset.value) || 0,
+        assetType: asset.assetType as ManualAsset['assetType'] || 'Stock',
     })).filter(asset => asset.value > 0);
 
     if (!accountName.trim()) {
@@ -61,7 +63,7 @@ const AggregationModal: React.FC = () => {
       });
       setAccountName('');
       setAccountType('Brokerage');
-      setAssets([{ id: Date.now().toString(), symbol: '', quantity: '', value: '' }]);
+      setAssets([{ id: Date.now().toString(), symbol: '', quantity: '', value: '', assetType: 'Stock' }]);
       setView('options');
       closeModal();
     } catch (err: any) {
@@ -135,20 +137,34 @@ const AggregationModal: React.FC = () => {
         <div className="border-t pt-4 mt-4">
            <h4 className="text-md font-medium text-gray-800 mb-2">Assets / Holdings</h4>
            {assets.map((asset, index) => (
-             <div key={asset.id} className="grid grid-cols-12 gap-2 mb-2 items-center">
+             <div key={asset.id} className="grid grid-cols-12 gap-2 mb-3 items-center">
                <input 
                  type="text" 
                  placeholder="Symbol/Name" 
                  value={asset.symbol}
                  onChange={(e) => handleAssetChange(asset.id, 'symbol', e.target.value)}
-                 className="col-span-4 border border-gray-300 rounded px-2 py-1 text-sm text-gray-900"
+                 className="col-span-3 border border-gray-300 rounded px-2 py-1 text-sm text-gray-900"
                />
+               <select
+                 value={asset.assetType || 'Stock'}
+                 onChange={(e) => handleAssetChange(asset.id, 'assetType', e.target.value)}
+                 className="col-span-2 border border-gray-300 rounded px-2 py-1 text-sm text-gray-900 bg-white"
+               >
+                 <option value="Stock">Stock</option>
+                 <option value="Bond">Bond</option>
+                 <option value="ETF">ETF</option>
+                 <option value="Mutual Fund">Mutual Fund</option>
+                 <option value="CD">CD</option>
+                 <option value="Crypto">Crypto</option>
+                 <option value="Cash">Cash</option>
+                 <option value="Other">Other</option>
+               </select>
                <input 
                  type="text" 
                  placeholder="Quantity" 
                  value={asset.quantity}
                  onChange={(e) => handleAssetChange(asset.id, 'quantity', e.target.value)}
-                 className="col-span-3 border border-gray-300 rounded px-2 py-1 text-sm text-gray-900"
+                 className="col-span-2 border border-gray-300 rounded px-2 py-1 text-sm text-gray-900"
                />
                <div className="col-span-4 relative rounded-md shadow-sm">
                  <div className="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none">

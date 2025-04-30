@@ -106,15 +106,28 @@ function getCorrelationColor(value: number): string {
     return 'bg-blue-700'; // Low or negative
 }
 
+// Add recommendation interface
+interface DiversificationRecommendation {
+  type: 'Critical' | 'Important' | 'Suggested';
+  recommendation: string;
+  rationale: string;
+}
+
 const DiversificationAnalysis: React.FC = () => {
   const { manualAccounts, isLoading } = useManualAccounts();
-  const diversificationScore = 78; // Keep as placeholder
-
-  // Calculate Sector Concentration & Geographic Distribution
-  const { sectorConcentration, geoDistribution, totalPortfolioValue } = useMemo(() => {
+  
+  // Calculate diversification metrics and score
+  const { 
+    sectorConcentration, 
+    geoDistribution, 
+    totalPortfolioValue, 
+    diversificationScore, 
+    recommendations 
+  } = useMemo(() => {
     const sectorMap: Record<string, number> = {};
     const geoMap: Record<string, number> = {};
     let currentTotalValue = 0;
+    const recs: DiversificationRecommendation[] = [];
 
     manualAccounts.forEach(account => {
         account.assets.forEach(asset => {
@@ -126,8 +139,15 @@ const DiversificationAnalysis: React.FC = () => {
         });
     });
 
-    if (currentTotalValue === 0) return { sectorConcentration: [], geoDistribution: [], totalPortfolioValue: 0 };
+    if (currentTotalValue === 0) return { 
+      sectorConcentration: [], 
+      geoDistribution: [], 
+      totalPortfolioValue: 0,
+      diversificationScore: 0,
+      recommendations: [] 
+    };
 
+    // Calculate sector concentration
     const calculatedConcentration: ConcentrationItem[] = Object.entries(sectorMap).map(([sector, value]) => {
         const weight = parseFloat(((value / currentTotalValue) * 100).toFixed(1));
         const benchmark = benchmarkSectorWeights[sector] || 0;
@@ -141,12 +161,76 @@ const DiversificationAnalysis: React.FC = () => {
         };
     }).sort((a, b) => b.weight - a.weight); // Sort by weight desc
 
+    // Calculate geographic distribution
     const calculatedGeo = Object.entries(geoMap).map(([name, value]) => ({
         name,
         value: parseFloat(((value / currentTotalValue) * 100).toFixed(1)),
     })).sort((a, b) => b.value - a.value);
-
-    return { sectorConcentration: calculatedConcentration, geoDistribution: calculatedGeo, totalPortfolioValue: currentTotalValue };
+    
+    // Generate diversification recommendations
+    const highConcentrationSectors = calculatedConcentration.filter(item => item.status === 'High Concentration');
+    
+    // Check for sector concentration issues
+    if (highConcentrationSectors.length > 0) {
+      const topSector = highConcentrationSectors[0];
+      recs.push({
+        type: 'Critical',
+        recommendation: `Reduce exposure to ${topSector.sector} sector`,
+        rationale: `${topSector.sector} represents ${topSector.weight.toFixed(1)}% of your portfolio, which is ${(topSector.weight - topSector.benchmark).toFixed(1)}% above benchmark.`
+      });
+    }
+    
+    // Check for geographic diversification
+    if (calculatedGeo.length > 0 && calculatedGeo[0].value > 85) {
+      recs.push({
+        type: 'Important',
+        recommendation: `Increase geographic diversification beyond ${calculatedGeo[0].name}`,
+        rationale: `${calculatedGeo[0].value.toFixed(1)}% of your portfolio is concentrated in ${calculatedGeo[0].name}.`
+      });
+    }
+    
+    // Check for number of assets
+    const uniqueAssets = new Set(manualAccounts.flatMap(a => a.assets.map(asset => asset.symbol))).size;
+    if (uniqueAssets < 10) {
+      recs.push({
+        type: 'Important',
+        recommendation: 'Increase the number of individual assets',
+        rationale: `Your portfolio contains only ${uniqueAssets} unique assets. Consider adding more for better diversification.`
+      });
+    }
+    
+    // Check for additional asset classes
+    const assetClassCount = new Set(Object.values(sectorMap).filter(v => v > 0)).size;
+    if (assetClassCount < 4) {
+      recs.push({
+        type: 'Suggested',
+        recommendation: 'Add exposure to more asset classes',
+        rationale: 'Adding uncorrelated asset classes can improve overall portfolio resilience.'
+      });
+    }
+    
+    // Calculate dynamic diversification score (0-100)
+    // Factors: sector concentration, geographic spread, number of assets, asset class diversity
+    const sectorScore = Math.min(100, Math.max(0, 100 - (highConcentrationSectors.length * 15))); // Deduct for each concentrated sector
+    const geoScore = Math.min(100, Math.max(0, 100 - Math.max(0, calculatedGeo[0]?.value - 65))); // Deduct for geographic concentration
+    const assetCountScore = Math.min(100, Math.max(0, uniqueAssets * 5)); // More assets = better score, up to 20
+    const assetClassScore = Math.min(100, Math.max(0, assetClassCount * 20)); // More asset classes = better score
+    
+    // Weighted average of scores (can adjust weights based on importance)
+    const calculatedScore = Math.round(
+      (sectorScore * 0.4) + 
+      (geoScore * 0.3) + 
+      (assetCountScore * 0.2) + 
+      (assetClassScore * 0.1)
+    );
+    
+    return { 
+      sectorConcentration: calculatedConcentration, 
+      geoDistribution: calculatedGeo, 
+      totalPortfolioValue: currentTotalValue,
+      diversificationScore: calculatedScore,
+      recommendations: recs
+    };
 
   }, [manualAccounts]);
 
@@ -155,6 +239,19 @@ const DiversificationAnalysis: React.FC = () => {
     return status === 'High Concentration' ? 
            <Badge className="bg-orange-600 hover:bg-orange-700 text-white text-xs">High</Badge> : 
            <Badge className="bg-green-600 hover:bg-green-700 text-white text-xs">Normal</Badge>;
+  };
+  
+  const getRecommendationBadge = (type: DiversificationRecommendation['type']) => {
+    switch (type) {
+      case 'Critical':
+        return <Badge className="bg-red-600 hover:bg-red-700 text-white text-xs">Critical</Badge>;
+      case 'Important':
+        return <Badge className="bg-yellow-500 hover:bg-yellow-600 text-white text-xs">Important</Badge>;
+      case 'Suggested':
+        return <Badge className="bg-blue-500 hover:bg-blue-600 text-white text-xs">Suggested</Badge>;
+      default:
+        return null;
+    }
   };
 
    if (isLoading) {
@@ -172,15 +269,49 @@ const DiversificationAnalysis: React.FC = () => {
     <div className="bg-[#2A3C61]/30 p-6 rounded-lg shadow-lg border border-gray-700 mt-6">
       <h3 className="text-xl font-semibold mb-4 text-gray-100">Diversification Analysis</h3>
 
-      {/* Diversification Score */}
+      {/* Diversification Score with dynamic calculation */}
       <div className="mb-6 text-center bg-[#1B2B4B]/60 p-4 rounded-lg">
           <h4 className="text-lg font-medium mb-2 text-gray-200">Overall Diversification Score</h4>
           <p className="text-4xl font-bold text-cyan-400">{diversificationScore}/100</p>
-          <p className="text-sm text-gray-400 mt-1">Measure of asset spread (Placeholder Score).</p>
+          <div className="w-full bg-gray-700 h-2 rounded-full mt-2">
+            <div 
+              className={`h-2 rounded-full ${
+                diversificationScore > 80 ? 'bg-green-500' : 
+                diversificationScore > 60 ? 'bg-cyan-500' : 
+                diversificationScore > 40 ? 'bg-yellow-500' : 
+                'bg-red-500'
+              }`} 
+              style={{ width: `${diversificationScore}%` }}
+            ></div>
+          </div>
+          <p className="text-sm text-gray-400 mt-2">
+            {diversificationScore > 80 ? 'Well-diversified portfolio' :
+             diversificationScore > 60 ? 'Moderately diversified portfolio' :
+             diversificationScore > 40 ? 'Portfolio needs diversification improvements' :
+             'Poorly diversified portfolio'}
+          </p>
       </div>
+      
+      {/* Diversification Recommendations */}
+      {recommendations.length > 0 && (
+        <div className="mb-6 border-t border-gray-700 pt-4">
+          <h4 className="text-lg font-medium mb-3 text-gray-200">Improvement Recommendations</h4>
+          {recommendations.map((rec, index) => (
+            <div key={index} className="mb-3 bg-[#1B2B4B]/60 p-3 rounded-lg border border-gray-700">
+              <div className="flex justify-between items-center mb-1">
+                <div className="flex items-center gap-2">
+                  {getRecommendationBadge(rec.type)}
+                  <h5 className="font-medium text-white">{rec.recommendation}</h5>
+                </div>
+              </div>
+              <p className="text-sm text-gray-400">{rec.rationale}</p>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Asset Correlation Heatmap Implementation */}
-      <div className="mb-6">
+      <div className="mb-6 border-t border-gray-700 pt-4">
         <h4 className="text-lg font-medium mb-3 text-gray-200">Asset Class Correlation (Illustrative)</h4>
          <div className="overflow-x-auto">
              <div className="inline-block min-w-full align-middle">
@@ -220,8 +351,16 @@ const DiversificationAnalysis: React.FC = () => {
         <h4 className="text-lg font-medium mb-3 text-gray-200">Sector Concentration Risk</h4>
          {sectorConcentration.map(item => (
             <div key={item.sector} className="flex justify-between items-center p-2 mb-1 bg-[#1B2B4B]/40 rounded text-sm">
-                <span className="text-gray-200 w-1/2 truncate" title={item.sector}>{item.sector}</span>
-                <div className="flex items-center gap-2">
+                <span className="text-gray-200 w-1/3 truncate" title={item.sector}>{item.sector}</span>
+                <div className="w-1/3 px-2">
+                  <div className="w-full bg-gray-700 rounded-full h-2.5">
+                    <div 
+                      className={`h-2.5 rounded-full ${item.status === 'High Concentration' ? 'bg-orange-500' : 'bg-green-500'}`}
+                      style={{ width: `${item.weight}%` }}
+                    ></div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 w-1/3 justify-end">
                     <span className="text-gray-100 w-12 text-right">{item.weight.toFixed(1)}%</span>
                     {getConcentrationBadge(item.status)}
                 </div>

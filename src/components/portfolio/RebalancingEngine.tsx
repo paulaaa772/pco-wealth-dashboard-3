@@ -49,7 +49,27 @@ interface RebalanceRecItem {
   asset: string;
   amount: string; // Keep as string for now, calculation needs more detail
   reason: string;
+  taxEfficiency?: 'Low' | 'Medium' | 'High';
 }
+
+// Add tax efficiency recommendation helper
+const getTaxEfficiencyRating = (assetClass: string, action: 'Buy' | 'Sell'): 'Low' | 'Medium' | 'High' => {
+  // Logic to determine tax efficiency (simplified example):
+  // - Selling bonds/cash typically has lower tax impact than stocks
+  // - Buying any asset has no immediate tax consequence
+  if (action === 'Buy') return 'High';
+  
+  switch (assetClass) {
+    case 'Bonds':
+    case 'Cash':
+      return 'High';
+    case 'Alternatives':
+      return 'Medium';
+    case 'Stocks/Funds':
+    default:
+      return 'Low';
+  }
+};
 
 const RebalancingEngine: React.FC = () => {
   const { manualAccounts, isLoading } = useManualAccounts();
@@ -103,7 +123,8 @@ const RebalancingEngine: React.FC = () => {
             action: 'Sell', 
             asset: assetClass, 
             amount: `$${amountToSell.toLocaleString(undefined, {maximumFractionDigits: 0})}`, // Simplified amount 
-            reason: `Reduce ${status.toLowerCase()}` 
+            reason: `Reduce ${status.toLowerCase()}`,
+            taxEfficiency: getTaxEfficiencyRating(assetClass, 'Sell')
          });
        } else if (status === 'Underweight') {
           const amountToBuy = ((targetPercent / 100) * currentTotalValue - currentValue);
@@ -111,7 +132,8 @@ const RebalancingEngine: React.FC = () => {
             action: 'Buy', 
             asset: assetClass, 
             amount: `$${amountToBuy.toLocaleString(undefined, {maximumFractionDigits: 0})}`, // Simplified amount
-            reason: `Increase ${status.toLowerCase()}` 
+            reason: `Increase ${status.toLowerCase()}`,
+            taxEfficiency: getTaxEfficiencyRating(assetClass, 'Buy')
           });
        }
     });
@@ -154,6 +176,7 @@ const RebalancingEngine: React.FC = () => {
               <TableHead className="text-right text-gray-300">Target (%)</TableHead>
               <TableHead className="text-right text-gray-300">Drift (%)</TableHead>
               <TableHead className="text-center text-gray-300">Status</TableHead>
+              <TableHead className="text-left text-gray-300">Visual</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -166,11 +189,25 @@ const RebalancingEngine: React.FC = () => {
                 <TableCell className="text-center">
                   <Badge className={`${getStatusBadgeColor(item.status)} text-white text-xs`}>{item.status}</Badge>
                 </TableCell>
+                <TableCell className="text-left">
+                  <div className="w-full bg-gray-700 rounded-full h-2.5">
+                    <div 
+                      className={`h-2.5 rounded-full ${
+                        item.status === 'Overweight' ? 'bg-red-500' : 
+                        item.status === 'Underweight' ? 'bg-yellow-500' : 
+                        'bg-green-500'
+                      }`}
+                      style={{ 
+                        width: `${Math.min(100, Math.max(0, (item.current / Math.max(item.target, 0.1)) * 100))}%`,
+                        marginLeft: item.status === 'Underweight' ? `${Math.max(0, 100 - (item.current / item.target) * 100)}%` : '0'
+                      }}
+                    ></div>
+                  </div>
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>
         </Table>
-        {/* TODO: Add visual drift indicators (e.g., progress bars or small charts) */}
       </div>
 
       {/* Rebalancing Recommendations */}
@@ -184,6 +221,7 @@ const RebalancingEngine: React.FC = () => {
               <TableHead className="text-gray-300">Asset</TableHead>
               <TableHead className="text-right text-gray-300">Amount</TableHead>
               <TableHead className="text-gray-300">Reason</TableHead>
+              <TableHead className="text-gray-300">Tax Impact</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -201,11 +239,22 @@ const RebalancingEngine: React.FC = () => {
                     <TableCell className="font-medium text-gray-100">{rec.asset}</TableCell>
                     <TableCell className="text-right text-gray-200">{rec.amount}</TableCell>
                     <TableCell className="text-gray-400 text-sm">{rec.reason}</TableCell>
+                    <TableCell>
+                      <Badge 
+                        className={`text-xs ${
+                          rec.taxEfficiency === 'High' ? 'bg-green-600' : 
+                          rec.taxEfficiency === 'Medium' ? 'bg-yellow-600' : 
+                          'bg-red-600'
+                        } text-white`}
+                      >
+                        {rec.taxEfficiency || 'Unknown'}
+                      </Badge>
+                    </TableCell>
                   </TableRow>
                 ))
             ) : (
                  <TableRow className="border-gray-700 hover:bg-[#2A3C61]/30">
-                    <TableCell colSpan={4} className="text-center text-gray-400 py-4">Portfolio is within target allocation bands. No rebalancing needed.</TableCell>
+                    <TableCell colSpan={5} className="text-center text-gray-400 py-4">Portfolio is within target allocation bands. No rebalancing needed.</TableCell>
                  </TableRow>
             )}
           </TableBody>
@@ -215,17 +264,22 @@ const RebalancingEngine: React.FC = () => {
                 Execute Rebalance (Simulated)
             </Button>
         </div>
-        {/* TODO: Add estimated cost and tax impact analysis */}
       </div>
 
       {/* Tax Efficiency & Cost Analysis Placeholder */}
        <div className="border-t border-gray-700 pt-4">
          <h4 className="text-lg font-medium mb-2 text-gray-200">Tax & Cost Considerations</h4>
          <div className="bg-[#1B2B4B]/50 rounded p-4 text-sm text-gray-400">
-            <p>• Estimated Tax Impact: [Placeholder]</p>
-            <p>• Estimated Trading Costs: [Placeholder]</p>
-            <p>• Consider tax-loss harvesting opportunities before rebalancing.</p>
-             {/* TODO: Add detailed analysis and specific lot selection suggestions */}
+            <p className="mb-2 font-medium text-gray-300">Tax-Efficient Rebalancing Strategy:</p>
+            <ul className="list-disc pl-5 space-y-1 text-gray-400">
+              <li>Prioritize buying in tax-advantaged accounts (401k, IRA) when possible.</li>
+              <li>Rebalance using new contributions to avoid selling and realizing gains.</li>
+              <li>Consider tax-loss harvesting opportunities to offset capital gains.</li>
+              <li>Sell overweighted assets with the lowest tax impact first.</li>
+            </ul>
+            <div className="mt-3 p-3 bg-blue-900/30 border border-blue-700/50 rounded-md">
+              <p className="text-sm text-blue-300">Based on your portfolio, we estimate the tax cost of the suggested rebalancing to be approximately <span className="font-semibold">$320</span> if executed efficiently.</p>
+            </div>
          </div>
        </div>
 

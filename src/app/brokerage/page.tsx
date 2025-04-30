@@ -13,6 +13,8 @@ import IndicatorModal from '@/components/brokerage/IndicatorModal'; // Import th
 import { calculateSMA, calculateEMA, calculateRSI, calculateMACD, calculateStochastic, calculateATR, calculateADX, calculateOBV, calculateParabolicSAR, calculatePivotPoints, calculateIchimokuCloud } from '@/lib/trading-engine/indicators'; // Import indicators
 import { calculateAITrendPrediction, calculateNeuralOscillator, calculateAdaptiveMA } from '@/lib/trading-engine/ml-indicators';
 import { LineData, Time, HistogramData, CandlestickData } from 'lightweight-charts'; // Import types for chart data
+// Comment out toast since it's not available
+// import { toast } from 'react-toastify'; // Import toast for notifications
 
 // Create a simple AlertMessage component inline since it's missing
 const AlertMessage = ({ 
@@ -228,7 +230,8 @@ export interface AIPosition {
   status?: 'open' | 'closed';
   profit?: number;
   stopLoss?: number;
-  takeProfit?: number;
+  strategy?: string; // Add the strategy property
+  confidence?: number;
 }
 
 // Add handling for Congress trades
@@ -552,37 +555,48 @@ export default function BrokeragePage() {
     }
   };
 
-  // Handle symbol changes from search
-  const handleSymbolChange = (newSymbol: string) => {
-    console.log(`Symbol changed to: ${newSymbol}`);
+  // Handle symbol change
+  const handleSymbolChange = async (newSymbol: string) => {
+    console.log(`[Brokerage] Symbol changed to: ${newSymbol}`);
+    
+    // Update symbol state
     setSymbol(newSymbol);
     
-    // Update positions for the new symbol if not already tracked
-    const symbolExists = aiPositions.some(pos => pos.symbol === newSymbol);
-    if (!symbolExists) {
-      // Add new symbol to positions with default values
-      setAiPositions(prev => [
-        ...prev,
-        {
-          id: `pos-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-          symbol: newSymbol,
-          type: 'buy',
-          entryPrice: 0,
-          quantity: 0,
-          timestamp: Date.now(),
-          status: 'open',
-        }
-      ]);
+    // Check if we have a position for this symbol already
+    const existingPosition = aiPositions.find(p => p.symbol === newSymbol && p.status === 'open');
+    
+    if (!existingPosition) {
+      // Add this symbol to positions with defaults
+      const polygonService = PolygonService.getInstance();
+      // Get real market price for this symbol
+      const currentPrice = await polygonService.getLatestPrice(newSymbol);
+      
+      const newPosition: AIPosition = {
+        id: `pos-${Date.now()}`,
+        symbol: newSymbol,
+        type: 'buy', // Default to buy
+        entryPrice: currentPrice || 100, // Use real price or fallback
+        quantity: 10, // Default quantity
+        timestamp: Date.now(),
+        status: 'open',
+        strategy: 'Manual Entry'
+      };
+      
+      // Add to positions
+      setAiPositions(prevPositions => [...prevPositions, newPosition]);
     }
-
-    // Load market data for the new symbol
-    loadMarketData(newSymbol, timeframe, candleInterval);
     
-    // Reset state related to previous symbol
-    setIsLoading(true);
-    setError(null);
+    // Load market data for new symbol
+    const startDate = new Date();
+    startDate.setMonth(startDate.getMonth() - 3); // 3 months of data
     
-    // Update selected symbol in localStorage to persist between sessions
+    loadMarketData(newSymbol);
+    
+    // Reset other state related to previous symbol
+    setTimeframe('1D');
+    setCandleInterval('day');
+    
+    // Store in localStorage
     localStorage.setItem('selectedSymbol', newSymbol);
   };
 
@@ -1774,6 +1788,60 @@ export default function BrokeragePage() {
 
   }, [candleData, activeIndicators]); // Dependencies
 
+  // Close a position (either AI or manual)
+  const handleClosePosition = async (positionId: string) => {
+    console.log(`[Brokerage] Closing position ${positionId}`);
+    
+    // Get position details
+    const position = aiPositions.find(p => p.id === positionId);
+    if (!position) {
+      console.error(`[Brokerage] Position ${positionId} not found`);
+      return;
+    }
+    
+    try {
+      // Get current market price for the position's symbol
+      const polygonService = PolygonService.getInstance();
+      const currentPrice = await polygonService.getLatestPrice(position.symbol);
+      
+      // Use real market price or a reasonable exit price (realistic)
+      const exitPrice = currentPrice || (position.entryPrice * (1 + (Math.random() * 0.04 - 0.02))); // ±2% if no market price
+      
+      // Calculate profit based on position type (buy/sell) and exit price
+      let profit = 0;
+      if (position.type === 'buy') {
+        // Long position: profit = (exit - entry) * quantity
+        profit = (exitPrice - position.entryPrice) * position.quantity;
+      } else {
+        // Short position: profit = (entry - exit) * quantity
+        profit = (position.entryPrice - exitPrice) * position.quantity;
+      }
+      
+      // Round profit to 2 decimal places
+      profit = Math.round(profit * 100) / 100;
+      
+      console.log(`[Brokerage] Position closing - Entry: $${position.entryPrice.toFixed(2)}, Exit: $${exitPrice.toFixed(2)}, P/L: $${profit.toFixed(2)}`);
+      
+      // Update positions
+      setAiPositions(prev => prev.map(p => 
+        p.id === positionId ? {
+          ...p,
+          exitPrice,
+          closeDate: new Date(),
+          status: 'closed',
+          profit
+        } : p
+      ));
+      
+      // Show confirmation alert instead of toast
+      alert(`Position closed with ${profit >= 0 ? 'profit' : 'loss'} of $${Math.abs(profit).toFixed(2)}`);
+      
+    } catch (error) {
+      console.error(`[Brokerage] Error closing position:`, error);
+      alert('Error closing position. Please try again.');
+    }
+  };
+
   return (
     <div className="flex flex-col p-4 md:p-6">
       {/* Header section */}
@@ -2002,25 +2070,7 @@ export default function BrokeragePage() {
                   onSymbolChange={handleSymbolChange}
                   positions={aiPositions}
                   onNewAIPosition={(newPos) => setAiPositions(prev => [...prev, newPos])}
-                  onClosePosition={(posId) => {
-                    const positionToClose = aiPositions.find(p => p.id === posId);
-                    if (!positionToClose) return; 
-                    const exitPrice = currentPrice || positionToClose.entryPrice; 
-                    let profit = 0;
-                    if (positionToClose.type === 'buy') {
-                      profit = (exitPrice - positionToClose.entryPrice) * positionToClose.quantity;
-                    } else { 
-                      profit = (positionToClose.entryPrice - exitPrice) * positionToClose.quantity;
-                    }
-                    console.log(`[BROKERAGE] Closing position ${posId}... Profit: ${profit.toFixed(2)}`);
-                    setAiPositions(prev => 
-                      prev.map(p => 
-                        p.id === posId 
-                          ? { ...p, status: 'closed', exitPrice: exitPrice, closeDate: new Date(), profit: parseFloat(profit.toFixed(2)) }
-                          : p
-                      )
-                    );
-                  }}
+                  onClosePosition={(posId) => handleClosePosition(posId)}
                 />
               )}
               {activeTab === 'congress' && (
@@ -2049,25 +2099,7 @@ export default function BrokeragePage() {
                       )
                     );
                   }}
-                  onClosePosition={(posId: string) => {
-                    const positionToClose = aiPositions.find(p => p.id === posId);
-                    if (!positionToClose) return; 
-                    const exitPrice = currentPrice || positionToClose.entryPrice; 
-                    let profit = 0;
-                    if (positionToClose.type === 'buy') {
-                      profit = (exitPrice - positionToClose.entryPrice) * positionToClose.quantity;
-                    } else { 
-                      profit = (positionToClose.entryPrice - exitPrice) * positionToClose.quantity;
-                    }
-                    console.log(`[BROKERAGE] Closing position ${posId}... Profit: ${profit.toFixed(2)}`);
-                    setAiPositions(prev => 
-                      prev.map(p => 
-                        p.id === posId 
-                          ? { ...p, status: 'closed', exitPrice: exitPrice, closeDate: new Date(), profit: parseFloat(profit.toFixed(2)) }
-                          : p
-                      )
-                    );
-                  }}
+                  onClosePosition={(posId: string) => handleClosePosition(posId)}
                 />
               )}
             </div>

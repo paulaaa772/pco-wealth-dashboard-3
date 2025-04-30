@@ -213,9 +213,9 @@ const RiskBasedAllocation: React.FC = () => {
                      formatter={(value: number, name: string) => [`${value}%`, name]}
                 />
                 {/* Frontier Curve */}
-                <Scatter name="Efficient Frontier" data={efficientFrontierData} fill="#8884d8" line={{ stroke: '#8884d8' }} shape="dot" />
+                <Scatter name="Efficient Frontier" data={efficientFrontierData} fill="#8884d8" line={{ stroke: '#8884d8' }} />
                 {/* Current Portfolio Point */}
-                <Scatter name="Current Portfolio" data={currentPortfolioPosition} fill="#FFC658" shape="star" size={100} />
+                <Scatter name="Current Portfolio" data={currentPortfolioPosition} fill="#FFC658" />
                  {/* TODO: Add Recommended Portfolio Point based on risk profile */}
             </ScatterChart>
          </ResponsiveContainer>

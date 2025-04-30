@@ -109,6 +109,11 @@ export default function TradingInterface({
   } | null>(null);
   const [showTradeDetails, setShowTradeDetails] = useState<boolean>(false);
 
+  // Add state for trade history page
+  const [tradeHistoryPage, setTradeHistoryPage] = useState<number>(1);
+  const [tradesPerPage, setTradesPerPage] = useState<number>(10);
+  const [showAllTrades, setShowAllTrades] = useState<boolean>(false);
+
   // Recalculate performance whenever the positions prop changes
   useEffect(() => {
       console.log("[TRADING UI] Positions prop updated, recalculating performance.");
@@ -510,6 +515,60 @@ export default function TradingInterface({
     }
   };
 
+  // Add function to export trade history
+  const exportTradeHistory = (format: 'csv' | 'json') => {
+    if (tradeProfitLoss.trades.length === 0) {
+      setErrorMessage('No trades to export');
+      return;
+    }
+    
+    try {
+      let data: string;
+      let filename: string;
+      let type: string;
+      
+      if (format === 'csv') {
+        // Generate CSV
+        const headers = 'Date,Symbol,Position,Entry Price,Exit Price,Quantity,P/L,Strategy,Confidence\n';
+        const rows = tradeProfitLoss.trades.map(trade => 
+          `${trade.date.toISOString()},${trade.symbol},${trade.type || ''},${trade.entryPrice || ''},${trade.exitPrice || ''},${trade.quantity || ''},${trade.pl},${(trade.strategy || '').replace(/,/g, ' ')},${trade.confidence || ''}`
+        ).join('\n');
+        
+        data = headers + rows;
+        filename = `trade_history_${new Date().toISOString().split('T')[0]}.csv`;
+        type = 'text/csv';
+      } else {
+        // Generate JSON
+        data = JSON.stringify(tradeProfitLoss.trades, null, 2);
+        filename = `trade_history_${new Date().toISOString().split('T')[0]}.json`;
+        type = 'application/json';
+      }
+      
+      // Create and download the file
+      const blob = new Blob([data], { type });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      
+      console.log(`[TRADING UI] Exported trade history in ${format.toUpperCase()} format`);
+    } catch (error) {
+      console.error('[TRADING UI] Error exporting trade history:', error);
+      setErrorMessage(`Failed to export trades in ${format.toUpperCase()} format`);
+    }
+  };
+
+  // Calculate pagination for trade history
+  const paginatedTrades = !showAllTrades
+    ? tradeProfitLoss.trades.slice((tradeHistoryPage - 1) * tradesPerPage, tradeHistoryPage * tradesPerPage)
+    : tradeProfitLoss.trades;
+  
+  const totalPages = Math.ceil(tradeProfitLoss.trades.length / tradesPerPage);
+
   return (
     <div className="bg-gray-900 rounded-lg p-4">
       <h2 className="text-2xl font-semibold text-white mb-4">AI Terminal</h2>
@@ -793,6 +852,24 @@ export default function TradingInterface({
       <div className="mb-4 bg-gray-800 rounded-lg p-3">
         <div className="flex justify-between items-center mb-2">
           <h3 className="text-sm font-medium text-gray-400">Profit/Loss Summary</h3>
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={() => exportTradeHistory('csv')}
+              className="px-2 py-1 text-xs rounded bg-blue-600 hover:bg-blue-700 text-white"
+              title="Export as CSV"
+              disabled={tradeProfitLoss.trades.length === 0}
+            >
+              Export CSV
+            </button>
+            <button
+              onClick={() => exportTradeHistory('json')}
+              className="px-2 py-1 text-xs rounded bg-blue-600 hover:bg-blue-700 text-white"
+              title="Export as JSON"
+              disabled={tradeProfitLoss.trades.length === 0}
+            >
+              Export JSON
+            </button>
+          </div>
         </div>
         <div className="grid grid-cols-3 gap-2 mb-2">
           <div className="bg-gray-700 rounded-md p-2">
@@ -811,21 +888,35 @@ export default function TradingInterface({
           </div>
         </div>
         
-        {/* Recent trades table - modified to make rows clickable */}
+        {/* Recent trades table - modified to show all trades with pagination */}
         {tradeProfitLoss.trades.length > 0 && (
           <div className="mt-2">
-            <div className="text-xs text-gray-400 mb-1">Recent Trade History (click for details)</div>
-            <div className="bg-gray-700 rounded-md max-h-32 overflow-y-auto">
+            <div className="flex justify-between items-center mb-1">
+              <div className="text-xs text-gray-400">Trade History (click for details)</div>
+              <div className="flex items-center space-x-2">
+                <button 
+                  onClick={() => setShowAllTrades(!showAllTrades)}
+                  className="text-xs text-blue-400 hover:text-blue-300"
+                >
+                  {showAllTrades ? 'Show Paginated' : 'Show All'}
+                </button>
+                <div className="text-xs text-gray-400">
+                  {tradeProfitLoss.trades.length} trades
+                </div>
+              </div>
+            </div>
+            <div className="bg-gray-700 rounded-md max-h-80 overflow-y-auto">
               <table className="w-full text-sm">
-                <thead className="text-xs text-gray-400 border-b border-gray-600">
+                <thead className="text-xs text-gray-400 border-b border-gray-600 sticky top-0 bg-gray-800">
                   <tr>
                     <th className="p-2 text-left">Date</th>
                     <th className="p-2 text-left">Symbol</th>
+                    <th className="p-2 text-left">Type</th>
                     <th className="p-2 text-right">P/L</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-600">
-                  {tradeProfitLoss.trades.slice(0, 5).map(trade => (
+                  {paginatedTrades.map(trade => (
                     <tr 
                       key={trade.id} 
                       className="cursor-pointer hover:bg-gray-600"
@@ -833,6 +924,11 @@ export default function TradingInterface({
                     >
                       <td className="p-2">{trade.date.toLocaleDateString()}</td>
                       <td className="p-2">{trade.symbol}</td>
+                      <td className="p-2">
+                        <span className={`${trade.type === 'buy' ? 'text-green-400' : 'text-red-400'}`}>
+                          {trade.type?.toUpperCase() || '-'}
+                        </span>
+                      </td>
                       <td className={`p-2 text-right ${trade.pl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                         ${trade.pl.toFixed(2)}
                       </td>
@@ -841,6 +937,39 @@ export default function TradingInterface({
                 </tbody>
               </table>
             </div>
+            
+            {/* Pagination controls - only show if not in 'show all' mode */}
+            {!showAllTrades && totalPages > 1 && (
+              <div className="flex justify-between items-center mt-2 text-xs text-gray-400">
+                <div>
+                  Page {tradeHistoryPage} of {totalPages}
+                </div>
+                <div className="flex space-x-2">
+                  <button
+                    onClick={() => setTradeHistoryPage(prev => Math.max(1, prev - 1))}
+                    disabled={tradeHistoryPage === 1}
+                    className={`px-2 py-1 rounded ${
+                      tradeHistoryPage === 1 
+                        ? 'bg-gray-700 text-gray-500 cursor-not-allowed' 
+                        : 'bg-gray-700 hover:bg-gray-600 text-white'
+                    }`}
+                  >
+                    Previous
+                  </button>
+                  <button
+                    onClick={() => setTradeHistoryPage(prev => Math.min(totalPages, prev + 1))}
+                    disabled={tradeHistoryPage === totalPages}
+                    className={`px-2 py-1 rounded ${
+                      tradeHistoryPage === totalPages 
+                        ? 'bg-gray-700 text-gray-500 cursor-not-allowed' 
+                        : 'bg-gray-700 hover:bg-gray-600 text-white'
+                    }`}
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
