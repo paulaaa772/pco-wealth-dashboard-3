@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { PolygonService, PolygonCandle } from '@/lib/market-data/PolygonService';
-import { format, parseISO, eachDayOfInterval, isValid, subDays, startOfDay } from 'date-fns';
+import { PolygonService } from '@/lib/market-data/PolygonService';
+import { format, parseISO, eachDayOfInterval, subDays, startOfDay } from 'date-fns';
 
 interface PortfolioAsset {
     symbol: string;
     quantity: number;
-    // value is not needed here, quantity is key
+    assetType?: string; // Add asset type to handle different securities differently
 }
 
 interface RequestBody {
@@ -38,49 +38,96 @@ export async function POST(request: NextRequest) {
 
         const polygonService = PolygonService.getInstance();
         const priceData: PriceData = {};
-        let earliestDataDate: Date | null = null;
-        let latestDataDate: Date | null = null;
+        
+        // Type-safe date tracking with definite initialization
+        let earliestDateFound = new Date(9999, 0, 1); // Initialize with far future date
+        let latestDateFound = new Date(1970, 0, 1);   // Initialize with far past date
+        let hasAnyData = false;
 
         console.log(`[API /historical-performance] Fetching data for ${assets.length} assets from ${startDate} to ${endDate}`);
 
         // Fetch candle data for all assets concurrently
         const candlePromises = assets.map(async (asset) => {
-            // Fetch slightly more data to handle missing start points better
-            const adjustedStartDate = format(subDays(parseISO(startDate), 7), 'yyyy-MM-dd');
-            const candles = await polygonService.getStockCandles(asset.symbol, adjustedStartDate, endDate, 'day', 1);
-            if (candles && candles.length > 0) {
-                priceData[asset.symbol] = {};
-                candles.forEach(candle => {
-                    const dateStr = format(new Date(candle.t), 'yyyy-MM-dd');
-                    priceData[asset.symbol][dateStr] = candle.c; // Store closing price
+            try {
+                // Fetch slightly more data to handle missing start points better
+                const adjustedStartDate = format(subDays(parseISO(startDate), 7), 'yyyy-MM-dd');
+                
+                // Use different timespan for bonds if available
+                const timespan = asset.assetType === 'Bond' ? 'day' : 'day';
+                
+                // Skip certain assets that might not have market data
+                if (asset.assetType === 'Cash' || asset.assetType === 'Other') {
+                    console.log(`[API /historical-performance] Skipping ${asset.symbol} (type: ${asset.assetType}) - using constant value`);
+                    // For cash or other, add a constant value
+                    const fromDateObj = parseISO(adjustedStartDate);
+                    const toDateObj = parseISO(endDate);
                     
-                    // Track overall date range
-                    const candleDate = startOfDay(new Date(candle.t));
-                    if (!earliestDataDate || candleDate < earliestDataDate) earliestDataDate = candleDate;
-                    if (!latestDataDate || candleDate > latestDataDate) latestDataDate = candleDate;
-                });
-                console.log(`[API /historical-performance] Fetched ${candles.length} candles for ${asset.symbol}`);
-            } else {
-                console.warn(`[API /historical-performance] No candle data returned for ${asset.symbol}`);
+                    const dayInterval = eachDayOfInterval({ start: fromDateObj, end: toDateObj });
+                    priceData[asset.symbol] = {};
+                    
+                    dayInterval.forEach(date => {
+                        const dateStr = format(date, 'yyyy-MM-dd');
+                        priceData[asset.symbol][dateStr] = 1; // Use price of 1 for each day
+                    });
+                    
+                    // Update date range
+                    if (fromDateObj < earliestDateFound) {
+                        earliestDateFound = fromDateObj;
+                    }
+                    if (toDateObj > latestDateFound) {
+                        latestDateFound = toDateObj;
+                    }
+                    
+                    hasAnyData = true;
+                    return;
+                }
+                
+                // For all other assets, fetch candles
+                const candles = await polygonService.getStockCandles(asset.symbol, adjustedStartDate, endDate, timespan, 1);
+                
+                if (candles && candles.length > 0) {
+                    hasAnyData = true;
+                    priceData[asset.symbol] = {};
+                    
+                    candles.forEach(candle => {
+                        const candleDate = startOfDay(new Date(candle.t));
+                        const dateStr = format(candleDate, 'yyyy-MM-dd');
+                        priceData[asset.symbol][dateStr] = candle.c; // Store closing price
+                        
+                        // Update date range
+                        if (candleDate < earliestDateFound) {
+                            earliestDateFound = candleDate;
+                        }
+                        if (candleDate > latestDateFound) {
+                            latestDateFound = candleDate;
+                        }
+                    });
+                    
+                    console.log(`[API /historical-performance] Fetched ${candles.length} candles for ${asset.symbol} (type: ${asset.assetType || 'unknown'})`);
+                } else {
+                    console.warn(`[API /historical-performance] No candle data returned for ${asset.symbol} (type: ${asset.assetType || 'unknown'})`);
+                }
+            } catch (err) {
+                console.error(`[API /historical-performance] Error fetching data for ${asset.symbol}:`, err);
             }
         });
 
-        await Promise.all(candlePromises);
+        await Promise.allSettled(candlePromises);
 
         // Check if any data was fetched
-        if (Object.keys(priceData).length === 0 || !earliestDataDate || !latestDataDate) {
+        if (!hasAnyData) {
             console.error('[API /historical-performance] Failed to fetch candle data for all requested assets.');
             return NextResponse.json({ error: 'Failed to fetch historical data for assets' }, { status: 500 });
         }
         
-        // Ensure date range starts from the requested start date, not just the earliest fetched data date
+        // Calculate final date range
         const requestedStartDate = startOfDay(parseISO(startDate));
-        const finalStartDate = earliestDataDate > requestedStartDate ? earliestDataDate : requestedStartDate;
+        const finalStartDate = earliestDateFound < requestedStartDate ? requestedStartDate : earliestDateFound;
 
-        console.log(`[API /historical-performance] Processing data from ${format(finalStartDate, 'yyyy-MM-dd')} to ${format(latestDataDate, 'yyyy-MM-dd')}`);
+        console.log(`[API /historical-performance] Processing data from ${format(finalStartDate, 'yyyy-MM-dd')} to ${format(latestDateFound, 'yyyy-MM-dd')}`);
 
         // Generate all dates in the interval
-        const dateInterval = eachDayOfInterval({ start: finalStartDate, end: latestDataDate });
+        const dateInterval = eachDayOfInterval({ start: finalStartDate, end: latestDateFound });
         const historicalValues: HistoricalValue[] = [];
         const lastKnownPrices: { [symbol: string]: number } = {};
 
@@ -91,6 +138,13 @@ export async function POST(request: NextRequest) {
             let dataFoundForDay = false;
 
             for (const asset of assets) {
+                // For cash assets, use quantity directly
+                if (asset.assetType === 'Cash') {
+                    dailyTotalValue += asset.quantity;
+                    dataFoundForDay = true;
+                    continue;
+                }
+                
                 let price = lastKnownPrices[asset.symbol]; // Start with last known price
 
                 // Update price if data exists for the current symbol and date
@@ -100,27 +154,27 @@ export async function POST(request: NextRequest) {
                     dataFoundForDay = true;
                 }
                 
-                 // Only add value if we have a price (either current or last known)
-                 if (price !== undefined) {
-                     dailyTotalValue += asset.quantity * price;
-                 }
+                // Only add value if we have a price (either current or last known)
+                if (price !== undefined) {
+                    dailyTotalValue += asset.quantity * price;
+                }
             }
 
             // Only add point if we had actual data for the day OR it's the first day with carry-over prices
             // And avoid adding points if the total value is zero (e.g., missing all prices)
-             if ((dataFoundForDay || historicalValues.length === 0) && dailyTotalValue > 0) {
-                 historicalValues.push({
+            if ((dataFoundForDay || historicalValues.length === 0) && dailyTotalValue > 0) {
+                historicalValues.push({
+                   date: dateStr,
+                   value: parseFloat(dailyTotalValue.toFixed(2)), // Round to 2 decimal places
+                });
+            } else if (!dataFoundForDay && historicalValues.length > 0) {
+                // If no new data, carry forward the previous day's value if available
+                const previousValue = historicalValues[historicalValues.length - 1].value;
+                historicalValues.push({
                     date: dateStr,
-                    value: parseFloat(dailyTotalValue.toFixed(2)), // Round to 2 decimal places
-                 });
-             } else if (!dataFoundForDay && historicalValues.length > 0) {
-                 // If no new data, carry forward the previous day's value if available
-                 const previousValue = historicalValues[historicalValues.length - 1].value;
-                 historicalValues.push({
-                     date: dateStr,
-                     value: previousValue
-                 });
-             }
+                    value: previousValue
+                });
+            }
         }
 
         console.log(`[API /historical-performance] Calculated ${historicalValues.length} historical data points`);

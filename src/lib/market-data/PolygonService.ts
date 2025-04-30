@@ -5,9 +5,22 @@ const generateMockCandles = (symbol: string, from: string, to: string) => {
   console.log(`[MOCK] Generating candles for ${symbol} from ${from} to ${to}`);
   
   const data = [];
+  // More realistic price points for common symbols
   const basePrice = symbol === 'AAPL' ? 180 : 
                    symbol === 'MSFT' ? 380 : 
-                   symbol === 'GOOG' ? 140 : 100;
+                   symbol === 'GOOG' ? 140 : 
+                   symbol === 'AMZN' ? 173 :
+                   symbol === 'TSLA' ? 190 :
+                   symbol === 'JPM' ? 186 :
+                   symbol === 'V' ? 273 :
+                   symbol === 'META' ? 481 :
+                   symbol === 'NVDA' ? 920 :
+                   symbol === 'BRK.B' ? 408 :
+                   symbol === 'SPY' ? 532 :
+                   symbol === 'QQQ' ? 433 :
+                   symbol === 'VTI' ? 252 :
+                   symbol === 'VOO' ? 488 :
+                   symbol === 'BND' ? 73 : 100;
   
   // Convert dates to timestamps
   const fromDate = new Date(from);
@@ -16,7 +29,27 @@ const generateMockCandles = (symbol: string, from: string, to: string) => {
   // Calculate number of days
   const daysDiff = Math.ceil((toDate.getTime() - fromDate.getTime()) / (1000 * 3600 * 24));
   
+  // Set trend based on symbol for more consistency
+  // Stocks generally up, bonds generally down/flat in recent market
+  let trendRate;
+  if (symbol.match(/^(BND|AGG|BOND|TLT)/)) {
+    // Bonds have been flat to slightly down
+    trendRate = -0.00005 + (Math.random() * 0.0001);
+  } else if (symbol.match(/^(AAPL|MSFT|GOOG|AMZN|NVDA|META)/)) {
+    // Big tech stocks have done well
+    trendRate = 0.0005 + (Math.random() * 0.0005);
+  } else if (symbol.match(/^(SPY|VOO|VTI|QQQ)/)) {
+    // Index funds have steady growth
+    trendRate = 0.0003 + (Math.random() * 0.0002);
+  } else {
+    // General stocks vary more
+    trendRate = 0.0001 + (Math.random() * 0.0006 - 0.0003);
+  }
+  
+  // Seed with sine wave for cyclical patterns
   let currentPrice = basePrice;
+  let seed = Math.random() * 1000; // Random starting point in the cycle
+  
   for (let i = 0; i < daysDiff; i++) {
     const date = new Date(fromDate);
     date.setDate(fromDate.getDate() + i);
@@ -24,26 +57,48 @@ const generateMockCandles = (symbol: string, from: string, to: string) => {
     // Skip weekends (simplified)
     if (date.getDay() === 0 || date.getDay() === 6) continue;
     
-    // Random price movement but trending slightly upward
-    const randomFactor = 0.98 + Math.random() * 0.04; // 0.98 to 1.02
-    currentPrice = currentPrice * randomFactor;
+    // Apply trend with realistic fluctuation
+    // Base daily movement on trend + sine wave + random noise
+    const cyclicalComponent = Math.sin(seed + i * 0.2) * 0.002; // Cyclical pattern
+    const randomNoise = (Math.random() - 0.5) * 0.003; // Random daily noise
+    const dailyReturn = trendRate + cyclicalComponent + randomNoise;
     
-    // Daily range is roughly 1-2% of price
-    const rangePercent = 0.01 + Math.random() * 0.01;
+    currentPrice = currentPrice * (1 + dailyReturn);
+    
+    // Daily range (more volatile for growth stocks, less for bonds/index)
+    let rangePercent;
+    if (symbol.match(/^(BND|AGG|BOND)/)) {
+      rangePercent = 0.001 + Math.random() * 0.002; // Low volatility
+    } else if (symbol.match(/^(TSLA|NVDA)/)) {
+      rangePercent = 0.01 + Math.random() * 0.02; // High volatility
+    } else {
+      rangePercent = 0.005 + Math.random() * 0.01; // Medium volatility
+    }
+    
     const range = currentPrice * rangePercent;
     
-    const open = currentPrice * (0.995 + Math.random() * 0.01);
+    const open = currentPrice * (0.997 + Math.random() * 0.006);
     const high = currentPrice + (range / 2) + Math.random() * (range / 2);
     const low = currentPrice - (range / 2) - Math.random() * (range / 2);
     const close = currentPrice;
     
+    // Volume also varies by stock type
+    let baseVolume;
+    if (symbol.match(/^(AAPL|MSFT|AMZN|TSLA|SPY)/)) {
+      baseVolume = 5000000 + Math.random() * 10000000; // High volume
+    } else if (symbol.match(/^(BND|AGG|BOND)/)) {
+      baseVolume = 200000 + Math.random() * 500000; // Low volume
+    } else {
+      baseVolume = 1000000 + Math.random() * 3000000; // Medium volume
+    }
+    
     data.push({
-      o: open,
-      h: high,
-      l: low,
-      c: close,
+      o: parseFloat(open.toFixed(2)),
+      h: parseFloat(high.toFixed(2)),
+      l: parseFloat(low.toFixed(2)),
+      c: parseFloat(close.toFixed(2)),
       t: date.getTime(),
-      v: Math.floor(1000000 + Math.random() * 5000000), // Volume between 1M and 6M
+      v: Math.floor(baseVolume),
     });
   }
   
