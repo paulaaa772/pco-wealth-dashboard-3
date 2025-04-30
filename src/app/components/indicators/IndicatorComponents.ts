@@ -8,5 +8,6 @@ export const indicatorDefinitions = [
   { name: 'Bollinger Bands', create: createBandIndicator('bbands') },
   { name: 'Volume', create: createVolumeIndicator() },
   { name: 'Stochastic', create: createLineIndicator('stochastic') },
-  { name: 'ATR', create: createLineIndicator('atr') }
+  { name: 'ATR', create: createLineIndicator('atr') },
+  { name: 'ADX', create: createLineIndicator('adx') }
 ]

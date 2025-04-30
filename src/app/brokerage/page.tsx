@@ -9,7 +9,7 @@ import BusinessInsiderTradingPanel from '../../components/brokerage/BusinessInsi
 import TradingInterface from '../../components/dashboard/TradingInterface';
 import { Settings } from 'lucide-react'; // Using Settings icon for Indicators button
 import IndicatorModal from '@/components/brokerage/IndicatorModal'; // Import the new modal
-import { calculateSMA, calculateEMA, calculateRSI, calculateMACD, calculateStochastic, calculateATR } from '@/lib/trading-engine/indicators'; // Import SMA, EMA, and RSI calculation
+import { calculateSMA, calculateEMA, calculateRSI, calculateMACD, calculateStochastic, calculateATR, calculateADX } from '@/lib/trading-engine/indicators'; // Import SMA, EMA, and RSI calculation
 import { LineData, Time, HistogramData, CandlestickData } from 'lightweight-charts'; // Import types for chart data
 
 // Create a simple AlertMessage component inline since it's missing
@@ -269,7 +269,7 @@ export interface InsiderTrade {
 // Define structure for active indicator configuration
 export interface ActiveIndicator {
   id: string; 
-  type: 'SMA' | 'EMA' | 'RSI' | 'MACD' | 'Stochastic' | 'ATR'; 
+  type: 'SMA' | 'EMA' | 'RSI' | 'MACD' | 'Stochastic' | 'ATR' | 'ADX'; 
   period?: number;
   // MACD specific
   fastPeriod?: number;
@@ -282,6 +282,8 @@ export interface ActiveIndicator {
   dPeriod?: number;
   showK?: boolean; // Flag to show %K line
   showD?: boolean; // Flag to show %D line
+  // ADX specific
+  showDI?: boolean; // Flag to show +DI and -DI lines
   // BBands specific (add later)
   stdDevMultiplier?: number;
 }
@@ -955,6 +957,86 @@ export default function BrokeragePage() {
         values = calculateATR(candlesForATR, indicator.period);
         alignmentOffset = candleData.length - values.length;
         color = '#FF4500'; // OrangeRed
+      } else if (indicator.type === 'ADX' && indicator.period) {
+        // Calculate ADX
+        const candlesForADX = candleData.map(candle => ({
+          h: candle.high,
+          l: candle.low,
+          c: candle.close,
+          v: candle.volume,
+          o: candle.open,
+          t: candle.timestamp
+        }));
+        
+        const adxResult = calculateADX(candlesForADX, indicator.period);
+        
+        if (adxResult) {
+          alignmentOffset = candleData.length - adxResult.adx.length;
+          labelPeriod = undefined;
+          
+          // ADX Line
+          const adxLineData = adxResult.adx.map((value, index) => {
+            const candleIndex = index + alignmentOffset;
+            if (candleIndex < 0 || candleIndex >= candleData.length) return null;
+            return { 
+              time: Math.floor(candleData[candleIndex].timestamp / 1000) as Time, 
+              value: parseFloat(value.toFixed(2)) 
+            };
+          }).filter((p): p is LineData => p !== null);
+          
+          if (adxLineData.length > 0) {
+            newIndicatorData.push({
+              id: `${indicator.id}-ADX`,
+              type: 'ADX',
+              data: adxLineData,
+              color: '#9370DB', // Medium Purple
+              pane: 1 // Display in separate pane
+            });
+          }
+          
+          // +DI and -DI Lines (if enabled)
+          if (indicator.showDI) {
+            // +DI Line
+            const plusDILineData = adxResult.plusDI.map((value, index) => {
+              const candleIndex = index + alignmentOffset;
+              if (candleIndex < 0 || candleIndex >= candleData.length) return null;
+              return { 
+                time: Math.floor(candleData[candleIndex].timestamp / 1000) as Time, 
+                value: parseFloat(value.toFixed(2)) 
+              };
+            }).filter((p): p is LineData => p !== null);
+            
+            if (plusDILineData.length > 0) {
+              newIndicatorData.push({
+                id: `${indicator.id}-PlusDI`,
+                type: 'ADX_PlusDI',
+                data: plusDILineData,
+                color: '#32CD32', // Lime Green
+                pane: 1 // Display in same pane as ADX
+              });
+            }
+            
+            // -DI Line
+            const minusDILineData = adxResult.minusDI.map((value, index) => {
+              const candleIndex = index + alignmentOffset;
+              if (candleIndex < 0 || candleIndex >= candleData.length) return null;
+              return { 
+                time: Math.floor(candleData[candleIndex].timestamp / 1000) as Time, 
+                value: parseFloat(value.toFixed(2)) 
+              };
+            }).filter((p): p is LineData => p !== null);
+            
+            if (minusDILineData.length > 0) {
+              newIndicatorData.push({
+                id: `${indicator.id}-MinusDI`,
+                type: 'ADX_MinusDI',
+                data: minusDILineData,
+                color: '#FF6347', // Tomato
+                pane: 1 // Display in same pane as ADX
+              });
+            }
+          }
+        }
       } else if (indicator.type === 'MACD' && indicator.fastPeriod && indicator.slowPeriod && indicator.signalPeriod) {
         const macdResult = calculateMACD(closingPrices, indicator.fastPeriod, indicator.slowPeriod, indicator.signalPeriod);
         if (macdResult) {

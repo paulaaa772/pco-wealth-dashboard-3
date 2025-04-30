@@ -11,8 +11,8 @@ interface IndicatorModalProps {
   onChange: (newIndicators: ActiveIndicator[]) => void;
 }
 
-// Define IndicatorType including MACD
-type IndicatorType = 'SMA' | 'EMA' | 'RSI' | 'MACD' | 'Stochastic' | 'ATR';
+// Define IndicatorType including all indicators
+type IndicatorType = 'SMA' | 'EMA' | 'RSI' | 'MACD' | 'Stochastic' | 'ATR' | 'ADX';
 
 interface IndicatorOption {
   type: IndicatorType;
@@ -20,7 +20,7 @@ interface IndicatorOption {
   defaultParams: Omit<ActiveIndicator, 'id' | 'type'>;
 }
 
-// Define available indicators including MACD
+// Define available indicators
 const availableIndicators: IndicatorOption[] = [
   { type: 'SMA', label: 'Simple Moving Average (SMA)', defaultParams: { period: 20 } },
   { type: 'EMA', label: 'Exponential Moving Average (EMA)', defaultParams: { period: 20 } },
@@ -51,6 +51,14 @@ const availableIndicators: IndicatorOption[] = [
     label: 'Average True Range (ATR)',
     defaultParams: {
       period: 14
+    }
+  },
+  {
+    type: 'ADX',
+    label: 'Average Directional Index (ADX)',
+    defaultParams: {
+      period: 14,
+      showDI: true
     }
   },
 ];
