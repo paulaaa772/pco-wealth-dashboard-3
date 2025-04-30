@@ -12,7 +12,7 @@ interface IndicatorModalProps {
 }
 
 // Define IndicatorType including MACD
-type IndicatorType = 'SMA' | 'EMA' | 'RSI' | 'MACD';
+type IndicatorType = 'SMA' | 'EMA' | 'RSI' | 'MACD' | 'Stochastic';
 
 interface IndicatorOption {
   type: IndicatorType;
@@ -35,6 +35,16 @@ const availableIndicators: IndicatorOption[] = [
       showSignal: true, // Default to showing signal
       showHistogram: true // Default to showing histogram
     } 
+  },
+  {
+    type: 'Stochastic',
+    label: 'Stochastic Oscillator',
+    defaultParams: {
+      kPeriod: 14,
+      dPeriod: 3,
+      showK: true,
+      showD: true
+    }
   },
 ];
 
@@ -166,7 +176,7 @@ const IndicatorModal: React.FC<IndicatorModalProps> = ({
                      <Trash2 size={16} />
                   </button>
                 </div>
-                {/* Parameter Inputs - Updated for MACD toggles */}
+                {/* Parameter Inputs - Updated for indicator specific fields */}
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm mt-2">
                    {/* Period Input (SMA, EMA, RSI) */}
                    {(ind.type === 'SMA' || ind.type === 'EMA' || ind.type === 'RSI') && ind.period !== undefined && (
@@ -232,6 +242,51 @@ const IndicatorModal: React.FC<IndicatorModalProps> = ({
                             />
                            <label htmlFor={`${ind.id}-showHisto`} className="text-gray-600 dark:text-gray-400">Show Histogram</label>
                         </div>
+                     </>
+                   )}
+                   {/* Stochastic Inputs */}
+                   {ind.type === 'Stochastic' && (
+                     <>
+                       <div className="flex items-center gap-1">
+                          <label htmlFor={`${ind.id}-kperiod`} className="text-gray-600 dark:text-gray-400">K Period:</label>
+                          <input 
+                            type="number" id={`${ind.id}-kperiod`} min="1"
+                            value={ind.kPeriod || ''} 
+                            onChange={(e) => handleParamChange(ind.id, 'kPeriod', e.target.value)}
+                            className="w-16 border border-gray-300 dark:border-zinc-600 rounded px-2 py-1 text-sm text-gray-900 dark:text-white bg-white dark:bg-zinc-700"
+                          />
+                       </div>
+                       <div className="flex items-center gap-1">
+                          <label htmlFor={`${ind.id}-dperiod`} className="text-gray-600 dark:text-gray-400">D Period:</label>
+                          <input 
+                            type="number" id={`${ind.id}-dperiod`} min="1"
+                            value={ind.dPeriod || ''} 
+                            onChange={(e) => handleParamChange(ind.id, 'dPeriod', e.target.value)}
+                            className="w-16 border border-gray-300 dark:border-zinc-600 rounded px-2 py-1 text-sm text-gray-900 dark:text-white bg-white dark:bg-zinc-700"
+                          />
+                       </div>
+                       {/* Toggle for K Line */} 
+                       <div className="flex items-center gap-1">
+                          <input 
+                             type="checkbox" 
+                             id={`${ind.id}-showK`}
+                             checked={!!ind.showK} 
+                             onChange={(e) => handleParamChange(ind.id, 'showK', e.target.checked)}
+                             className="h-4 w-4 rounded text-indigo-600 focus:ring-indigo-500 border-gray-300 dark:border-zinc-600 dark:bg-zinc-700 dark:checked:bg-indigo-500"
+                            />
+                           <label htmlFor={`${ind.id}-showK`} className="text-gray-600 dark:text-gray-400">Show %K Line</label>
+                       </div>
+                       {/* Toggle for D Line */} 
+                       <div className="flex items-center gap-1">
+                          <input 
+                             type="checkbox" 
+                             id={`${ind.id}-showD`}
+                             checked={!!ind.showD} 
+                             onChange={(e) => handleParamChange(ind.id, 'showD', e.target.checked)}
+                             className="h-4 w-4 rounded text-indigo-600 focus:ring-indigo-500 border-gray-300 dark:border-zinc-600 dark:bg-zinc-700 dark:checked:bg-indigo-500"
+                           />
+                           <label htmlFor={`${ind.id}-showD`} className="text-gray-600 dark:text-gray-400">Show %D Line</label>
+                       </div>
                      </>
                    )}
                 </div>

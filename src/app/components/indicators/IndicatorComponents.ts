@@ -6,5 +6,6 @@ export const indicatorDefinitions = [
   { name: 'RSI', create: createLineIndicator('rsi') },
   { name: 'MACD', create: createLineIndicator('macd') },
   { name: 'Bollinger Bands', create: createBandIndicator('bbands') },
-  { name: 'Volume', create: createVolumeIndicator() }
+  { name: 'Volume', create: createVolumeIndicator() },
+  { name: 'Stochastic', create: createLineIndicator('stochastic') }
 ]

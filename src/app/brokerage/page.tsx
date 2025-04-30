@@ -9,7 +9,7 @@ import BusinessInsiderTradingPanel from '../../components/brokerage/BusinessInsi
 import TradingInterface from '../../components/dashboard/TradingInterface';
 import { Settings } from 'lucide-react'; // Using Settings icon for Indicators button
 import IndicatorModal from '@/components/brokerage/IndicatorModal'; // Import the new modal
-import { calculateSMA, calculateEMA, calculateRSI, calculateMACD } from '@/lib/trading-engine/indicators'; // Import SMA, EMA, and RSI calculation
+import { calculateSMA, calculateEMA, calculateRSI, calculateMACD, calculateStochastic } from '@/lib/trading-engine/indicators'; // Import SMA, EMA, and RSI calculation
 import { LineData, Time, HistogramData, CandlestickData } from 'lightweight-charts'; // Import types for chart data
 
 // Create a simple AlertMessage component inline since it's missing
@@ -269,7 +269,7 @@ export interface InsiderTrade {
 // Define structure for active indicator configuration
 export interface ActiveIndicator {
   id: string; 
-  type: 'SMA' | 'EMA' | 'RSI' | 'MACD'; 
+  type: 'SMA' | 'EMA' | 'RSI' | 'MACD' | 'Stochastic'; 
   period?: number;
   // MACD specific
   fastPeriod?: number;
@@ -277,6 +277,11 @@ export interface ActiveIndicator {
   signalPeriod?: number;
   showSignal?: boolean; // Flag to show MACD Signal line
   showHistogram?: boolean; // Flag to show MACD Histogram
+  // Stochastic specific
+  kPeriod?: number;
+  dPeriod?: number;
+  showK?: boolean; // Flag to show %K line
+  showD?: boolean; // Flag to show %D line
   // BBands specific (add later)
   stdDevMultiplier?: number;
 }
@@ -284,7 +289,7 @@ export interface ActiveIndicator {
 // Add type for indicator data to be passed to chart
 export interface IndicatorData {
   id: string;        
-  type: 'SMA' | 'EMA' | 'RSI' | 'MACD' | 'MACD_Signal' | 'MACD_Histogram'; // Add MACD sub-types
+  type: string; // Use string type to accept all indicator types and subtypes 
   data: LineData[] | HistogramData[]; // Allow HistogramData for histogram
   color?: string;    
   period?: number;   
@@ -993,6 +998,69 @@ export default function BrokeragePage() {
                     pane: 1 
                   });
               }
+          }
+        }
+      } else if (indicator.type === 'Stochastic' && indicator.kPeriod && indicator.dPeriod) {
+        // Calculate Stochastic oscillator
+        const stochasticResult = calculateStochastic(
+          candleData.map(candle => ({
+            h: candle.high,
+            l: candle.low,
+            c: candle.close,
+            v: candle.volume,
+            o: candle.open,
+            t: candle.timestamp
+          })), 
+          indicator.kPeriod, 
+          indicator.dPeriod
+        );
+        
+        if (stochasticResult) {
+          alignmentOffset = candleData.length - stochasticResult.percentK.length;
+          labelPeriod = undefined;
+          
+          // %K Line (faster, more sensitive line)
+          if (indicator.showK !== false) {
+            const kLineData = stochasticResult.percentK.map((value, index) => {
+              const candleIndex = index + alignmentOffset;
+              if (candleIndex < 0 || candleIndex >= candleData.length) return null;
+              return { 
+                time: Math.floor(candleData[candleIndex].timestamp / 1000) as Time, 
+                value: parseFloat(value.toFixed(2)) 
+              };
+            }).filter((p): p is LineData => p !== null);
+            
+            if (kLineData.length > 0) {
+              newIndicatorData.push({
+                id: `${indicator.id}-K`,
+                type: 'Stochastic_K',
+                data: kLineData,
+                color: '#1E90FF', // Dodger Blue
+                pane: 1 // Display in separate pane
+              });
+            }
+          }
+          
+          // %D Line (slower, smoother signal line)
+          if (indicator.showD !== false) {
+            const dLineData = stochasticResult.percentD.map((value, index) => {
+              const candleIndex = index + alignmentOffset;
+              if (candleIndex < 0 || candleIndex >= candleData.length) return null;
+              return { 
+                time: Math.floor(candleData[candleIndex].timestamp / 1000) as Time, 
+                value: parseFloat(value.toFixed(2)) 
+              };
+            }).filter((p): p is LineData => p !== null);
+            
+            if (dLineData.length > 0) {
+              newIndicatorData.push({
+                id: `${indicator.id}-D`,
+                type: 'Stochastic_D',
+                data: dLineData,
+                color: '#FF8C00', // Dark Orange
+                pane: 1 // Display in separate pane
+              });
+            }
           }
         }
       }
