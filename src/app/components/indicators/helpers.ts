@@ -1,4 +1,4 @@
-import { IChartApi, DeepPartial, HistogramStyleOptions, SeriesOptionsCommon } from 'lightweight-charts'
+import { IChartApi, DeepPartial, HistogramStyleOptions, SeriesOptionsCommon, LineStyle } from 'lightweight-charts'
 
 export const createLineIndicator = (type: string) => (chart: IChartApi, data: any[]) => {
   const series = chart.addLineSeries({
@@ -63,4 +63,79 @@ export const createVolumeIndicator = () => (chart: IChartApi, data: any[]) => {
 
   series.setData(points)
   return series
+}
+
+// ML Indicators
+export const createMLIndicator = (type: string) => (chart: IChartApi, data: any[]) => {
+  let series = null;
+  
+  if (type === 'ai_trend') {
+    // Main prediction line
+    series = chart.addLineSeries({
+      color: '#8884d8', // Purple
+      lineWidth: 2,
+    });
+    
+    // Forecast with dashed style
+    const forecastSeries = chart.addLineSeries({
+      color: '#F1025E', // Pink
+      lineWidth: 2,
+      lineStyle: LineStyle.Dashed,
+    });
+    
+    const mainPoints = data.filter(d => !d.isForecast).map(d => ({
+      time: d.time,
+      value: d.value
+    }));
+    
+    const forecastPoints = data.filter(d => d.isForecast).map(d => ({
+      time: d.time,
+      value: d.value
+    }));
+    
+    series.setData(mainPoints);
+    if (forecastPoints.length > 0) {
+      forecastSeries.setData(forecastPoints);
+      return [series, forecastSeries];
+    }
+    
+  } else if (type === 'neural_osc') {
+    // Create a separate pane for the oscillator
+    series = chart.addLineSeries({
+      color: '#00BFFF', // Sky blue
+      lineWidth: 2,
+      priceScaleId: 'neural-scale',
+    });
+    
+    series.priceScale().applyOptions({
+      scaleMargins: {
+        top: 0.1,
+        bottom: 0.1,
+      },
+      autoScale: true,
+    });
+    
+    const points = data.map(d => ({
+      time: d.time,
+      value: d.value
+    }));
+    
+    series.setData(points);
+    
+  } else if (type === 'adaptive_ma') {
+    // Main MA line
+    series = chart.addLineSeries({
+      color: '#FF6EC7', // Pink
+      lineWidth: 2,
+    });
+    
+    const points = data.map(d => ({
+      time: d.time,
+      value: d.value
+    }));
+    
+    series.setData(points);
+  }
+  
+  return series;
 }

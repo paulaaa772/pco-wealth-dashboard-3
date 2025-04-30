@@ -1,4 +1,4 @@
-import { createLineIndicator, createBandIndicator, createVolumeIndicator } from './helpers'
+import { createLineIndicator, createBandIndicator, createVolumeIndicator, createMLIndicator } from './helpers'
 
 export const indicatorDefinitions = [
   { name: 'SMA', create: createLineIndicator('sma') },
@@ -15,7 +15,7 @@ export const indicatorDefinitions = [
   { name: 'Pivot Points', create: createLineIndicator('pivots') },
   { name: 'Ichimoku Cloud', create: createBandIndicator('ichimoku') },
   // Machine Learning Indicators
-  { name: 'AI Trend Prediction', create: createLineIndicator('ai_trend') },
-  { name: 'Neural Oscillator', create: createLineIndicator('neural_osc') },
-  { name: 'Adaptive MA', create: createLineIndicator('adaptive_ma') }
+  { name: 'AI Trend Prediction', create: createMLIndicator('ai_trend') },
+  { name: 'Neural Oscillator', create: createMLIndicator('neural_osc') },
+  { name: 'Adaptive MA', create: createMLIndicator('adaptive_ma') }
 ]
