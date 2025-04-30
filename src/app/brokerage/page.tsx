@@ -228,6 +228,7 @@ export interface AIPosition {
   status?: 'open' | 'closed';
   profit?: number;
   stopLoss?: number;
+  takeProfit?: number;
 }
 
 // Add handling for Congress trades
