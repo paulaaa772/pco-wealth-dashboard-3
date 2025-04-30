@@ -6,7 +6,7 @@ import SidebarLayout from './components/SidebarLayout'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'S&P Wealth Dashboard',
+  title: 'FINANCIAL ENGINE',
   description: 'AI-Powered Long-Term Wealth Building Dashboard',
 }
 

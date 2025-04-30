@@ -1,4 +1,4 @@
-# S&P Wealth Dashboard
+# FINANCIAL ENGINE
 
 AI-Powered Long-Term Wealth Building Dashboard for analyzing stocks and market data.
 

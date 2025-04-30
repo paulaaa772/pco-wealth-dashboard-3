@@ -24,7 +24,7 @@ export default function SidebarLayout({ children }: { children: React.ReactNode 
         <nav className="w-64 bg-[#2A3C61] p-6">
           <div className="space-y-6">
             <div>
-              <h2 className="text-xl font-semibold text-white">S&P Wealth</h2>
+              <h2 className="text-xl font-semibold text-white">FINANCIAL ENGINE</h2>
             </div>
             <div className="space-y-1">
               {tabs.map((tab) => (
