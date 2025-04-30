@@ -390,11 +390,241 @@ export default function BrokeragePage() {
   // Empty implementation of missing functions to make the build pass
   const [successMessage, setSuccessMessage] = useState<string>('');
   
-  const loadMarketData = async (symbol?: string, timeframe?: string, interval?: string, isAutoRefresh?: boolean) => {
-    console.log('Market data loading not implemented');
-    setIsLoading(false);
-    // Mock implementation to prevent build errors
+  const loadMarketData = async (symbolToLoad = symbol, tf = timeframe, interval = candleInterval, isAutoRefresh = false) => {
+    console.log(`[MARKET DATA] Loading data for ${symbolToLoad}, timeframe: ${tf}, interval: ${interval}`);
+    
+    if (!isAutoRefresh) {
+      setIsLoading(true);
+    }
+    
+    try {
+      // Get polygon service
+      const polygonService = PolygonService.getInstance();
+      
+      // Determine date range based on timeframe
+      const endDate = new Date();
+      const startDate = new Date();
+      
+      // Set the appropriate start date based on selected timeframe
+      switch (tf) {
+        case '1D':
+          startDate.setDate(endDate.getDate() - 1);
+          break;
+        case '5D':
+          startDate.setDate(endDate.getDate() - 5);
+          break;
+        case '1M':
+          startDate.setMonth(endDate.getMonth() - 1);
+          break;
+        case '3M':
+          startDate.setMonth(endDate.getMonth() - 3);
+          break;
+        case 'YTD':
+          startDate.setMonth(0);
+          startDate.setDate(1);
+          break;
+        case '1Y':
+          startDate.setFullYear(endDate.getFullYear() - 1);
+          break;
+        case '5Y':
+          startDate.setFullYear(endDate.getFullYear() - 5);
+          break;
+        case 'ALL':
+          startDate.setFullYear(endDate.getFullYear() - 20); // Maximum history
+          break;
+        default:
+          startDate.setDate(endDate.getDate() - 1); // Default to 1D
+      }
+      
+      const formattedStartDate = startDate.toISOString().split('T')[0];
+      const formattedEndDate = endDate.toISOString().split('T')[0];
+      
+      console.log(`[MARKET DATA] Fetching from ${formattedStartDate} to ${formattedEndDate}, interval: ${interval}`);
+      
+      // Fetch candle data
+      const candles = await polygonService.getStockCandles(
+        symbolToLoad,
+        formattedStartDate,
+        formattedEndDate,
+        interval
+      );
+      
+      if (candles && candles.length > 0) {
+        console.log(`[MARKET DATA] Received ${candles.length} candles for ${symbolToLoad}`);
+        
+        // Get latest price
+        const latestPrice = candles[candles.length - 1].c;
+        setCurrentPrice(latestPrice);
+        
+        // Format candles for the chart
+        const formattedCandles = candles.map(candle => ({
+          time: candle.t / 1000, // Convert from milliseconds to seconds for chart
+          open: candle.o,
+          high: candle.h,
+          low: candle.l,
+          close: candle.c,
+          volume: candle.v
+        }));
+        
+        setCandleData(formattedCandles);
+        
+        // Calculate indicators based on new data
+        if (activeIndicators.length > 0) {
+          calculateIndicators(formattedCandles, activeIndicators);
+        }
+      } else {
+        console.warn(`[MARKET DATA] No candle data received for ${symbolToLoad}`);
+        setCandleData([]);
+      }
+    } catch (error) {
+      console.error('[MARKET DATA] Error fetching market data:', error);
+      setError(`Failed to load market data for ${symbolToLoad}. ${error}`);
+      setCandleData([]);
+    } finally {
+      setIsLoading(false);
+    }
+    
     return Promise.resolve();
+  };
+  
+  // Calculate indicators based on candle data
+  const calculateIndicators = (candles: CandleData[], indicators: ActiveIndicator[]) => {
+    if (!candles || candles.length === 0) return;
+    
+    console.log(`[INDICATORS] Calculating ${indicators.length} indicators`);
+    const newIndicatorData: IndicatorData[] = [];
+    
+    // Get closing prices array for traditional indicators
+    const closePrices = candles.map(candle => candle.close);
+    
+    // Process each active indicator
+    indicators.forEach(indicator => {
+      try {
+        switch (indicator.type) {
+          case 'SMA':
+            if (indicator.period) {
+              const smaData = calculateSMA(closePrices, indicator.period);
+              
+              // Map the SMA data back to the time points from candles
+              const mappedSMA = smaData.map((value, index) => {
+                const i = candles.length - smaData.length + index;
+                return {
+                  time: candles[i >= 0 ? i : 0].time as Time,
+                  value
+                };
+              });
+              
+              newIndicatorData.push({
+                id: indicator.id,
+                type: 'SMA',
+                data: mappedSMA,
+                color: indicator.color || '#2962FF',
+                period: indicator.period
+              });
+            }
+            break;
+          case 'EMA':
+            if (indicator.period) {
+              const emaData = calculateEMA(closePrices, indicator.period);
+              
+              // Map the EMA data back to the time points from candles
+              const mappedEMA = emaData.map((value, index) => {
+                const i = candles.length - emaData.length + index;
+                return {
+                  time: candles[i >= 0 ? i : 0].time as Time,
+                  value
+                };
+              });
+              
+              newIndicatorData.push({
+                id: indicator.id,
+                type: 'EMA',
+                data: mappedEMA,
+                color: indicator.color || '#C74864',
+                period: indicator.period
+              });
+            }
+            break;
+          case 'MACD':
+            if (indicator.fastPeriod && indicator.slowPeriod && indicator.signalPeriod) {
+              const macdResult = calculateMACD(
+                closePrices, 
+                indicator.fastPeriod, 
+                indicator.slowPeriod, 
+                indicator.signalPeriod
+              );
+              
+              if (macdResult) {
+                const { macdLine, signalLine, histogram } = macdResult;
+                
+                // Map MACD Line to time points
+                const mappedMACDLine = macdLine.map((value, index) => {
+                  const i = candles.length - macdLine.length + index;
+                  return {
+                    time: candles[i >= 0 ? i : 0].time as Time,
+                    value
+                  };
+                });
+                
+                // MACD Line
+                newIndicatorData.push({
+                  id: `${indicator.id}-line`,
+                  type: 'MACD',
+                  data: mappedMACDLine,
+                  color: indicator.color || '#2962FF',
+                  period: indicator.slowPeriod
+                });
+                
+                // Signal Line
+                if (indicator.showSignal) {
+                  const mappedSignalLine = signalLine.map((value, index) => {
+                    const i = candles.length - signalLine.length + index;
+                    return {
+                      time: candles[i >= 0 ? i : 0].time as Time,
+                      value
+                    };
+                  });
+                  
+                  newIndicatorData.push({
+                    id: `${indicator.id}-signal`,
+                    type: 'MACD',
+                    data: mappedSignalLine,
+                    color: '#FF6D00',
+                    isSignalLine: true
+                  });
+                }
+                
+                // Histogram
+                if (indicator.showHistogram && histogram) {
+                  const mappedHistogram = histogram.map((value, index) => {
+                    const i = candles.length - histogram.length + index;
+                    return {
+                      time: candles[i >= 0 ? i : 0].time as Time,
+                      value,
+                      color: value >= 0 ? '#26A69A' : '#EF5350'
+                    };
+                  });
+                  
+                  newIndicatorData.push({
+                    id: `${indicator.id}-histogram`,
+                    type: 'MACD',
+                    data: mappedHistogram,
+                    isHistogram: true,
+                    pane: 1 // Display in a separate pane
+                  });
+                }
+              }
+            }
+            break;
+          // Add other indicators as needed
+        }
+      } catch (error) {
+        console.error(`[INDICATORS] Error calculating indicator ${indicator.type}:`, error);
+      }
+    });
+    
+    console.log(`[INDICATORS] Calculated ${newIndicatorData.length} indicator datasets`);
+    setIndicatorChartData(newIndicatorData);
   };
   
   const initializeSampleOrders = () => {
@@ -470,7 +700,7 @@ export default function BrokeragePage() {
     }
   }, [refreshInterval, storedRefreshInterval, setRefreshInterval]);
 
-  // WebSocket Connection Logic
+  // Enhance the WebSocket Connection Logic
   useEffect(() => {
     // Don't connect if API key is invalid or missing
     if (!isApiKeyValid || !apiKey) {
@@ -500,6 +730,14 @@ export default function BrokeragePage() {
         if (ws.current?.readyState === WebSocket.OPEN) {
           ws.current.send(JSON.stringify({ action: 'subscribe', params: `T.${symbol}` }));
           console.log(`[WS] Subscribed to trades for ${symbol}`);
+          
+          // Also subscribe to quotes for more frequent updates
+          ws.current.send(JSON.stringify({ action: 'subscribe', params: `Q.${symbol}` }));
+          console.log(`[WS] Subscribed to quotes for ${symbol}`);
+          
+          // Subscribe to minute aggregates (candles) for real-time chart updates
+          ws.current.send(JSON.stringify({ action: 'subscribe', params: `AM.${symbol}` }));
+          console.log(`[WS] Subscribed to minute aggregates for ${symbol}`);
         } else {
           console.error('[WS] WebSocket not open when trying to subscribe');
         }
@@ -520,7 +758,7 @@ export default function BrokeragePage() {
             }
             
             // Check for subscription acknowledgments
-            if (message.ev === 'status' && message.status === 'success' && message.message.includes('subscribed')) {
+            if (message.ev === 'status' && message.status === 'success' && message.message && message.message.includes('subscribed')) {
               console.log(`[WS] ${message.message}`);
             }
             
@@ -532,10 +770,56 @@ export default function BrokeragePage() {
                 setCurrentPrice(message.p);
               }
             }
-             // Handle other message types if needed (e.g., status messages)
-             else if (message.ev === 'status') {
-                 console.log(`[WS] Status message: ${message.message}`);
-             }
+            
+            // Check if it's a quote event ('Q')
+            else if (message.ev === 'Q') {
+              console.log(`[WS] Quote received for ${message.sym}: ask $${message.ap}, bid $${message.bp}`);
+              // Update current price state with average of ask and bid
+              if (message.sym === symbol) {
+                const midPrice = (message.ap + message.bp) / 2;
+                setCurrentPrice(midPrice);
+              }
+            }
+            
+            // Check if it's a minute aggregate event ('AM')
+            else if (message.ev === 'AM') {
+              console.log(`[WS] Minute aggregate received for ${message.sym}: o=${message.o}, h=${message.h}, l=${message.l}, c=${message.c}`);
+              if (message.sym === symbol) {
+                // Add new candle to the chart data
+                setCandleData(prev => {
+                  // Create a new candle
+                  const newCandle: CandleData = {
+                    time: message.s / 1000, // Start time in seconds
+                    open: message.o,
+                    high: message.h,
+                    low: message.l,
+                    close: message.c,
+                    volume: message.v
+                  };
+                  
+                  // Check if we already have this candle (same timestamp)
+                  const existingIndex = prev.findIndex(c => c.time === newCandle.time);
+                  
+                  if (existingIndex >= 0) {
+                    // Update existing candle
+                    const updatedCandles = [...prev];
+                    updatedCandles[existingIndex] = newCandle;
+                    return updatedCandles;
+                  } else {
+                    // Add new candle
+                    return [...prev, newCandle];
+                  }
+                });
+                
+                // Update current price
+                setCurrentPrice(message.c);
+              }
+            }
+            
+            // Handle other message types if needed (e.g., status messages)
+            else if (message.ev === 'status') {
+              console.log(`[WS] Status message: ${message.message}`);
+            }
           });
         }
       } catch (error) {
