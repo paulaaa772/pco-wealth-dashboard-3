@@ -14,7 +14,7 @@ import { useManualAccounts } from '@/context/ManualAccountsContext';
 import AssetAllocation from '@/components/portfolio/AssetAllocation';
 import EnhancedPerformanceAnalytics from '@/components/portfolio/EnhancedPerformanceAnalytics';
 import GoalTrackingDashboard from '@/components/portfolio/GoalTrackingDashboard';
-import TaxAnalyticsDashboard from '@/components/portfolio/TaxAnalyticsDashboard';
+import TaxCenter from '@/components/portfolio/TaxCenter';
 import PortfolioOptimizationTools from '@/components/portfolio/PortfolioOptimizationTools';
 import ESGSustainabilityMetrics from '@/components/portfolio/ESGSustainabilityMetrics';
 import AIFeatures from '@/components/portfolio/AIFeatures';
@@ -145,7 +145,7 @@ export default function PortfolioPage() {
         {activeTab === 'goals' && <GoalTrackingDashboard />}
         
         {/* Tax Tab */}
-        {activeTab === 'tax' && <TaxAnalyticsDashboard />}
+        {activeTab === 'tax' && <TaxCenter />}
         
         {/* Optimization Tab */}
         {activeTab === 'optimization' && (
