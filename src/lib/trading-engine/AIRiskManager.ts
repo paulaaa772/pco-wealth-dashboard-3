@@ -705,10 +705,14 @@ export class AIRiskManager {
         // For short positions, if price has moved down, adjust stop downward
         if (currentPrice < entryPrice) {
           const trailingDistance = atr * this.stopLossSettings.atrMultiplier;
-          const newStopLevel = currentPrice + trailingDistance;
+          // Calculate new stop level - ensure it's not too far from current price
+          const newStopLevel = Math.min(
+            currentPrice + trailingDistance,
+            entryPrice * 1.2 // Cap at 20% above entry price as safety measure
+          );
           
           // Only move stop down, never up
-          if (currentStopLoss === 0 || newStopLevel < currentStopLoss) {
+          if (currentStopLoss === 0 || (newStopLevel < currentStopLoss && newStopLevel > currentPrice)) {
             updatedPosition.stopLoss = newStopLevel;
           }
         }
