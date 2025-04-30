@@ -15,6 +15,9 @@ import { calculateAITrendPrediction, calculateNeuralOscillator, calculateAdaptiv
 import { LineData, Time, HistogramData, CandlestickData } from 'lightweight-charts'; // Import types for chart data
 // Comment out toast since it's not available
 // import { toast } from 'react-toastify'; // Import toast for notifications
+import { usePersistentStore } from '@/hooks/usePersistentStore'; // Import persistent store
+import { v4 as uuidv4 } from 'uuid';
+import { AIPosition } from '@/lib/trading-engine/types'; // Import AIPosition from types
 
 // Create a simple AlertMessage component inline since it's missing
 const AlertMessage = ({ 
@@ -192,49 +195,6 @@ const OrderEntryPanel = dynamic(() => import('../../components/brokerage/OrderEn
 const OrderBook = dynamic(() => import('../../components/brokerage/OrderBook'), { ssr: false });
 const TradeHistory = dynamic(() => import('../../components/brokerage/TradeHistory'), { ssr: false });
 
-// Stock data interfaces
-export interface CandleData {
-  timestamp: number;
-  open: number;
-  high: number;
-  low: number;
-  close: number;
-  volume: number;
-}
-
-export interface ChartDataPoint {
-  date: string;
-  value: number;
-}
-
-// Order and position interfaces
-export interface ManualOrder {
-  id: string;
-  symbol: string;
-  type: 'buy' | 'sell';
-  quantity: number;
-  price: number;
-  timestamp: number;
-  status: 'open' | 'filled' | 'canceled';
-}
-
-export interface AIPosition {
-  id: string;
-  symbol: string;
-  type: 'buy' | 'sell';
-  entryPrice: number;
-  quantity: number;
-  timestamp: number;
-  exitPrice?: number;
-  closeDate?: Date;
-  status?: 'open' | 'closed';
-  profit?: number;
-  stopLoss?: number;
-  takeProfit?: number;
-  strategy?: string; // Add the strategy property
-  confidence?: number;
-}
-
 // Add handling for Congress trades
 export interface CongressTrade {
   id: number;
@@ -356,46 +316,120 @@ export interface IndicatorData {
   pane?: number; // To plot histogram on a separate pane (e.g., 1)
 }
 
+// Let's define and export ManualOrder at the beginning before the component
+export interface ManualOrder {
+  id: string;
+  symbol: string;
+  action: 'buy' | 'sell';
+  type: 'market' | 'limit' | 'stop';
+  quantity: number;
+  price?: number;
+  status: 'open' | 'filled' | 'cancelled';
+  timestamp: string;
+  expiryDate?: string;
+  notes?: string;
+}
+
+// Also define CandleData if needed
+export interface CandleData {
+  time: number;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume?: number;
+}
+
 export default function BrokeragePage() {
+  // Use values from the persistent store
+  const {
+    selectedSymbol,
+    timeframe: storedTimeframe,
+    candleInterval: storedCandleInterval,
+    activeIndicators: storedIndicators,
+    activeTab: storedActiveTab,
+    refreshInterval: storedRefreshInterval,
+    manualOrders: storedManualOrders,
+    aiPositions: storedPositions,
+    setSymbol,
+    setTimeframe,
+    setCandleInterval,
+    setActiveIndicators,
+    setActiveTab,
+    setRefreshInterval,
+    addManualOrder,
+    updateManualOrder,
+    addAIPosition: addPositionToStore,
+    updateAIPosition: updatePositionInStore,
+    closeAIPosition
+  } = usePersistentStore();
+
+  // Local state for UI and processing
+  const [symbol, setLocalSymbol] = useState<string>(selectedSymbol || 'AAPL');
+  const [timeframe, setLocalTimeframe] = useState<string>(storedTimeframe || '1D');
+  const [candleInterval, setLocalCandleInterval] = useState<string>(storedCandleInterval || 'day');
+  const [activeIndicators, setLocalActiveIndicators] = useState<ActiveIndicator[]>(storedIndicators || []);
+  const [activeTab, setLocalActiveTab] = useState<'ai' | 'congress' | 'insiders' | 'paper'>(storedActiveTab || 'ai');
+  const [refreshInterval, setLocalRefreshInterval] = useState<number>(storedRefreshInterval || 60);
+  const [manualOrders, setLocalManualOrders] = useState<ManualOrder[]>(storedManualOrders || []);
+  const [positions, setLocalPositions] = useState<AIPosition[]>(storedPositions || []);
+
   // State for stock data
-  const [symbol, setSymbol] = useState(() => {
-    // Use localStorage value if available, otherwise default to 'AAPL'
-    if (typeof window !== 'undefined') {
-      const savedSymbol = localStorage.getItem('selectedSymbol');
-      return savedSymbol || 'AAPL';
-    }
-    return 'AAPL';
-  });
-  const [timeframe, setTimeframe] = useState('1D');
-  const [candleInterval, setCandleInterval] = useState('day'); // State for candle interval (day, minute, etc.)
   const [candleData, setCandleData] = useState<CandleData[]>([]);
   const [currentPrice, setCurrentPrice] = useState<number>(0);
   const ws = useRef<WebSocket | null>(null);
-  const apiKey = process.env.NEXT_PUBLIC_POLYGON_API_KEY; // Get API key
-  
-  // Orders and positions
-  const [manualOrders, setManualOrders] = useState<ManualOrder[]>([]);
-  const [aiPositions, setAiPositions] = useState<AIPosition[]>([]);
+  const apiKey = process.env.NEXT_PUBLIC_POLYGON_API_KEY;
   
   // UI state
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [isApiKeyValid, setIsApiKeyValid] = useState<boolean>(true);
   const [lastUpdateTime, setLastUpdateTime] = useState<Date>(new Date());
-  const [refreshInterval, setRefreshInterval] = useState<number>(60); // seconds
-  const [activeTab, setActiveTab] = useState<'ai' | 'congress' | 'insiders' | 'paper'>('ai'); // Tab navigation state
+  const [indicatorChartData, setIndicatorChartData] = useState<IndicatorData[]>([]);
   
-  // Add state for showIndicatorModal and activeIndicators
-  const [showIndicatorModal, setShowIndicatorModal] = useState(false);
-  const [activeIndicators, setActiveIndicators] = useState<ActiveIndicator[]>(() => {
-    // Load active indicators from localStorage if available
-    if (typeof window !== 'undefined') {
-      const savedIndicators = localStorage.getItem('activeIndicators');
-      return savedIndicators ? JSON.parse(savedIndicators) : [];
+  // Initialize sample data only if none exists in the store
+  useEffect(() => {
+    if (manualOrders.length === 0) {
+      initializeSampleOrders();
     }
-    return [];
-  });
-  const [indicatorChartData, setIndicatorChartData] = useState<IndicatorData[]>([]); // State for calculated indicator data
+  }, [manualOrders]);
+
+  // Sync local state with persistent store
+  useEffect(() => {
+    if (symbol !== selectedSymbol) {
+      setSymbol(symbol);
+    }
+  }, [symbol, selectedSymbol, setSymbol]);
+
+  useEffect(() => {
+    if (timeframe !== storedTimeframe) {
+      setTimeframe(timeframe);
+    }
+  }, [timeframe, storedTimeframe, setTimeframe]);
+
+  useEffect(() => {
+    if (candleInterval !== storedCandleInterval) {
+      setCandleInterval(candleInterval);
+    }
+  }, [candleInterval, storedCandleInterval, setCandleInterval]);
+
+  useEffect(() => {
+    if (JSON.stringify(activeIndicators) !== JSON.stringify(storedIndicators)) {
+      setActiveIndicators(activeIndicators);
+    }
+  }, [activeIndicators, storedIndicators, setActiveIndicators]);
+
+  useEffect(() => {
+    if (activeTab !== storedActiveTab) {
+      setActiveTab(activeTab);
+    }
+  }, [activeTab, storedActiveTab, setActiveTab]);
+
+  useEffect(() => {
+    if (refreshInterval !== storedRefreshInterval) {
+      setRefreshInterval(refreshInterval);
+    }
+  }, [refreshInterval, storedRefreshInterval, setRefreshInterval]);
 
   // WebSocket Connection Logic
   useEffect(() => {
@@ -502,7 +536,7 @@ export default function BrokeragePage() {
 
   // Load initial data when page loads
   useEffect(() => {
-    console.log('Brokerage page initialized');
+    console.log('Brokerage page initialized with persistent state');
     
     // First, check if API key is configured
     verifyApiKey();
@@ -511,9 +545,6 @@ export default function BrokeragePage() {
     if (symbol) {
       loadMarketData(symbol, timeframe, candleInterval);
     }
-
-    // Add sample orders for demo
-    initializeSampleOrders();
     
     // Start auto-refresh timer
     const interval = setInterval(() => {
@@ -525,45 +556,7 @@ export default function BrokeragePage() {
     }, refreshInterval * 1000);
     
     return () => clearInterval(interval);
-  }, [refreshInterval]);
-
-  // Initialize sample orders and positions
-  const initializeSampleOrders = () => {
-    const now = Date.now();
-    
-    setManualOrders([
-      {
-        id: '1',
-        symbol: 'AAPL',
-        type: 'buy',
-        quantity: 10,
-        price: 175.23,
-        timestamp: now - 3600000,
-        status: 'filled'
-      },
-      {
-        id: '2',
-        symbol: 'AAPL',
-        type: 'sell',
-        quantity: 5,
-        price: 178.45,
-        timestamp: now - 1800000,
-        status: 'open'
-      }
-    ]);
-
-    setAiPositions([
-      {
-        id: '1',
-        symbol: 'AAPL',
-        type: 'buy',
-        entryPrice: 170.45,
-        quantity: 15,
-        timestamp: now - 86400000,
-        status: 'open',
-      }
-    ]);
-  };
+  }, [refreshInterval, timeframe, candleInterval]);
 
   // Verify the API key
   const verifyApiKey = async () => {
@@ -587,70 +580,6 @@ export default function BrokeragePage() {
     }
   };
 
-  // Handle symbol change
-  const handleSymbolChange = async (newSymbol: string) => {
-    console.log(`[Brokerage] Symbol changed to: ${newSymbol}`);
-    
-    // Update symbol state
-    setSymbol(newSymbol);
-    
-    // Check if we have a position for this symbol already
-    const existingPosition = aiPositions.find(p => p.symbol === newSymbol && p.status === 'open');
-    
-    if (!existingPosition) {
-      // Add this symbol to positions with defaults
-      const polygonService = PolygonService.getInstance();
-      // Get real market price for this symbol
-      const currentPrice = await polygonService.getLatestPrice(newSymbol);
-      
-      const newPosition: AIPosition = {
-        id: `pos-${Date.now()}`,
-        symbol: newSymbol,
-        type: 'buy', // Default to buy
-        entryPrice: currentPrice || 100, // Use real price or fallback
-        quantity: 10, // Default quantity
-        timestamp: Date.now(),
-        status: 'open',
-        strategy: 'Manual Entry'
-      };
-      
-      // Add to positions
-      setAiPositions(prevPositions => [...prevPositions, newPosition]);
-    }
-    
-    // Load market data for new symbol
-    loadMarketData(newSymbol, timeframe, candleInterval);
-    
-    // Reset other state related to previous symbol
-    
-    // Store in localStorage
-    localStorage.setItem('selectedSymbol', newSymbol);
-  };
-
-  // Handle timeframe changes
-  const handleTimeframeChange = useCallback((newTimeframe: string) => {
-    console.log('Timeframe changed to:', newTimeframe);
-    setTimeframe(newTimeframe);
-    setIsLoading(true);
-    // Pass current interval when changing timeframe
-    loadMarketData(symbol, newTimeframe, candleInterval);
-  }, [symbol, candleInterval]); // Add candleInterval dependency
-
-  // Handle interval changes
-  const handleIntervalChange = useCallback((newInterval: string) => {
-    console.log('Interval changed to:', newInterval);
-    setCandleInterval(newInterval);
-    setIsLoading(true);
-    // Pass current timeframe when changing interval
-    loadMarketData(symbol, timeframe, newInterval);
-  }, [symbol, timeframe]); // Add timeframe dependency
-
-  // Set the refresh interval
-  const handleRefreshIntervalChange = (seconds: number) => {
-    console.log(`Setting refresh interval to ${seconds} seconds`);
-    setRefreshInterval(seconds);
-  };
-
   // Handle manual refresh button click
   const handleManualRefresh = () => {
     console.log('Manual refresh requested');
@@ -669,1349 +598,186 @@ export default function BrokeragePage() {
     });
   };
 
-  // Load market data from API or generate demo data
-  const loadMarketData = async (symbol: string, timeframe: string = '1D', candleInterval: string = 'day', isAutoRefresh = false) => {
-    if (!isAutoRefresh) {
-      setError(null);
-    }
-    setIsLoading(true);
-    
-    try {
-      console.log(`[BROKERAGE] Loading market data for ${symbol} (${timeframe}, ${candleInterval})`);
-      const polygonService = PolygonService.getInstance();
-      
-      // Get latest price (WebSocket handles this mostly, but good for initial load)
-      if (!ws.current || ws.current.readyState !== WebSocket.OPEN) {
-        console.log(`[BROKERAGE] Fetching initial latest price for ${symbol}`);
-        const price = await polygonService.getLatestPrice(symbol);
-        console.log(`[BROKERAGE] Received latest price for ${symbol}:`, price);
-        if (price !== null) {
-          setCurrentPrice(price);
-        } else {
-           console.error('[BROKERAGE] Failed to get initial latest price');
-           // Don't set error here if WS will connect
-        }
-      } else {
-        console.log(`[BROKERAGE] WebSocket already open, will receive price updates automatically`);
-      }
-      
-      // Determine API timespan and multiplier
-      let apiTimespan = candleInterval; // minute, hour, day, week, month, quarter, year
-      let apiMultiplier = 1;
-      
-      // Map common intervals to Polygon API params (adjust as needed)
-      // Note: Polygon free tier might only support 'day' effectively
-      // For minute data, multiplier is the number of minutes (e.g., 5 for 5m)
-      if (candleInterval === 'minute') { 
-          // We need to decide the multiplier based on UI selection (1m, 5m, 15m)
-          // For now, let's assume '1m' selection means multiplier=1, 5m->5 etc.
-          // This logic needs refinement based on how interval buttons pass values.
-          // Let's default to 1 minute for now if candleInterval is 'minute'
-          apiMultiplier = 1; // Example: fetch 1-minute bars
-      } else if (candleInterval === 'hour') {
-          apiMultiplier = 1; // Fetch 1-hour bars
-      } // else defaults to day/week etc. with multiplier 1
-
-
-      // Calculate start/end dates based on BOTH timeframe and interval
-      const endDate = new Date();
-      let startDate = new Date();
-      
-      // Adjust lookback based on interval first
-      let lookbackDays = 90; // Default lookback
-      if (apiTimespan === 'minute') {
-          lookbackDays = timeframe === '1D' ? 2 : 7; // Shorter lookback for minute bars
-      } else if (apiTimespan === 'hour') {
-          lookbackDays = timeframe === '1D' ? 7 : timeframe === '5D' ? 14 : 30;
-      }
-      
-      // Apply timeframe modifier
-      switch(timeframe) {
-        case '1D': lookbackDays = apiTimespan === 'minute' ? 2 : apiTimespan === 'hour' ? 5 : 3; break;
-        case '5D': lookbackDays = apiTimespan === 'minute' ? 7 : apiTimespan === 'hour' ? 10 : 7; break;
-        case '1M': lookbackDays = 35; break;
-        case '3M': lookbackDays = 95; break;
-        case 'YTD': startDate = new Date(endDate.getFullYear(), 0, 1); lookbackDays = 0; break; // Special case
-        case '1Y': lookbackDays = 370; break;
-        case '5Y': lookbackDays = 365 * 5 + 5; break;
-        case 'ALL': lookbackDays = 365 * 20 + 20; break; // Max 20 years
-        default: lookbackDays = 90;
-      }
-
-      if (lookbackDays > 0) {
-        startDate.setDate(endDate.getDate() - lookbackDays);
-      }
-      
-      const formattedStartDate = startDate.toISOString().split('T')[0];
-      const formattedEndDate = endDate.toISOString().split('T')[0];
-      
-      console.log(`Fetching candles: ${symbol}, ${apiMultiplier} ${apiTimespan} from ${formattedStartDate} to ${formattedEndDate}`);
-      const rawCandleData = await polygonService.getStockCandles(
-        symbol,
-        formattedStartDate,
-        formattedEndDate,
-        apiTimespan, // Pass the selected timespan
-        apiMultiplier // Pass the calculated multiplier
-      );
-      
-      if (rawCandleData && rawCandleData.length > 0) {
-        console.log(`Received ${rawCandleData.length} candles for ${symbol}`);
-        
-        // Convert PolygonCandle to CandleData format
-        const formattedCandleData: CandleData[] = rawCandleData.map((candle: PolygonCandle) => ({
-          timestamp: candle.t,
-          open: candle.o,
-          high: candle.h,
-          low: candle.l,
-          close: candle.c,
-          volume: candle.v
-        }));
-        
-        setCandleData(formattedCandleData);
-      } else {
-        console.error('No candle data returned, using demo data');
-        
-        if (!isAutoRefresh) {
-          if (!isApiKeyValid) {
-            setError('Using demo data - API key not configured');
-          } else {
-            setError('Failed to load chart data. Using demo data.');
-          }
-        }
-        
-        // Generate demo candle data
-        setCandleData(generateDemoCandleData(symbol, startDate, endDate));
-      }
-    } catch (error: any) {
-      console.error('[BROKERAGE] Error in loadMarketData:', error);
-      if (!isAutoRefresh) {
-        setError(`Error: ${error.message || 'Failed to load market data'}. Using demo data.`);
-      }
-      
-      // Generate demo data if real data fails
-      setCurrentPrice(generateSimulatedPrice(symbol));
-      setCandleData(generateDemoCandleData(symbol));
-    } finally {
-      setIsLoading(false);
-      setLastUpdateTime(new Date());
-    }
-  };
-
-  // Generate a simulated price for a symbol
-  const generateSimulatedPrice = (symbol: string): number => {
-    // Base prices for common stocks
-    const basePrices: Record<string, number> = {
-      'AAPL': 175.23,
-      'MSFT': 420.45,
-      'GOOGL': 162.87,
-      'AMZN': 183.92,
-      'TSLA': 172.63,
-      'NVDA': 930.12,
-      'META': 475.81,
-      'JPM': 182.45,
-      'V': 278.32,
-      'WMT': 62.15,
-      'JNJ': 152.78,
-      'PG': 165.92,
-      'UNH': 526.38,
-      'XOM': 113.55,
-      'HD': 342.80
-    };
-    
-    // Use the base price or generate a random one if symbol not found
-    const basePrice = basePrices[symbol] || 100 + Math.random() * 200;
-    
-    // Add a small random variation
-    return parseFloat((basePrice + (Math.random() * 4 - 2)).toFixed(2));
-  };
-
-  // Generate realistic demo candle data
-  const generateDemoCandleData = (symbol: string, startDate?: Date, endDate?: Date): CandleData[] => {
-    const candles: CandleData[] = [];
-    const basePrice = generateSimulatedPrice(symbol);
-    const now = endDate || new Date();
-    const start = startDate || new Date(now.getTime() - (60 * 24 * 60 * 60 * 1000)); // Default to 60 days
-    
-    // Calculate number of days between dates
-    const dayDiff = Math.floor((now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
-    const numCandles = Math.max(20, dayDiff);
-    
-    // Generate candles
-    let prevClose = basePrice;
-    for (let i = numCandles; i >= 0; i--) {
-      const date = new Date(now);
-      date.setDate(now.getDate() - i);
-      
-      // Skip weekends
-      if (date.getDay() === 0 || date.getDay() === 6) continue;
-      
-      // Simulate realistic price movement based on previous close
-      // Use a random walk with momentum and mean reversion
-      const dailyVolatility = basePrice * 0.02; // 2% daily volatility
-      const meanReversionFactor = 0.3; // Pull toward basePrice
-      const momentumFactor = 0.2; // Continue previous direction
-      const randomFactor = Math.random() * 2 - 1; // Random component
-      
-      // Calculate today's movement
-      const distanceFromBase = prevClose - basePrice;
-      const meanReversion = -meanReversionFactor * distanceFromBase / basePrice;
-      const dailyChange = dailyVolatility * (randomFactor + meanReversion);
-      
-      // Generate OHLC values
-      const open = prevClose;
-      const direction = Math.random() > 0.5 ? 1 : -1;
-      const range = dailyVolatility * (0.5 + Math.random() * 0.5);
-      const high = Math.max(open, open + dailyChange) + (range * 0.5);
-      const low = Math.min(open, open + dailyChange) - (range * 0.5);
-      const close = open + dailyChange;
-      
-      // Update prevClose for next iteration
-      prevClose = close;
-      
-      candles.push({
-        timestamp: date.getTime(),
-        open,
-        high,
-        low,
-        close,
-        volume: Math.floor(1000000 + Math.random() * 9000000)
-      });
-    }
-    
-    return candles;
-  };
-
-  // Handle manual order submission
-  const handleManualOrder = (order: Omit<ManualOrder, 'id' | 'timestamp' | 'status' | 'price'>) => {
-    console.log('Submitting manual order:', order);
-    
-    const newOrderId = `order-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    const now = Date.now();
-    
-    // Generate a new order with timestamp and ID, initially 'open'
-    const newOrder: ManualOrder = {
-      ...order,
-      id: newOrderId,
-      timestamp: now,
-      status: 'open',
-      price: currentPrice, // Use current market price for simulation
-    };
-
-    // Add the 'open' order immediately to state
-    setManualOrders(prevOrders => [...prevOrders, newOrder]);
-    
-    // Simulate order filling after a delay
-    const fillDelay = 1500; // 1.5 seconds
-    setTimeout(() => {
-      setManualOrders(prevOrders => 
-        prevOrders.map(ord => 
-          ord.id === newOrderId 
-            ? { ...ord, status: 'filled', timestamp: Date.now() } // Update status and timestamp
-            : ord
-        )
-      );
-      console.log(`Simulated filling order: ${newOrderId}`);
-      // Optionally trigger a notification for filled order here
-    }, fillDelay);
-    
-    // Show a toast or notification for submission here (optional)
-    console.log(`Order ${newOrderId} submitted with status 'open'.`);
-    
-    return newOrder; // Return the initially submitted order object
-  };
-
-  // Calculate the total value of owned shares
-  const calculatePortfolioValue = () => {
-    let portfolioValue = 0;
-    
-    // Add value from filled buy orders
-    const filledBuys = manualOrders.filter(order => order.status === 'filled' && order.type === 'buy');
-    const filledSells = manualOrders.filter(order => order.status === 'filled' && order.type === 'sell');
-    
-    for (const order of filledBuys) {
-      if (order.symbol === symbol) {
-        portfolioValue += order.quantity * currentPrice;
-      }
-    }
-    
-    // Subtract value from filled sell orders
-    for (const order of filledSells) {
-      if (order.symbol === symbol) {
-        portfolioValue -= order.quantity * currentPrice;
-      }
-    }
-    
-    return portfolioValue;
-  };
-
-  // Format the last update time
-  const formatLastUpdate = () => {
-    return lastUpdateTime.toLocaleTimeString();
-  };
-
-  // Handle copying a trade from a Congress member
-  const handleCopyCongressTrade = (trade: CongressTrade) => {
-    // Create a corresponding manual order
-    const newOrder: Omit<ManualOrder, 'id' | 'timestamp' | 'status' | 'price'> = {
-      symbol: trade.symbol,
-      type: trade.type.toLowerCase() as 'buy' | 'sell',
-      quantity: calculateQuantityFromAmount(trade.amount),
-    };
-    
-    // Submit the order
-    handleManualOrder(newOrder);
-  };
-  
-  // Helper to estimate quantity based on amount range
-  const calculateQuantityFromAmount = (amountRange: string): number => {
-    console.log(`[QTY CALC] Input range: ${amountRange}`);
-    let estimatedAmount = 1001; // Lower default amount
-
-    try {
-      const amounts = amountRange.split('-').map(a =>
-        parseInt(a.replace(/[^\d.-]/g, '')) // Keep decimal point if present, remove others
-      );
-      
-      // Check if the first amount is a valid number
-      if (!isNaN(amounts[0])) {
-        estimatedAmount = amounts[0];
-        console.log(`[QTY CALC] Using lower bound: ${estimatedAmount}`);
-      } else {
-        // Optional: Try parsing the second part if the first failed (e.g., for ranges like "< $1000")
-        if (amounts.length > 1 && !isNaN(amounts[1])) {
-           estimatedAmount = amounts[1]; // Use upper bound as estimate if lower failed
-           console.warn(`[QTY CALC] Lower bound parsing failed for '${amountRange}', using upper bound estimate: ${estimatedAmount}`);
-        } else {
-          console.warn(`[QTY CALC] Failed to parse amount range '${amountRange}'. Defaulting to ${estimatedAmount}`);
-        }
-      }
-    } catch (parseError) {
-       console.error(`[QTY CALC] Error parsing amount range '${amountRange}':`, parseError);
-       console.warn(`[QTY CALC] Defaulting to ${estimatedAmount} due to parsing error.`);
-    }
-
-    // Ensure estimated amount is positive
-    estimatedAmount = Math.max(1, estimatedAmount); // Ensure at least $1 is used
-    
-    const price = currentPrice || generateSimulatedPrice(symbol);
-    console.log(`[QTY CALC] Using price: ${price}`);
-
-    const calculatedQuantity = price > 0 ? Math.floor(estimatedAmount / price) : 1;
-    const finalQuantity = Math.max(1, calculatedQuantity); // Ensure minimum 1 share
-    
-    console.log(`[QTY CALC] Final calculated quantity: ${finalQuantity}`);
-    return finalQuantity;
-  };
-
-  // Handle copying a business insider trade
-  const handleCopyInsiderTrade = (trade: InsiderTrade) => {
-    // Create a corresponding manual order
-    const newOrder: Omit<ManualOrder, 'id' | 'timestamp' | 'status' | 'price'> = {
-      symbol: trade.symbol,
-      type: trade.type.toLowerCase() as 'buy' | 'sell',
-      quantity: trade.shares,
-    };
-    
-    // Submit the order
-    handleManualOrder(newOrder);
-  };
-
-  // Handler for when indicators are changed in the modal
-  const handleIndicatorsChange = (newIndicators: ActiveIndicator[]) => {
-    console.log('[BROKERAGE] Updating active indicators:', newIndicators);
-    // Save to state
-    setActiveIndicators(newIndicators);
-    // Persist to localStorage
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('activeIndicators', JSON.stringify(newIndicators));
-    }
-  };
-
-  // Recalculate indicator data when candleData or activeIndicators change
+  // Modify the useEffect that loads data on component mount to use only the existing state variables
   useEffect(() => {
-    if (candleData.length === 0 || activeIndicators.length === 0) {
-      setIndicatorChartData([]); 
-      return;
-    }
-    const newIndicatorData: IndicatorData[] = [];
-    const closingPrices = candleData.map(c => c.close);
-
-    activeIndicators.forEach(async (indicator) => {
-      let indicatorLineData: LineData[] | null = null;
-      let indicatorHistogramData: HistogramData[] | null = null; // Separate state
-      let values: number[] = [];
-      let color = '#FFA500'; 
-      let alignmentOffset = 0;
-      let labelPeriod = indicator.period;
-
-      // Calculate based on type
-      if (indicator.type === 'SMA' && indicator.period) {
-        values = calculateSMA(closingPrices, indicator.period);
-        alignmentOffset = candleData.length - values.length; 
-        color = '#FFD700'; // Gold
-      } else if (indicator.type === 'EMA' && indicator.period) {
-        values = calculateEMA(closingPrices, indicator.period);
-        alignmentOffset = candleData.length - values.length; 
-        color = '#4169E1'; // Royal Blue
-      } else if (indicator.type === 'RSI' && indicator.period) {
-        values = calculateRSI(closingPrices, indicator.period);
-        alignmentOffset = candleData.length - values.length;
-        color = '#DA70D6'; // Orchid
-      } else if (indicator.type === 'ATR' && indicator.period) {
-        // Calculate ATR
-        const candlesForATR = candleData.map(candle => ({
-          h: candle.high,
-          l: candle.low,
-          c: candle.close,
-          v: candle.volume,
-          o: candle.open,
-          t: candle.timestamp
-        }));
-        
-        values = calculateATR(candlesForATR, indicator.period);
-        alignmentOffset = candleData.length - values.length;
-        color = '#FF4500'; // OrangeRed
-      } else if (indicator.type === 'ADX' && indicator.period) {
-        // Calculate ADX
-        const candlesForADX = candleData.map(candle => ({
-          h: candle.high,
-          l: candle.low,
-          c: candle.close,
-          v: candle.volume,
-          o: candle.open,
-          t: candle.timestamp
-        }));
-        
-        const adxResult = calculateADX(candlesForADX, indicator.period);
-        
-        if (adxResult) {
-          alignmentOffset = candleData.length - adxResult.adx.length;
-          labelPeriod = undefined;
-          
-          // ADX Line
-          const adxLineData = adxResult.adx.map((value, index) => {
-            const candleIndex = index + alignmentOffset;
-            if (candleIndex < 0 || candleIndex >= candleData.length) return null;
-            return { 
-              time: Math.floor(candleData[candleIndex].timestamp / 1000) as Time, 
-              value: parseFloat(value.toFixed(2)) 
-            };
-          }).filter((p): p is LineData => p !== null);
-          
-          if (adxLineData.length > 0) {
-            newIndicatorData.push({
-              id: `${indicator.id}-ADX`,
-              type: 'ADX',
-              data: adxLineData,
-              color: '#9370DB', // Medium Purple
-              pane: 1 // Display in separate pane
-            });
-          }
-          
-          // +DI and -DI Lines (if enabled)
-          if (indicator.showDI) {
-            // +DI Line
-            const plusDILineData = adxResult.plusDI.map((value, index) => {
-              const candleIndex = index + alignmentOffset;
-              if (candleIndex < 0 || candleIndex >= candleData.length) return null;
-              return { 
-                time: Math.floor(candleData[candleIndex].timestamp / 1000) as Time, 
-                value: parseFloat(value.toFixed(2)) 
-              };
-            }).filter((p): p is LineData => p !== null);
-            
-            if (plusDILineData.length > 0) {
-              newIndicatorData.push({
-                id: `${indicator.id}-PlusDI`,
-                type: 'ADX_PlusDI',
-                data: plusDILineData,
-                color: '#32CD32', // Lime Green
-                pane: 1 // Display in same pane as ADX
-              });
-            }
-            
-            // -DI Line
-            const minusDILineData = adxResult.minusDI.map((value, index) => {
-              const candleIndex = index + alignmentOffset;
-              if (candleIndex < 0 || candleIndex >= candleData.length) return null;
-              return { 
-                time: Math.floor(candleData[candleIndex].timestamp / 1000) as Time, 
-                value: parseFloat(value.toFixed(2)) 
-              };
-            }).filter((p): p is LineData => p !== null);
-            
-            if (minusDILineData.length > 0) {
-              newIndicatorData.push({
-                id: `${indicator.id}-MinusDI`,
-                type: 'ADX_MinusDI',
-                data: minusDILineData,
-                color: '#FF6347', // Tomato
-                pane: 1 // Display in same pane as ADX
-              });
-            }
-          }
-        }
-      } else if (indicator.type === 'OBV') {
-        // Calculate OBV
-        const candlesForOBV = candleData.map(candle => ({
-          h: candle.high,
-          l: candle.low,
-          c: candle.close,
-          v: candle.volume,
-          o: candle.open,
-          t: candle.timestamp
-        }));
-        
-        const obvValues = calculateOBV(candlesForOBV);
-        
-        if (obvValues && obvValues.length > 0) {
-          alignmentOffset = candleData.length - obvValues.length;
-          labelPeriod = undefined;
-          
-          // OBV Line
-          const obvLineData = obvValues.map((value, index) => {
-            const candleIndex = index + alignmentOffset;
-            if (candleIndex < 0 || candleIndex >= candleData.length) return null;
-            return { 
-              time: Math.floor(candleData[candleIndex].timestamp / 1000) as Time, 
-              value: parseFloat(value.toFixed(2)) 
-            };
-          }).filter((p): p is LineData => p !== null);
-          
-          if (obvLineData.length > 0) {
-            newIndicatorData.push({
-              id: indicator.id,
-              type: 'OBV',
-              data: obvLineData,
-              color: '#4B0082', // Indigo
-              pane: 1 // Display in separate pane
-            });
-          }
-        }
-      } else if (indicator.type === 'Parabolic SAR') {
-        // Calculate Parabolic SAR
-        const candlesForPSAR = candleData.map(candle => ({
-          h: candle.high,
-          l: candle.low,
-          c: candle.close,
-          v: candle.volume,
-          o: candle.open,
-          t: candle.timestamp
-        }));
-        
-        const initialAF = indicator.initialAcceleration || 0.02;
-        const maxAF = indicator.maxAcceleration || 0.2;
-        
-        const psarResult = calculateParabolicSAR(candlesForPSAR, initialAF, maxAF);
-        
-        if (psarResult && psarResult.sarValues.length > 0) {
-          alignmentOffset = candleData.length - psarResult.sarValues.length;
-          
-          // Create line data for SAR - simplify typings to avoid errors
-          const psarLineData: LineData[] = [];
-          
-          for (let i = 0; i < psarResult.sarValues.length; i++) {
-            const candleIndex = i + alignmentOffset;
-            if (candleIndex >= 0 && candleIndex < candleData.length) {
-              // Add to array directly rather than filtering
-              psarLineData.push({
-                time: Math.floor(candleData[candleIndex].timestamp / 1000) as Time,
-                value: parseFloat(psarResult.sarValues[i].toFixed(2))
-              });
-            }
-          }
-          
-          if (psarLineData.length > 0) {
-            newIndicatorData.push({
-              id: indicator.id,
-              type: 'Parabolic SAR',
-              data: psarLineData,
-              color: '#FF00FF', // Magenta
-              // No separate pane - display on main price chart
-            });
-          }
-        }
-      } else if (indicator.type === 'Pivot Points') {
-        // Calculate Pivot Points
-        const candlesForPivots = candleData.map(candle => ({
-          h: candle.high,
-          l: candle.low,
-          c: candle.close,
-          v: candle.volume,
-          o: candle.open,
-          t: candle.timestamp
-        }));
-        
-        // Take the most recent candle for pivot calculation
-        const pivotType = indicator.pivotType || 'daily';
-        
-        if (candlesForPivots.length > 0) {
-          const pivotResult = calculatePivotPoints([candlesForPivots[0]], pivotType);
-          
-          if (pivotResult) {
-            const currentChart = {
-              minTime: candleData[0].timestamp,
-              maxTime: candleData[candleData.length - 1].timestamp
-            };
-            
-            // Generate horizontal line data for pivot and support/resistance levels
-            // A horizontal line requires just two points: the start and end time
-            
-            // Helper to create line data for a level
-            const createLevelLine = (value: number, levelName: string, color: string) => {
-              const lineData: LineData[] = [
-                { time: Math.floor(currentChart.minTime / 1000) as Time, value },
-                { time: Math.floor(currentChart.maxTime / 1000) as Time, value }
-              ];
-              
-              if (lineData.length > 0) {
-                newIndicatorData.push({
-                  id: `${indicator.id}-${levelName}`,
-                  type: `Pivot_${levelName}`,
-                  data: lineData,
-                  color: color
-                });
-              }
-            };
-            
-            // Pivot line (always shown)
-            createLevelLine(pivotResult.pivot, 'Pivot', '#FFFFFF');
-            
-            // Resistance levels
-            if (indicator.showR1 !== false) {
-              createLevelLine(pivotResult.r1, 'R1', '#FF6666');
-            }
-            
-            if (indicator.showR2 !== false) {
-              createLevelLine(pivotResult.r2, 'R2', '#FF3333');
-            }
-            
-            if (indicator.showR3 !== false) {
-              createLevelLine(pivotResult.r3, 'R3', '#FF0000');
-            }
-            
-            // Support levels
-            if (indicator.showS1 !== false) {
-              createLevelLine(pivotResult.s1, 'S1', '#66FF66');
-            }
-            
-            if (indicator.showS2 !== false) {
-              createLevelLine(pivotResult.s2, 'S2', '#33FF33');
-            }
-            
-            if (indicator.showS3 !== false) {
-              createLevelLine(pivotResult.s3, 'S3', '#00FF00');
-            }
-          }
-        }
-      } else if (indicator.type === 'Ichimoku Cloud') {
-        // Calculate Ichimoku Cloud
-        const candlesForIchimoku = candleData.map(candle => ({
-          h: candle.high,
-          l: candle.low,
-          c: candle.close,
-          v: candle.volume,
-          o: candle.open,
-          t: candle.timestamp
-        }));
-        
-        const tenkanPeriod = indicator.tenkanPeriod || 9;
-        const kijunPeriod = indicator.kijunPeriod || 26;
-        const senkouBPeriod = indicator.senkouBPeriod || 52;
-        const displacement = indicator.displacement || 26;
-        
-        const ichimokuResult = calculateIchimokuCloud(
-          candlesForIchimoku, 
-          tenkanPeriod, 
-          kijunPeriod, 
-          senkouBPeriod, 
-          displacement
-        );
-        
-        if (ichimokuResult) {
-          // Process each component of the Ichimoku Cloud
-          const addIchimokuLine = (values: number[], name: string, color: string) => {
-            const alignmentOffset = candleData.length - values.length;
-            
-            const lineData = values.map((value, index) => {
-              const candleIndex = index + alignmentOffset;
-              if (candleIndex < 0 || candleIndex >= candleData.length) return null;
-              return { 
-                time: Math.floor(candleData[candleIndex].timestamp / 1000) as Time, 
-                value: parseFloat(value.toFixed(2)) 
-              };
-            }).filter((p): p is LineData => p !== null);
-            
-            if (lineData.length > 0) {
-              newIndicatorData.push({
-                id: `${indicator.id}-${name}`,
-                type: `Ichimoku_${name}`,
-                data: lineData,
-                color: color
-              });
-            }
-          };
-          
-          // Add Tenkan-sen (Conversion Line)
-          if (indicator.showTenkan !== false) {
-            addIchimokuLine(ichimokuResult.tenkan, 'Tenkan', '#FF6B6B'); // Red
-          }
-          
-          // Add Kijun-sen (Base Line)
-          if (indicator.showKijun !== false) {
-            addIchimokuLine(ichimokuResult.kijun, 'Kijun', '#4ECDC4'); // Blue
-          }
-          
-          // Add Senkou Span A and B (Cloud)
-          if (indicator.showCloud !== false) {
-            // Future values are displaced forward
-            // Senkou Span A (Leading Span A)
-            addIchimokuLine(ichimokuResult.senkouA, 'SenkouA', '#6B66FF'); // Blue cloud
-            
-            // Senkou Span B (Leading Span B)
-            addIchimokuLine(ichimokuResult.senkouB, 'SenkouB', '#FE9A76'); // Red cloud
-            
-            // TODO: Add actual cloud fill between Senkou Span A and B
-            // This would require a special area series or band in the chart library
-          }
-          
-          // Add Chikou Span (Lagging Span)
-          if (indicator.showChikou !== false) {
-            addIchimokuLine(ichimokuResult.chikou, 'Chikou', '#50C878'); // Green
-          }
-        }
-      } else if (indicator.type === 'AI Trend Prediction') {
-        // Skip if there's not enough data
-        if (candleData.length < 20) return;
-        
-        // Prepare candle data for the AI model
-        const candlesForML = candleData.map(candle => ({
-          h: candle.high,
-          l: candle.low,
-          c: candle.close,
-          v: candle.volume,
-          o: candle.open,
-          t: candle.timestamp
-        }));
-        
-        // Set reasonable defaults
-        const lookbackPeriod = indicator.lookbackPeriod || 20;
-        const forecastPeriod = indicator.forecastPeriod || 5;
-        
+    if (typeof window !== 'undefined') {
+      // Load active indicators
+      const savedIndicators = localStorage.getItem('activeIndicators');
+      if (savedIndicators) {
         try {
-          // This is an async operation - ML models take time to train
-          const aiResult = await calculateAITrendPrediction(
-            candlesForML,
-            lookbackPeriod,
-            forecastPeriod
-          );
-          
-          if (aiResult) {
-            // Historical fitted values
-            if (indicator.showPredictionLine !== false) {
-              const predictionLineData: LineData[] = [];
-              
-              // Map prediction values to chart data points
-              for (let i = 0; i < aiResult.predictedValues.length; i++) {
-                predictionLineData.push({
-                  time: Math.floor(candleData[i].timestamp / 1000) as Time,
-                  value: aiResult.predictedValues[i]
-                });
-              }
-              
-              if (predictionLineData.length > 0) {
-                newIndicatorData.push({
-                  id: `${indicator.id}-prediction`,
-                  type: 'AI_Trend_Prediction',
-                  data: predictionLineData,
-                  color: '#8884d8' // Purple
-                });
-              }
-            }
-            
-            // Future forecasted values
-            if (indicator.showForecast !== false && aiResult.futurePredictions.length > 0) {
-              const forecastLineData: LineData[] = [];
-              
-              // Map forecast values to future time points
-              // Start from the last historical point
-              const lastTime = candleData[candleData.length - 1].timestamp;
-              const timeStep = lastTime - candleData[candleData.length - 2].timestamp; // Estimate time interval
-              
-              // Add the last historical point to connect the lines
-              forecastLineData.push({
-                time: Math.floor(lastTime / 1000) as Time,
-                value: aiResult.predictedValues[aiResult.predictedValues.length - 1]
-              });
-              
-              // Add forecast points
-              for (let i = 0; i < aiResult.futurePredictions.length; i++) {
-                forecastLineData.push({
-                  time: Math.floor((lastTime + timeStep * (i + 1)) / 1000) as Time,
-                  value: aiResult.futurePredictions[i]
-                });
-              }
-              
-              if (forecastLineData.length > 0) {
-                newIndicatorData.push({
-                  id: `${indicator.id}-forecast`,
-                  type: 'AI_Trend_Forecast',
-                  data: forecastLineData,
-                  color: '#F1025E' // Bright pink for forecast line
-                });
-              }
-            }
-          }
-        } catch (error) {
-          console.error('[ML] AI Trend Prediction error:', error);
-        }
-      } else if (indicator.type === 'Neural Oscillator') {
-        // Skip if there's not enough data
-        if (candleData.length < 30) return;
-        
-        // Prepare candle data for the oscillator
-        const candlesForML = candleData.map(candle => ({
-          h: candle.high,
-          l: candle.low,
-          c: candle.close,
-          v: candle.volume,
-          o: candle.open,
-          t: candle.timestamp
-        }));
-        
-        // Set reasonable defaults
-        const lookbackPeriod = indicator.lookbackPeriod || 14;
-        const threshold = indicator.threshold || 0.8;
-        
-        try {
-          // Neural Network calculation
-          const neuralResult = await calculateNeuralOscillator(
-            candlesForML,
-            lookbackPeriod,
-            threshold
-          );
-          
-          if (neuralResult) {
-            const alignmentOffset = candleData.length - neuralResult.values.length;
-            
-            // Main oscillator values
-            const oscillatorLineData: LineData[] = [];
-            
-            // Map oscillator values to chart data points
-            for (let i = 0; i < neuralResult.values.length; i++) {
-              const candleIndex = i + alignmentOffset;
-              if (candleIndex < 0 || candleIndex >= candleData.length) continue;
-              
-              oscillatorLineData.push({
-                time: Math.floor(candleData[candleIndex].timestamp / 1000) as Time,
-                value: neuralResult.values[i]
-              });
-            }
-            
-            if (oscillatorLineData.length > 0) {
-              newIndicatorData.push({
-                id: `${indicator.id}-line`,
-                type: 'Neural_Oscillator',
-                data: oscillatorLineData,
-                color: '#00BFFF', // Deep sky blue
-                pane: 1 // Display in separate pane
-              });
-            }
-            
-            // Overbought signals
-            if (indicator.showOverbought !== false) {
-              const overboughtLineData: LineData[] = [];
-              
-              for (let i = 0; i < neuralResult.overbought.length; i++) {
-                if (neuralResult.overbought[i] === 0) continue; // Skip non-overbought points
-                
-                const candleIndex = i + alignmentOffset;
-                if (candleIndex < 0 || candleIndex >= candleData.length) continue;
-                
-                overboughtLineData.push({
-                  time: Math.floor(candleData[candleIndex].timestamp / 1000) as Time,
-                  value: threshold // Fixed value for visualization
-                });
-              }
-              
-              if (overboughtLineData.length > 0) {
-                newIndicatorData.push({
-                  id: `${indicator.id}-overbought`,
-                  type: 'Neural_Overbought',
-                  data: overboughtLineData,
-                  color: '#FF4500', // OrangeRed
-                  pane: 1 // Display in same pane as oscillator
-                });
-              }
-            }
-            
-            // Oversold signals
-            if (indicator.showOversold !== false) {
-              const oversoldLineData: LineData[] = [];
-              
-              for (let i = 0; i < neuralResult.oversold.length; i++) {
-                if (neuralResult.oversold[i] === 0) continue; // Skip non-oversold points
-                
-                const candleIndex = i + alignmentOffset;
-                if (candleIndex < 0 || candleIndex >= candleData.length) continue;
-                
-                oversoldLineData.push({
-                  time: Math.floor(candleData[candleIndex].timestamp / 1000) as Time,
-                  value: -threshold // Fixed value for visualization
-                });
-              }
-              
-              if (oversoldLineData.length > 0) {
-                newIndicatorData.push({
-                  id: `${indicator.id}-oversold`,
-                  type: 'Neural_Oversold',
-                  data: oversoldLineData,
-                  color: '#32CD32', // LimeGreen
-                  pane: 1 // Display in same pane as oscillator
-                });
-              }
-            }
-          }
-        } catch (error) {
-          console.error('[ML] Neural Oscillator error:', error);
-        }
-      } else if (indicator.type === 'Adaptive MA') {
-        // Skip if there's not enough data
-        if (candleData.length < 60) return;
-        
-        // Prepare candle data
-        const candlesForMA = candleData.map(candle => ({
-          h: candle.high,
-          l: candle.low,
-          c: candle.close,
-          v: candle.volume,
-          o: candle.open,
-          t: candle.timestamp
-        }));
-        
-        // Get parameters with defaults
-        const minPeriod = indicator.minPeriod || 5;
-        const maxPeriod = indicator.maxPeriod || 50;
-        const volatilityWindow = indicator.volatilityWindow || 10;
-        
-        // Calculate Adaptive MA
-        const adaptiveResult = calculateAdaptiveMA(
-          candlesForMA,
-          minPeriod,
-          maxPeriod,
-          volatilityWindow
-        );
-        
-        if (adaptiveResult) {
-          const alignmentOffset = candleData.length - adaptiveResult.values.length;
-          
-          // MA values
-          const maLineData: LineData[] = [];
-          
-          // Map MA values to chart data points
-          for (let i = 0; i < adaptiveResult.values.length; i++) {
-            const candleIndex = i + alignmentOffset;
-            if (candleIndex < 0 || candleIndex >= candleData.length) continue;
-            
-            maLineData.push({
-              time: Math.floor(candleData[candleIndex].timestamp / 1000) as Time,
-              value: adaptiveResult.values[i]
-            });
-          }
-          
-          if (maLineData.length > 0) {
-            newIndicatorData.push({
-              id: `${indicator.id}-ma`,
-              type: 'Adaptive_MA',
-              data: maLineData,
-              color: '#FF6EC7' // Pink
-            });
-          }
-          
-          // Optional period indicator (shows the period used at each point)
-          if (indicator.showPeriodIndicator && adaptiveResult.periods.length > 0) {
-            const periodData: LineData[] = [];
-            
-            // Scale periods to a visible range on the chart
-            const priceRange = Math.max(...candleData.map(c => c.high)) - Math.min(...candleData.map(c => c.low));
-            const scaleFactor = priceRange / (maxPeriod - minPeriod) * 0.1; // Use 10% of price range
-            
-            // Calculate base level (near the bottom of the chart)
-            const baseLevel = Math.min(...candleData.map(c => c.low)) - priceRange * 0.05;
-            
-            for (let i = 0; i < adaptiveResult.periods.length; i++) {
-              const candleIndex = i + alignmentOffset;
-              if (candleIndex < 0 || candleIndex >= candleData.length) continue;
-              
-              // Scale period to visible chart area
-              const scaledValue = baseLevel + (adaptiveResult.periods[i] - minPeriod) * scaleFactor;
-              
-              periodData.push({
-                time: Math.floor(candleData[candleIndex].timestamp / 1000) as Time,
-                value: scaledValue
-              });
-            }
-            
-            if (periodData.length > 0) {
-              newIndicatorData.push({
-                id: `${indicator.id}-period`,
-                type: 'Adaptive_MA_Period',
-                data: periodData,
-                color: '#AAEEEE' // Light cyan
-              });
-            }
-          }
-        }
-      } else if (indicator.type === 'MACD' && indicator.fastPeriod && indicator.slowPeriod && indicator.signalPeriod) {
-        const macdResult = calculateMACD(closingPrices, indicator.fastPeriod, indicator.slowPeriod, indicator.signalPeriod);
-        if (macdResult) {
-          alignmentOffset = candleData.length - macdResult.macdLine.length;
-          labelPeriod = undefined; 
-
-          // MACD Line Data
-          const macdLineData = macdResult.macdLine.map((value, index) => {
-             const candleIndex = index + alignmentOffset;
-             if (candleIndex < 0 || candleIndex >= candleData.length) return null; 
-             return { time: Math.floor(candleData[candleIndex].timestamp / 1000) as Time, value: parseFloat(value.toFixed(2)) };
-           }).filter((p): p is LineData => p !== null);
-           if (macdLineData.length > 0) {
-              newIndicatorData.push({
-                id: indicator.id, type: indicator.type, data: macdLineData, color: '#FF6347',
-              });
-           }
-
-          // Signal Line Data
-          if (indicator.showSignal && macdResult.signalLine.length > 0) {
-             const signalLineData = macdResult.signalLine.map((value, index) => {
-               const candleIndex = index + alignmentOffset; // Align with MACD line
-               if (candleIndex < 0 || candleIndex >= candleData.length) return null;
-               return { time: Math.floor(candleData[candleIndex].timestamp / 1000) as Time, value: parseFloat(value.toFixed(2)) };
-             }).filter((p): p is LineData => p !== null);
-             if (signalLineData.length > 0) {
-                newIndicatorData.push({
-                  id: `${indicator.id}-Signal`, type: 'MACD_Signal', data: signalLineData, color: '#4682B4', isSignalLine: true
-                });
-             }
-          }
-
-          // Histogram Data - Corrected Typing
-          if (indicator.showHistogram && macdResult.histogram.length > 0) {
-             const histogramPoints = macdResult.histogram.map((value, index) => {
-               const candleIndex = index + alignmentOffset; 
-               if (candleIndex < 0 || candleIndex >= candleData.length) return null;
-               // Map to the structure expected by lightweight-charts HistogramData
-               return {
-                 time: Math.floor(candleData[candleIndex].timestamp / 1000) as Time,
-                 value: parseFloat(value.toFixed(2)),
-                 // Color is optional for HistogramData type, set on series later
-               };
-             }).filter((p): p is { time: Time; value: number } => p !== null); // Filter nulls first
-
-             // Now cast the filtered array to HistogramData[]
-             indicatorHistogramData = histogramPoints as HistogramData[];
-             
-              if (indicatorHistogramData && indicatorHistogramData.length > 0) {
-                  newIndicatorData.push({
-                    id: `${indicator.id}-Histogram`,
-                    type: 'MACD_Histogram',
-                    data: indicatorHistogramData, // Assign the correctly typed data
-                    isHistogram: true,
-                    pane: 1 
-                  });
-              }
-          }
-        }
-      } else if (indicator.type === 'Stochastic' && indicator.kPeriod && indicator.dPeriod) {
-        // Calculate Stochastic oscillator
-        const stochasticResult = calculateStochastic(
-          candleData.map(candle => ({
-            h: candle.high,
-            l: candle.low,
-            c: candle.close,
-            v: candle.volume,
-            o: candle.open,
-            t: candle.timestamp
-          })), 
-          indicator.kPeriod, 
-          indicator.dPeriod
-        );
-        
-        if (stochasticResult) {
-          alignmentOffset = candleData.length - stochasticResult.percentK.length;
-          labelPeriod = undefined;
-          
-          // %K Line (faster, more sensitive line)
-          if (indicator.showK !== false) {
-            const kLineData = stochasticResult.percentK.map((value, index) => {
-              const candleIndex = index + alignmentOffset;
-              if (candleIndex < 0 || candleIndex >= candleData.length) return null;
-              return { 
-                time: Math.floor(candleData[candleIndex].timestamp / 1000) as Time, 
-                value: parseFloat(value.toFixed(2)) 
-              };
-            }).filter((p): p is LineData => p !== null);
-            
-            if (kLineData.length > 0) {
-              newIndicatorData.push({
-                id: `${indicator.id}-K`,
-                type: 'Stochastic_K',
-                data: kLineData,
-                color: '#1E90FF', // Dodger Blue
-                pane: 1 // Display in separate pane
-              });
-            }
-          }
-          
-          // %D Line (slower, smoother signal line)
-          if (indicator.showD !== false) {
-            const dLineData = stochasticResult.percentD.map((value, index) => {
-              const candleIndex = index + alignmentOffset;
-              if (candleIndex < 0 || candleIndex >= candleData.length) return null;
-              return { 
-                time: Math.floor(candleData[candleIndex].timestamp / 1000) as Time, 
-                value: parseFloat(value.toFixed(2)) 
-              };
-            }).filter((p): p is LineData => p !== null);
-            
-            if (dLineData.length > 0) {
-              newIndicatorData.push({
-                id: `${indicator.id}-D`,
-                type: 'Stochastic_D',
-                data: dLineData,
-                color: '#FF8C00', // Dark Orange
-                pane: 1 // Display in separate pane
-              });
-            }
-          }
+          const parsedIndicators = JSON.parse(savedIndicators);
+          setActiveIndicators(parsedIndicators);
+        } catch (e) {
+          console.error('Failed to parse saved indicators', e);
         }
       }
-      // --- Add logic for other calculations here later --- 
       
-      // Format data if values were calculated
-      if (values.length > 0) {
-         indicatorLineData = values.map((value, index) => {
-            const candleIndex = index + alignmentOffset;
-            if (candleIndex < 0 || candleIndex >= candleData.length) return null; 
-            return {
-              time: Math.floor(candleData[candleIndex].timestamp / 1000) as Time,
-              value: parseFloat(value.toFixed(2))
-            };
-          }).filter((point): point is LineData => point !== null); 
+      // Load positions
+      const savedPositions = localStorage.getItem('aiPositions');
+      if (savedPositions) {
+        try {
+          const parsedPositions = JSON.parse(savedPositions);
+          setLocalPositions(parsedPositions);
+        } catch (e) {
+          console.error('Failed to parse saved positions', e);
+        }
       }
-
-      // Add to array if data exists
-      if (indicatorLineData && indicatorLineData.length > 0) {
-        newIndicatorData.push({
-          id: indicator.id,
-          type: indicator.type,
-          data: indicatorLineData,
-          color: color,
-          period: labelPeriod, // Pass label period
-          pane: indicator.type === 'ATR' ? 1 : undefined // Display ATR in separate pane
-        });
+      
+      // Load manual orders
+      const savedOrders = localStorage.getItem('manualOrders');
+      if (savedOrders) {
+        try {
+          const parsedOrders = JSON.parse(savedOrders);
+          setLocalManualOrders(parsedOrders);
+        } catch (e) {
+          console.error('Failed to parse saved orders', e);
+        }
       }
-    });
-
-    console.log(`[BROKERAGE] Setting ${newIndicatorData.length} indicator data sets.`);
-    setIndicatorChartData(newIndicatorData);
-
-  }, [candleData, activeIndicators]); // Dependencies
-
-  // Close a position (either AI or manual)
-  const handleClosePosition = async (positionId: string) => {
-    console.log(`[Brokerage] Closing position ${positionId}`);
-    
-    // Get position details
-    const position = aiPositions.find(p => p.id === positionId);
-    if (!position) {
-      console.error(`[Brokerage] Position ${positionId} not found`);
-      return;
+      
+      // Load selected symbol
+      const savedSymbol = localStorage.getItem('selectedSymbol');
+      if (savedSymbol) {
+        setSymbol(savedSymbol);
+      }
     }
     
-    try {
-      // Get current market price for the position's symbol
-      const polygonService = PolygonService.getInstance();
-      const currentPrice = await polygonService.getLatestPrice(position.symbol);
-      
-      // Use real market price or a reasonable exit price (realistic)
-      const exitPrice = currentPrice || (position.entryPrice * (1 + (Math.random() * 0.04 - 0.02))); // ±2% if no market price
-      
-      // Calculate profit based on position type (buy/sell) and exit price
-      let profit = 0;
-      if (position.type === 'buy') {
-        // Long position: profit = (exit - entry) * quantity
-        profit = (exitPrice - position.entryPrice) * position.quantity;
-      } else {
-        // Short position: profit = (entry - exit) * quantity
-        profit = (position.entryPrice - exitPrice) * position.quantity;
-      }
-      
-      // Round profit to 2 decimal places
-      profit = Math.round(profit * 100) / 100;
-      
-      console.log(`[Brokerage] Position closing - Entry: $${position.entryPrice.toFixed(2)}, Exit: $${exitPrice.toFixed(2)}, P/L: $${profit.toFixed(2)}`);
-      
-      // Update positions
-      setAiPositions(prev => prev.map(p => 
-        p.id === positionId ? {
-          ...p,
-          exitPrice,
-          closeDate: new Date(),
-          status: 'closed',
-          profit
-        } : p
-      ));
-      
-      // Show confirmation alert instead of toast
-      alert(`Position closed with ${profit >= 0 ? 'profit' : 'loss'} of $${Math.abs(profit).toFixed(2)}`);
-      
-    } catch (error) {
-      console.error(`[Brokerage] Error closing position:`, error);
-      alert('Error closing position. Please try again.');
+    initializeSampleOrders();
+    loadMarketData();
+    verifyApiKey();
+  }, []);
+
+  // Modify the existing functions to include localStorage persistence
+  const addAIPosition = (newPosition: AIPosition) => {
+    const positionWithId = {
+      ...newPosition,
+      id: newPosition.id || `position-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+    };
+    
+    const updatedPositions = [...positions, positionWithId];
+    setLocalPositions(updatedPositions);
+    
+    // Save to localStorage
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('aiPositions', JSON.stringify(updatedPositions));
+    }
+    
+    setSuccessMessage(`Added new ${positionWithId.type} position for ${positionWithId.symbol}`);
+  };
+
+  const updateAIPosition = (positionId: string, updates: Partial<AIPosition>) => {
+    const updatedPositions = positions.map(pos => 
+      pos.id === positionId ? { ...pos, ...updates } : pos
+    );
+    
+    setLocalPositions(updatedPositions);
+    
+    // Save to localStorage
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('aiPositions', JSON.stringify(updatedPositions));
     }
   };
 
-  // Update active indicators
-  const updateActiveIndicators = (indicators: ActiveIndicator[]) => {
+  const handleManualOrder = (order: ManualOrder) => {
+    const orderWithId = {
+      ...order,
+      id: order.id || `order-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      timestamp: order.timestamp || new Date().toISOString()
+    };
+    
+    const updatedOrders = [...manualOrders, orderWithId];
+    setLocalManualOrders(updatedOrders);
+    
+    // Save to localStorage
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('manualOrders', JSON.stringify(updatedOrders));
+    }
+    
+    setSuccessMessage(`${orderWithId.action} order placed for ${orderWithId.symbol}`);
+  };
+
+  const handleClosePosition = (positionId: string) => {
+    const positionToClose = positions.find(pos => pos.id === positionId);
+    
+    if (!positionToClose) {
+      setError(`Position with ID ${positionId} not found`);
+      return;
+    }
+    
+    const profit = positionToClose.type === 'buy' 
+      ? (currentPrice - positionToClose.entryPrice) * positionToClose.quantity
+      : (positionToClose.entryPrice - currentPrice) * positionToClose.quantity;
+    
+    const updatedPositions = positions.map(pos => 
+      pos.id === positionId ? { 
+        ...pos, 
+        status: 'closed',
+        exitPrice: currentPrice,
+        closeDate: new Date().toISOString(),
+        profit
+      } : pos
+    );
+    
+    setLocalPositions(updatedPositions);
+    
+    // Save to localStorage
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('aiPositions', JSON.stringify(updatedPositions));
+    }
+    
+    setSuccessMessage(`Closed ${positionToClose.type} position for ${positionToClose.symbol} with ${profit > 0 ? 'profit' : 'loss'} of $${Math.abs(profit).toFixed(2)}`);
+  };
+
+  const handleIndicatorsChange = (indicators: ActiveIndicator[]) => {
     setActiveIndicators(indicators);
+    
     // Save to localStorage
     if (typeof window !== 'undefined') {
       localStorage.setItem('activeIndicators', JSON.stringify(indicators));
     }
   };
 
-  // Toggle indicator selection
-  const toggleIndicator = (indicatorType: string) => {
-    const updatedIndicators = [...activeIndicators];
-    const index = updatedIndicators.findIndex(ind => ind.type === indicatorType);
+  // Fix the handleSymbolChange function to avoid conflicting variables
+  const handleSymbolChange = async (newSymbol: string) => {
+    console.log(`[BROKERAGE] Symbol changed to ${newSymbol}`);
     
-    if (index === -1) {
-      // Add indicator if it doesn't exist
-      const newId = `${indicatorType}-${Date.now()}`;
-      updatedIndicators.push({ 
-        id: newId,
-        type: indicatorType as any, // Cast to the union type defined in ActiveIndicator
-        isVisible: true, 
-        color: getRandomColor(),
-        period: getDefaultPeriodForIndicator(indicatorType)
-      });
-    } else {
-      // Remove indicator if it exists
-      updatedIndicators.splice(index, 1);
-    }
+    // Update the symbol state
+    setSymbol(newSymbol);
     
-    setActiveIndicators(updatedIndicators);
-    localStorage.setItem('activeIndicators', JSON.stringify(updatedIndicators));
-  };
-
-  const toggleIndicatorVisibility = (indicatorId: string) => {
-    const updatedIndicators = [...activeIndicators];
-    const index = updatedIndicators.findIndex(ind => ind.id === indicatorId);
-    
-    if (index !== -1) {
-      updatedIndicators[index].isVisible = !updatedIndicators[index].isVisible;
-      setActiveIndicators(updatedIndicators);
-      localStorage.setItem('activeIndicators', JSON.stringify(updatedIndicators));
-    }
-  };
-
-  const changeIndicatorColor = (indicatorId: string, color: string) => {
-    const updatedIndicators = [...activeIndicators];
-    const index = updatedIndicators.findIndex(ind => ind.id === indicatorId);
-    
-    if (index !== -1) {
-      updatedIndicators[index].color = color;
-      setActiveIndicators(updatedIndicators);
-      localStorage.setItem('activeIndicators', JSON.stringify(updatedIndicators));
-    }
-  };
-
-  // Helper function to get default period based on indicator type
-  const getDefaultPeriodForIndicator = (indicatorType: string): number => {
-    switch (indicatorType) {
-      case 'SMA':
-      case 'EMA':
-        return 20;
-      case 'RSI':
-        return 14;
-      case 'MACD':
-        return 12; // This is the fast period
-      case 'Stochastic':
-        return 14; // This is the K period
-      case 'ATR':
-        return 14;
-      case 'ADX':
-        return 14;
-      case 'OBV':
-        return 20;
-      case 'AI Trend Prediction':
-        return 50; // Lookback period
-      case 'Neural Oscillator':
-        return 14;
-      case 'Adaptive MA':
-        return 10; // Min period
-      default:
-        return 14;
-    }
-  };
-
-  // Load saved indicator settings from localStorage on page load
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      // Load symbol from localStorage
-      const savedSymbol = localStorage.getItem('selectedSymbol');
-      if (savedSymbol) {
-        setSymbol(savedSymbol);
-      }
+    // Check if position already exists, create a new one if it doesn't
+    const existingPosition = positions.find(p => p.symbol === newSymbol);
+    if (!existingPosition) {
+      const newPosition = {
+        id: `position-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        symbol: newSymbol,
+        type: 'buy' as const,
+        entryPrice: 0,
+        quantity: 0,
+        timestamp: new Date().toISOString(),
+        status: 'open' as const,
+        strategy: 'Manual',
+        confidence: 0
+      };
       
-      // Load active indicators from localStorage
-      const savedIndicators = localStorage.getItem('activeIndicators');
-      if (savedIndicators) {
-        try {
-          const parsedIndicators = JSON.parse(savedIndicators);
-          setActiveIndicators(parsedIndicators);
-        } catch (error) {
-          console.error('Error parsing saved indicators:', error);
-        }
+      const updatedPositions = [...positions, newPosition];
+      setLocalPositions(updatedPositions);
+      
+      // Save to localStorage
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('aiPositions', JSON.stringify(updatedPositions));
       }
     }
-  }, []);
-
-  // Helper function to generate random colors for indicators
-  const getRandomColor = () => {
-    const letters = '0123456789ABCDEF';
-    let color = '#';
-    for (let i = 0; i < 6; i++) {
-      color += letters[Math.floor(Math.random() * 16)];
-    }
-    return color;
-  };
-
-  const getDefaultPeriod = (type: string): number => {
-    switch (type) {
-      case 'SMA':
-      case 'EMA':
-        return 20;
-      case 'RSI':
-        return 14;
-      case 'MACD':
-        return 12; // This is the fast period
-      case 'Stochastic':
-        return 14; // This is the K period
-      case 'ATR':
-        return 14;
-      case 'ADX':
-        return 14;
-      case 'OBV':
-        return 20;
-      case 'AI Trend Prediction':
-        return 50; // Lookback period
-      case 'Neural Oscillator':
-        return 14;
-      case 'Adaptive MA':
-        return 10; // Min period
-      default:
-        return 14;
+    
+    // Load market data for the new symbol
+    await loadMarketData(newSymbol, timeframe, candleInterval);
+    
+    // Reset state related to the previous symbol
+    setIndicatorChartData([]);
+    setCurrentPrice(0);
+    setError(null);
+    
+    // Save to localStorage
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('selectedSymbol', newSymbol);
     }
   };
 
@@ -2140,7 +906,7 @@ export default function BrokeragePage() {
             onClick={() => handleRefreshIntervalChange(60)}
             className={`px-1 text-xs ${refreshInterval === 60 ? 'bg-blue-100 text-blue-700' : 'hover:bg-gray-100'}`}
           >
-            1m
+            60s
           </button>
           <button 
             onClick={() => handleRefreshIntervalChange(300)}
@@ -2158,24 +924,24 @@ export default function BrokeragePage() {
         <div className="lg:col-span-2 flex flex-col gap-4">
           {/* Chart Area */}
           <div className="bg-white dark:bg-zinc-800 rounded-lg shadow p-4">
-            {/* Constrain chart height, e.g., 50% of viewport height */} 
+            {/* Constrain chart height, e.g., 50% of viewport height */}
             <div className="h-[55vh] w-full">
               {isLoading ? (
                 <div className="h-full flex items-center justify-center">
                   <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
                 </div>
-              ) : candleData.length > 0 ? (
-                <TradingChart
-                  symbol={symbol}
-                  data={candleData}
-                  currentPrice={currentPrice}
-                  indicatorData={indicatorChartData}
-                />
-              ) : (
-                <div className="h-full flex items-center justify-center">
-                  <p className="text-gray-500 dark:text-gray-400">No data available</p>
-                </div>
-              )}
+              ) : candleData.length > 0
+                ? <TradingChart
+                    symbol={symbol}
+                    data={candleData}
+                    currentPrice={currentPrice}
+                    indicatorData={indicatorChartData}
+                  />
+                : (
+                  <div className="h-full flex items-center justify-center">
+                    <p className="text-gray-500 dark:text-gray-400">No data available</p>
+                  </div>
+                )}
             </div>
             {/* Portfolio value (Optional display under chart) */}
             <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700 flex-shrink-0">
@@ -2200,37 +966,37 @@ export default function BrokeragePage() {
                     ? 'text-blue-600 border-b-2 border-blue-600 dark:text-blue-400 dark:border-blue-400' 
                     : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
                 }`}
-                onClick={() => setActiveTab('ai')}
+                onClick={() => setLocalActiveTab('ai')}
               >
                 AI
               </button>
               <button
                 className={`px-3 py-2 text-sm font-medium ${
                   activeTab === 'congress' 
-                    ? 'text-blue-600 border-b-2 border-blue-600 dark:text-blue-400 dark:border-blue-400' 
+                    ? 'text-blue-600 border-b-2 border-blue-600 dark:text-blue-400 dark:border-blue-400'
                     : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
                 }`}
-                onClick={() => setActiveTab('congress')}
+                onClick={() => setLocalActiveTab('congress')}
               >
                 Congress
               </button>
               <button
                 className={`px-3 py-2 text-sm font-medium ${
-                  activeTab === 'insiders' 
-                    ? 'text-blue-600 border-b-2 border-blue-600 dark:text-blue-400 dark:border-blue-400' 
+                  activeTab === 'insiders'
+                    ? 'text-blue-600 border-b-2 border-blue-600 dark:text-blue-400 dark:border-blue-400'
                     : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
                 }`}
-                onClick={() => setActiveTab('insiders')}
+                onClick={() => setLocalActiveTab('insiders')}
               >
                 Business Insider
               </button>
               <button
                 className={`px-3 py-2 text-sm font-medium ${
-                  activeTab === 'paper' 
-                    ? 'text-blue-600 border-b-2 border-blue-600 dark:text-blue-400 dark:border-blue-400' 
+                  activeTab === 'paper'
+                    ? 'text-blue-600 border-b-2 border-blue-600 dark:text-blue-400 dark:border-blue-400'
                     : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
                 }`}
-                onClick={() => setActiveTab('paper')}
+                onClick={() => setLocalActiveTab('paper')}
               >
                 Paper Trading
               </button>
@@ -2241,8 +1007,8 @@ export default function BrokeragePage() {
                 <TradingInterface 
                   currentSymbol={symbol}
                   onSymbolChange={handleSymbolChange}
-                  positions={aiPositions}
-                  onNewAIPosition={(newPos) => setAiPositions(prev => [...prev, newPos])}
+                  positions={positions}
+                  onNewAIPosition={(newPos) => addPositionToStore(newPos)}
                   onClosePosition={(posId) => handleClosePosition(posId)}
                 />
               )}
@@ -2261,16 +1027,10 @@ export default function BrokeragePage() {
               {activeTab === 'paper' && (
                 <PaperTradingPanel
                   symbol={symbol}
-                  positions={aiPositions}
-                  onNewPosition={(newPos: AIPosition) => setAiPositions(prev => [...prev, newPos])}
+                  positions={positions}
+                  onNewPosition={(newPos: AIPosition) => addPositionToStore(newPos)}
                   onUpdatePosition={(posId: string, updatedPosition: Partial<AIPosition>) => {
-                    setAiPositions(prev => 
-                      prev.map(p => 
-                        p.id === posId 
-                          ? { ...p, ...updatedPosition }
-                          : p
-                      )
-                    );
+                    updatePositionInStore(posId, updatedPosition);
                   }}
                   onClosePosition={(posId: string) => handleClosePosition(posId)}
                 />
@@ -2300,19 +1060,40 @@ export default function BrokeragePage() {
           <div className="bg-white dark:bg-zinc-800 rounded-lg shadow p-4 flex-grow flex flex-col min-h-0">
             <h3 className="text-lg font-semibold mb-3 flex-shrink-0">Trade History</h3>
             <div className="flex-grow overflow-auto">
-              <TradeHistory orders={manualOrders.filter(order => order.status === 'filled')} />
+              <TradeHistory
+                orders={manualOrders.filter(order => order.status === 'filled')}
+              />
             </div>
           </div>
         </div>
       </div>
-
-      {/* Modal */}
-      <IndicatorModal 
-        isOpen={showIndicatorModal} 
-        onClose={() => setShowIndicatorModal(false)} 
-        currentIndicators={activeIndicators} 
-        onChange={handleIndicatorsChange} 
-      />
+      
+      {/* Indicator settings modal */}
+      {typeof window !== 'undefined' && (
+        <IndicatorModal
+          isOpen={showIndicatorModal}
+          onClose={() => setShowIndicatorModal(false)}
+          activeIndicators={activeIndicators}
+          onIndicatorsChange={handleIndicatorsChange}
+        />
+      )}
+      
+      {/* Success message toast - Simple implementation */}
+      {successMessage && (
+        <div className="fixed bottom-4 right-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-md shadow-md max-w-md z-50">
+          <div className="flex justify-between items-center">
+            <div className="mr-4">{successMessage}</div>
+            <button 
+              onClick={() => setSuccessMessage('')}
+              className="text-green-700 hover:text-green-900"
+            >
+              <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

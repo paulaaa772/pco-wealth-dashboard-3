@@ -1,29 +1,14 @@
 import React, { useState, useEffect } from 'react';
+import { AIPosition } from '@/lib/trading-engine/types';
 
-interface AIPosition {
-  id: string;
-  symbol: string;
-  entryPrice: number;
-  quantity: number;
-  entryTime: number;
-  exitPrice?: number;
-  exitTime?: number;
-  status: 'open' | 'closed';
-  pnl?: number;
-  pnlPercent?: number;
-  strategy: string;
-  stopLoss?: number;
-  takeProfit?: number;
-}
+const strategies = [
+  'Momentum', 'Mean Reversion', 'Trend Following', 'Breakout', 'Sentiment Analysis'
+];
 
 interface AITradingPanelProps {
   symbol: string;
   positions: AIPosition[];
 }
-
-const strategies = [
-  'Momentum', 'Mean Reversion', 'Trend Following', 'Breakout', 'Sentiment Analysis'
-];
 
 const AITradingPanel: React.FC<AITradingPanelProps> = ({ symbol, positions }) => {
   const [isEnabled, setIsEnabled] = useState(false);

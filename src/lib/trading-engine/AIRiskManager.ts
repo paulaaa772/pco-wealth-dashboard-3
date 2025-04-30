@@ -2,7 +2,7 @@
 
 // AIRiskManager.ts - Advanced risk management system for AI trading
 
-import { AIPosition } from '@/app/brokerage/page';
+import { AIPosition } from '@/lib/trading-engine/types';
 import { PolygonCandle } from '../market-data/PolygonService';
 
 export interface KellyParams {

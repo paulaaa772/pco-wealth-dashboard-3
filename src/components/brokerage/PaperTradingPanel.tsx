@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react';
-import { AIPosition } from '@/app/brokerage/page';
+import { AIPosition } from '@/lib/trading-engine/types';
 import { AITradingEngine, TradeSignal } from '@/lib/trading-engine/AITradingEngine';
 import { TradingMode } from '@/lib/trading-engine/TradingMode';
 import { AIRiskManager, TradeStats } from '@/lib/trading-engine/AIRiskManager';
