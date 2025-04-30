@@ -12,6 +12,8 @@ interface AIPosition {
   pnl?: number;
   pnlPercent?: number;
   strategy: string;
+  stopLoss?: number;
+  takeProfit?: number;
 }
 
 interface AITradingPanelProps {
