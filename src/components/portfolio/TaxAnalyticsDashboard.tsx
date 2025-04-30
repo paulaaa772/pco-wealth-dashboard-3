@@ -20,6 +20,7 @@ import {
   Area
 } from 'recharts';
 import { format, addDays, addMonths, addYears, subYears, parseISO, isValid } from 'date-fns';
+import TaxPlanner from './tax/TaxPlanner';
 
 // Define interfaces for our tax-related data
 interface TaxLot {
@@ -160,7 +161,7 @@ const generateTaxCategoryData = (): TaxCategory[] => {
 export default function TaxAnalyticsDashboard() {
   const { manualAccounts, isLoading } = useManualAccounts();
   const [taxLots, setTaxLots] = useState<TaxLot[]>(generateSampleTaxLots());
-  const [activeTab, setActiveTab] = useState<'harvesting' | 'gains' | 'optimization'>('harvesting');
+  const [activeTab, setActiveTab] = useState<'harvesting' | 'gains' | 'optimization' | 'tax-planner'>('harvesting');
   const [taxYear, setTaxYear] = useState<string>(new Date().getFullYear().toString());
   
   // Calculate total portfolio value from accounts
@@ -266,39 +267,52 @@ export default function TaxAnalyticsDashboard() {
             >
               Tax Optimization
             </button>
+            <button
+              onClick={() => setActiveTab('tax-planner')}
+              className={`${tabStyles.base} ${activeTab === 'tax-planner' ? tabStyles.active : tabStyles.inactive}`}
+            >
+              Tax Planner
+            </button>
           </div>
         </div>
         
-        {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="bg-[#2A3C61] rounded-lg p-4">
-            <h4 className="text-sm font-medium text-gray-400 mb-1">Potential Tax Savings</h4>
-            <p className="text-2xl font-semibold text-white">
-              ${totalPotentialSavings.toLocaleString(undefined, { maximumFractionDigits: 0 })}
-            </p>
+        {/* Summary Cards - show on all tabs except tax planner */}
+        {activeTab !== 'tax-planner' && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="bg-[#2A3C61] rounded-lg p-4">
+              <h4 className="text-sm font-medium text-gray-400 mb-1">Potential Tax Savings</h4>
+              <p className="text-2xl font-semibold text-white">
+                ${totalPotentialSavings.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+              </p>
+            </div>
+            
+            <div className="bg-[#2A3C61] rounded-lg p-4">
+              <h4 className="text-sm font-medium text-gray-400 mb-1">Unrealized Gains</h4>
+              <p className={`text-2xl font-semibold ${totalUnrealizedGains >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                ${totalUnrealizedGains.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+              </p>
+            </div>
+            
+            <div className="bg-[#2A3C61] rounded-lg p-4">
+              <h4 className="text-sm font-medium text-gray-400 mb-1">Realized Gains (YTD)</h4>
+              <p className={`text-2xl font-semibold ${totalRealizedGains >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                ${totalRealizedGains.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+              </p>
+            </div>
+            
+            <div className="bg-[#2A3C61] rounded-lg p-4">
+              <h4 className="text-sm font-medium text-gray-400 mb-1">Estimated Tax (YTD)</h4>
+              <p className="text-2xl font-semibold text-white">
+                ${estimatedTax.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+              </p>
+            </div>
           </div>
-          
-          <div className="bg-[#2A3C61] rounded-lg p-4">
-            <h4 className="text-sm font-medium text-gray-400 mb-1">Unrealized Gains</h4>
-            <p className={`text-2xl font-semibold ${totalUnrealizedGains >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-              ${totalUnrealizedGains.toLocaleString(undefined, { maximumFractionDigits: 0 })}
-            </p>
-          </div>
-          
-          <div className="bg-[#2A3C61] rounded-lg p-4">
-            <h4 className="text-sm font-medium text-gray-400 mb-1">Realized Gains (YTD)</h4>
-            <p className={`text-2xl font-semibold ${totalRealizedGains >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-              ${totalRealizedGains.toLocaleString(undefined, { maximumFractionDigits: 0 })}
-            </p>
-          </div>
-          
-          <div className="bg-[#2A3C61] rounded-lg p-4">
-            <h4 className="text-sm font-medium text-gray-400 mb-1">Estimated Tax (YTD)</h4>
-            <p className="text-2xl font-semibold text-white">
-              ${estimatedTax.toLocaleString(undefined, { maximumFractionDigits: 0 })}
-            </p>
-          </div>
-        </div>
+        )}
+        
+        {/* Tax Planner Tab */}
+        {activeTab === 'tax-planner' && (
+          <TaxPlanner />
+        )}
         
         {/* Tax-Loss Harvesting Tab */}
         {activeTab === 'harvesting' && (
