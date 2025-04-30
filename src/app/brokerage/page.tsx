@@ -350,7 +350,14 @@ export interface IndicatorData {
 
 export default function BrokeragePage() {
   // State for stock data
-  const [symbol, setSymbol] = useState('AAPL');
+  const [symbol, setSymbol] = useState(() => {
+    // Use localStorage value if available, otherwise default to 'AAPL'
+    if (typeof window !== 'undefined') {
+      const savedSymbol = localStorage.getItem('selectedSymbol');
+      return savedSymbol || 'AAPL';
+    }
+    return 'AAPL';
+  });
   const [timeframe, setTimeframe] = useState('1D');
   const [candleInterval, setCandleInterval] = useState('day'); // State for candle interval (day, minute, etc.)
   const [candleData, setCandleData] = useState<CandleData[]>([]);
