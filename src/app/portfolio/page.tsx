@@ -16,6 +16,7 @@ import EnhancedPerformanceAnalytics from '@/components/portfolio/EnhancedPerform
 import GoalTrackingDashboard from '@/components/portfolio/GoalTrackingDashboard';
 import TaxAnalyticsDashboard from '@/components/portfolio/TaxAnalyticsDashboard';
 import PortfolioOptimizationTools from '@/components/portfolio/PortfolioOptimizationTools';
+import ESGSustainabilityMetrics from '@/components/portfolio/ESGSustainabilityMetrics';
 
 export default function PortfolioPage() {
   const { manualAccounts, isLoading: isLoadingAccounts, error: accountsError } = useManualAccounts();
@@ -106,6 +107,12 @@ export default function PortfolioPage() {
               Optimization
             </button>
             <button 
+              className={activeTab === 'esg' ? activeTabStyle : inactiveTabStyle}
+              onClick={() => setActiveTab('esg')}
+            >
+              ESG
+            </button>
+            <button 
               className={activeTab === 'income' ? activeTabStyle : inactiveTabStyle}
               onClick={() => setActiveTab('income')}
             >
@@ -129,6 +136,9 @@ export default function PortfolioPage() {
         
         {/* Optimization Tab */}
         {activeTab === 'optimization' && <PortfolioOptimizationTools />}
+        
+        {/* ESG Tab */}
+        {activeTab === 'esg' && <ESGSustainabilityMetrics />}
         
         {/* Income Analysis Tab */}
         {activeTab === 'income' && <IncomeAnalysis />}
