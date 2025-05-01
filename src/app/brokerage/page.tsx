@@ -971,6 +971,8 @@ export default function BrokeragePage() {
 
   // Modify the existing functions to include localStorage persistence
   const addAIPosition = (newPosition: AIPosition) => {
+    console.log('[BrokeragePage:addAIPosition] Received Position Object:', JSON.stringify(newPosition));
+    
     const positionWithId = {
       ...newPosition,
       id: newPosition.id || `position-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
@@ -978,6 +980,8 @@ export default function BrokeragePage() {
     
     const updatedPositions = [...positions, positionWithId];
     setLocalPositions(updatedPositions);
+    
+    addPositionToStore(positionWithId);
     
     // Save to localStorage
     if (typeof window !== 'undefined') {
@@ -1059,49 +1063,30 @@ export default function BrokeragePage() {
     }
   };
 
-  // Fix the handleSymbolChange function to avoid conflicting variables
+  // Revisit the handleSymbolChange function
   const handleSymbolChange = async (newSymbol: string) => {
-    console.log(`[BROKERAGE] Symbol changed to ${newSymbol}`);
+    console.log(`[BROKERAGE] Symbol changed to: ${newSymbol}`);
     
-    // Update the symbol state
-    setSymbol(newSymbol);
+    // Update the main symbol state
+    setLocalSymbol(newSymbol); // Update local state first
+    setSymbol(newSymbol); // Update persistent store
     
-    // Check if position already exists, create a new one if it doesn't
-    const existingPosition = positions.find(p => p.symbol === newSymbol);
-    if (!existingPosition) {
-      const newPosition = {
-        id: `position-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        symbol: newSymbol,
-        type: 'buy' as const,
-        entryPrice: 0,
-        quantity: 0,
-        timestamp: new Date().toISOString(),
-        status: 'open' as const,
-        strategy: 'Manual',
-        confidence: 0
-      };
-      
-      const updatedPositions = [...positions, newPosition];
-      setLocalPositions(updatedPositions);
-      
-      // Save to localStorage
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('aiPositions', JSON.stringify(updatedPositions));
-      }
-    }
+    // No need to add a default position here, that should be handled by trading logic
     
-    // Load market data for the new symbol
+    // Immediately trigger data loading for the new symbol
+    console.log(`[BROKERAGE] Triggering loadMarketData for new symbol: ${newSymbol}`);
     await loadMarketData(newSymbol, timeframe, candleInterval);
     
-    // Reset state related to the previous symbol
+    // Reset relevant state for the new symbol
     setIndicatorChartData([]);
     setCurrentPrice(0);
-    setError(null);
+    setError(null); // Clear previous errors
     
-    // Save to localStorage
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('selectedSymbol', newSymbol);
-    }
+    // Save the newly selected symbol to localStorage via persistent store
+    // This is handled by the setSymbol call above
+    // if (typeof window !== 'undefined') {
+    //   localStorage.setItem('selectedSymbol', newSymbol);
+    // }
   };
 
   return (

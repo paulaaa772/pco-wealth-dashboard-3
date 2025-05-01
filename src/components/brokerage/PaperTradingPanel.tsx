@@ -345,6 +345,11 @@ export default function PaperTradingPanel({
         strategy: signal.strategy // Add strategy from signal
       };
       
+      // *** ADD LOGGING HERE ***
+      console.log('[PaperTradingPanel:executeSignal] Created Position Object:', JSON.stringify(newPosition));
+      addStatusMessage(`[Debug] Created position: ${newPosition.type.toUpperCase()} ${newPosition.symbol} `);
+      // *** END LOGGING ***
+      
       // Add position
       onNewPosition(newPosition);
       
@@ -480,7 +485,10 @@ export default function PaperTradingPanel({
       strategy: result.reason, // Use the reason as the strategy description
     };
     
-    addStatusMessage(`Constructed signal: ${signalToExecute.direction.toUpperCase()} ${signalToExecute.symbol} @ ${signalToExecute.price.toFixed(2)} based on scan.`);
+    // *** ADD LOGGING HERE ***
+    console.log('[PaperTradingPanel:handleExecuteScanResult] Constructed Signal:', JSON.stringify(signalToExecute));
+    addStatusMessage(`[Debug] Constructed signal: ${signalToExecute.direction.toUpperCase()} ${signalToExecute.symbol}`);
+    // *** END LOGGING ***
     
     // Call the main executeSignal function
     executeSignal(signalToExecute);

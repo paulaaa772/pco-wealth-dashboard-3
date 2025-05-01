@@ -73,10 +73,12 @@ export const usePersistentStore = create<AppState>()(
           )
         })),
         
-      addAIPosition: (position) =>
+      addAIPosition: (position) => {
+        console.log('[usePersistentStore:addAIPosition] Received Position Object:', JSON.stringify(position));
         set((state) => ({
           aiPositions: [...state.aiPositions, position]
-        })),
+        }));
+      },
         
       updateAIPosition: (id, updates) =>
         set((state) => ({
